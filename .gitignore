@@ -1,0 +1,35 @@
+*.iml
+.DS_Store
+
+# Local IDE state
+/.idea/
+/.claude/
+/.kotlin/
+
+# Gradle and Android build output
+.gradle/
+**/build/
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local machine configuration
+local.properties
+/local.properties
+
+# Signing material and release secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+release-signing.properties
+
+# Generated release artifacts
+*.apk
+*.apks
+*.aab
+output-metadata.json
+
+# Local debug output
+nexnote-debug-log.txt

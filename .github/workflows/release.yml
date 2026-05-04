@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build signed release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build unsigned release APK
+        run: ./gradlew --no-daemon clean assembleRelease
+
+      - name: Decode signing keystore
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_FILE }}" ]; then
+            echo "Missing KEYSTORE_FILE secret"
+            exit 1
+          fi
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 --decode > release.keystore
+
+      - name: Sign APK
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          aligned_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}-aligned.apk"
+          signed_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}.apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+
+          test -f "$unsigned_apk"
+          "$build_tools/zipalign" -p -f 4 "$unsigned_apk" "$aligned_apk"
+          "$build_tools/apksigner" sign \
+            --ks release.keystore \
+            --ks-pass "pass:${KEYSTORE_PASSWORD}" \
+            --ks-key-alias "${KEY_ALIAS}" \
+            --key-pass "pass:${KEY_PASSWORD}" \
+            --out "$signed_apk" \
+            "$aligned_apk"
+          "$build_tools/apksigner" verify --verbose "$signed_apk"
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          signed_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}.apk"
+          gh release create "$GITHUB_REF_NAME" "$signed_apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "NexNote ${GITHUB_REF_NAME}" \
+            --notes-file CHANGELOG.md \
+            --verify-tag

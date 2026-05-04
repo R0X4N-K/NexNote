@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temporary export files in cache; no storage permission required (minSdk 29+). -->
+    <cache-path name="exports" path="exports/" />
+    <!-- Images copied into the internal directory (M9.1). -->
+    <files-path name="images" path="images/" />
+</paths>

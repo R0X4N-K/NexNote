@@ -1,0 +1,21 @@
+NexNote is a local-first note-taking app for Android.
+
+It is built for fast personal notes without accounts, analytics, advertising, or proprietary runtime services.
+
+Features:
+
+* Write and edit notes with Markdown-oriented tools.
+* Organize notes with tags and search.
+* Browse notes by date in the agenda view.
+* Create and reuse templates.
+* Move deleted notes to trash before permanent deletion.
+* Export notes and share generated files through Android's system share flow.
+* Customize theme, accent color, font scale, timezone, and left-handed layout preference.
+
+Privacy:
+
+* Notes are stored locally on the device.
+* No account is required.
+* No Firebase, Google Play Services, analytics, ads, or remote backend are included.
+
+NexNote is free software licensed under GPL-3.0-only.

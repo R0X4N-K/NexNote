@@ -1,0 +1,7 @@
+# Copy this file to release-signing.properties for local release signing.
+# Never commit release-signing.properties or the keystore.
+
+storeFile=/absolute/path/to/release.keystore
+storePassword=change-me
+keyAlias=nexnote
+keyPassword=change-me

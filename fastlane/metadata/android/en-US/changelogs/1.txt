@@ -1,0 +1,1 @@
+Initial private GitHub-ready release setup with Compose UI, local Room storage, tags, templates, agenda, export flow, F-Droid metadata, GPL-3.0-only license, and CI/release workflows.

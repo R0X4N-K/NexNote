@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security reports
+    url: https://github.com/R0X4N-K/NexNote/security
+    about: Please report vulnerabilities privately when private reporting is enabled.
