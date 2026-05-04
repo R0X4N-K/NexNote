@@ -22,7 +22,7 @@ The project is prepared as a single-module Android repository for solo developme
 - Debug application id: `io.github.r0x4nk.nexnote.debug`
 - Current version: `1.0.0` / versionCode `1`
 
-The Kotlin namespace is still `com.example.nexnote`. The release application id is already stable and F-Droid friendly; a source package rename can be done later only if needed.
+The Kotlin namespace and release application id are both `io.github.r0x4nk.nexnote`, with the debug variant using `io.github.r0x4nk.nexnote.debug`.
 
 ## Project Shape
 

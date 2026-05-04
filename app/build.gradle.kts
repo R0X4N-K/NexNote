@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.nexnote"
+    namespace = "io.github.r0x4nk.nexnote"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -42,7 +42,12 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -51,7 +56,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
 
-    // Compose BOM — gestisce le versioni di tutte le librerie Compose
+    // Compose BOM controls versions for all Compose libraries.
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

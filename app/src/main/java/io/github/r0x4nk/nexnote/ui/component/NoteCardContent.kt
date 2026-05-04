@@ -1,0 +1,207 @@
+package io.github.r0x4nk.nexnote.ui.component
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
+
+private data class NoteCardVisuals(
+    val primaryColor: Color,
+    val containerColor: Color,
+    val cardElevation: Dp,
+    val accentAlpha: Float
+)
+
+private data class NoteCardTextState(
+    val title: AnnotatedString,
+    val content: AnnotatedString
+)
+
+@Composable
+internal fun NoteCardContent(
+    note: Note,
+    onClick: () -> Unit,
+    onPin: () -> Unit,
+    noteCardStyle: NoteCardStyle,
+    titleHighlightRanges: List<IntRange>,
+    contentHighlightRanges: List<IntRange>
+) {
+    val visuals = rememberNoteCardVisuals(note)
+    val textState = rememberNoteCardTextState(
+        note = note,
+        titleHighlightRanges = titleHighlightRanges,
+        contentHighlightRanges = contentHighlightRanges,
+        primaryColor = visuals.primaryColor
+    )
+
+    NoteCardSurface(
+        note = note,
+        onClick = onClick,
+        onPin = onPin,
+        noteCardStyle = noteCardStyle,
+        visuals = visuals,
+        textState = textState
+    )
+}
+
+@Composable
+private fun rememberNoteCardVisuals(note: Note): NoteCardVisuals {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val isDark = remember(surfaceColor) { surfaceColor.luminance() < 0.5f }
+
+    return NoteCardVisuals(
+        primaryColor = primaryColor,
+        containerColor = note.backgroundColor?.let { adaptNoteColor(it, isDark) }
+            ?: MaterialTheme.colorScheme.surfaceVariant,
+        cardElevation = if (note.isPinned) 3.dp else 1.dp,
+        accentAlpha = if (note.isPinned) 0.80f else 0.18f
+    )
+}
+
+@Composable
+private fun rememberNoteCardTextState(
+    note: Note,
+    titleHighlightRanges: List<IntRange>,
+    contentHighlightRanges: List<IntRange>,
+    primaryColor: Color
+): NoteCardTextState {
+    val displayTitle = remember(note.title, note.content) {
+        note.title.ifBlank {
+            note.content.lines().firstOrNull { it.isNotBlank() }?.take(80) ?: "Untitled note"
+        }
+    }
+    val effectiveRanges = if (note.title.isNotBlank()) titleHighlightRanges else emptyList()
+    val titleAnnotated = remember(displayTitle, effectiveRanges, primaryColor) {
+        buildNoteCardHighlightedText(displayTitle, effectiveRanges, primaryColor)
+    }
+
+    val previewText = remember(note.id, note.content) { note.content.take(160) }
+    val clampedContentRanges = remember(contentHighlightRanges, previewText.length) {
+        contentHighlightRanges.mapNotNull { range ->
+            val safeStart = range.first.coerceIn(0, previewText.length)
+            val safeEnd = (range.last + 1).coerceIn(safeStart, previewText.length)
+            if (safeStart < safeEnd) safeStart..<safeEnd else null
+        }
+    }
+    val contentAnnotated = remember(previewText, clampedContentRanges, primaryColor) {
+        buildNoteCardHighlightedText(previewText, clampedContentRanges, primaryColor)
+    }
+
+    return NoteCardTextState(title = titleAnnotated, content = contentAnnotated)
+}
+
+@Composable
+private fun NoteCardSurface(
+    note: Note,
+    onClick: () -> Unit,
+    onPin: () -> Unit,
+    noteCardStyle: NoteCardStyle,
+    visuals: NoteCardVisuals,
+    textState: NoteCardTextState
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onPin),
+        elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
+        colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        NoteCardBody(
+            note = note,
+            onPin = onPin,
+            noteCardStyle = noteCardStyle,
+            visuals = visuals,
+            textState = textState
+        )
+    }
+}
+
+@Composable
+private fun NoteCardBody(
+    note: Note,
+    onPin: () -> Unit,
+    noteCardStyle: NoteCardStyle,
+    visuals: NoteCardVisuals,
+    textState: NoteCardTextState
+) {
+    val verticalPadding = if (noteCardStyle == NoteCardStyle.TITLE_ONLY) 10.dp else 12.dp
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+    ) {
+        NoteCardAccentStrip(visuals.primaryColor, visuals.accentAlpha)
+        NoteCardMainColumn(
+            note = note,
+            onPin = onPin,
+            noteCardStyle = noteCardStyle,
+            visuals = visuals,
+            textState = textState,
+            verticalPadding = verticalPadding,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun NoteCardAccentStrip(primaryColor: Color, accentAlpha: Float) {
+    Box(
+        modifier = Modifier
+            .width(3.dp)
+            .fillMaxHeight()
+            .background(primaryColor.copy(alpha = accentAlpha))
+    )
+}
+
+@Composable
+private fun NoteCardMainColumn(
+    note: Note,
+    onPin: () -> Unit,
+    noteCardStyle: NoteCardStyle,
+    visuals: NoteCardVisuals,
+    textState: NoteCardTextState,
+    verticalPadding: Dp,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(
+            start = 13.dp,
+            end = 16.dp,
+            top = verticalPadding,
+            bottom = verticalPadding
+        )
+    ) {
+        NoteCardTitleRow(textState.title, note.isPinned, visuals.primaryColor, onPin)
+        if (showsContentPreview(note, noteCardStyle)) {
+            Spacer(Modifier.height(4.dp))
+            NoteCardPreview(textState.content)
+        }
+        Spacer(Modifier.height(if (noteCardStyle == NoteCardStyle.TITLE_ONLY) 4.dp else 8.dp))
+        NoteCardFooter(note, noteCardStyle, visuals.primaryColor)
+    }
+}
