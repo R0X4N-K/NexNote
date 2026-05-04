@@ -12,7 +12,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.NexNote">
-        <!-- FileProvider per condividere file esportati senza permessi WRITE_EXTERNAL_STORAGE -->
+        <!-- FileProvider to share exported files without WRITE_EXTERNAL_STORAGE permissions -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

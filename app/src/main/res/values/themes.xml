@@ -2,7 +2,7 @@
 <resources>
 
     <style name="Theme.NexNote" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Abilita il disegno dietro le barre di sistema (richiesto da enableEdgeToEdge) -->
+        <!-- Enables drawing behind system bars (required by enableEdgeToEdge) -->
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
