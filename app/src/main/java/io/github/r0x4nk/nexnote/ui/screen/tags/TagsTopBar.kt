@@ -5,13 +5,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,17 +23,25 @@ internal fun TagsTopBar(
     actions: TagsActions
 ) {
     TopAppBar(
-        title = { Text("Tags") },
+        title = {
+            Text(
+                text = "Tags",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
         actions = {
             if (!isSearchActive) {
-                IconButton(onClick = actions.onSearchOpen) {
-                    Icon(Icons.Default.Search, contentDescription = "Search tags")
-                }
+                NexIconButton(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search tags",
+                    onClick = actions.onSearchOpen
+                )
             }
             Box {
-                IconButton(onClick = actions.onSortMenuOpen) {
-                    TagsSortIcon(uiState.sortOrder)
-                }
+                TagsSortButton(
+                    sortOrder = uiState.sortOrder,
+                    onClick = actions.onSortMenuOpen
+                )
                 SortDropdownMenu(
                     expanded = showSortMenu,
                     current = uiState.sortOrder,
@@ -42,19 +50,17 @@ internal fun TagsTopBar(
                 )
             }
         },
+        colors = nexTopAppBarColors(),
         scrollBehavior = scrollBehavior
     )
 }
 
 @Composable
-private fun TagsSortIcon(sortOrder: TagSortOrder) {
-    Icon(
+private fun TagsSortButton(sortOrder: TagSortOrder, onClick: () -> Unit) {
+    NexIconButton(
         imageVector = Icons.Default.Tag,
         contentDescription = "Sort tags",
-        tint = if (sortOrder != TagSortOrder.USAGE_DESC) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        }
+        onClick = onClick,
+        selected = sortOrder != TagSortOrder.USAGE_DESC
     )
 }

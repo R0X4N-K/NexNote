@@ -1,16 +1,11 @@
 package io.github.r0x4nk.nexnote.ui.screen.export
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import io.github.r0x4nk.nexnote.ui.component.NexSectionLabel
 
 @Composable
 internal fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary
-    )
+    NexSectionLabel(text = text)
 }
 
 internal val ExportScope.label: String

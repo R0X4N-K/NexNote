@@ -20,23 +20,23 @@ import androidx.compose.ui.unit.dp
 /**
  * Reusable pill chip displaying a tag name with the '#' prefix.
  *
- * Role: UI component layer — stateless, theme-aware, reused across Home,
+ * Role: UI component layer - stateless, theme-aware, reused across Home,
  * Agenda, Editor, and Tags screens.
  *
  * Visual states:
- * - Default: [surfaceVariant] background, [onSurfaceVariant] text.
+ * - Default: elevated surface-container background, [onSurfaceVariant] text.
  * - Selected: [primaryContainer] background, [onPrimaryContainer] text.
  *
  * Variants:
  * - Standard: clickable pill with ripple.
- * - Dismissible: shows a small '×' icon that calls [onDismiss] independently
+ * - Dismissible: shows a close icon that calls [onDismiss] independently
  *   from the chip body click. Used in [TagFilterBar] for active filters.
  *
  * @param tagName    Lowercase tag name without the leading '#'.
  * @param onClick    Called when the chip body is tapped.
  * @param isSelected Whether the chip should render in its selected state.
- * @param dismissible Whether to show the dismiss '×' icon.
- * @param onDismiss  Called when the '×' icon is tapped (only relevant when
+ * @param dismissible Whether to show the dismiss icon.
+ * @param onDismiss  Called when the dismiss icon is tapped (only relevant when
  *                   [dismissible] is true).
  */
 @Composable
@@ -51,7 +51,7 @@ fun TagChip(
     val containerColor = if (isSelected)
         MaterialTheme.colorScheme.primaryContainer
     else
-        MaterialTheme.colorScheme.surfaceVariant
+        MaterialTheme.colorScheme.surfaceContainerHighest
 
     val contentColor = if (isSelected)
         MaterialTheme.colorScheme.onPrimaryContainer
@@ -61,17 +61,17 @@ fun TagChip(
     Surface(
         onClick      = onClick,
         modifier     = modifier,
-        shape        = MaterialTheme.shapes.small,
+        shape        = MaterialTheme.shapes.extraLarge,
         color        = containerColor,
         contentColor = contentColor,
-        tonalElevation = if (isSelected) 2.dp else 0.dp
+        tonalElevation = if (isSelected) 2.dp else 1.dp
     ) {
         Row(
             modifier              = Modifier.padding(
-                start  = 10.dp,
-                end    = if (dismissible) 6.dp else 10.dp,
-                top    = 6.dp,
-                bottom = 6.dp
+                start = 12.dp,
+                end = if (dismissible) 7.dp else 12.dp,
+                top = 7.dp,
+                bottom = 7.dp
             ),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)

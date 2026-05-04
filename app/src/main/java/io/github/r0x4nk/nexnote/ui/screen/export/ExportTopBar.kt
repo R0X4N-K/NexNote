@@ -3,21 +3,30 @@ package io.github.r0x4nk.nexnote.ui.screen.export
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExportTopBar(onBack: () -> Unit) {
     TopAppBar(
-        title = { Text("Export") },
+        title = {
+            Text(
+                text = "Export",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
         navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-        }
+            NexIconButton(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack
+            )
+        },
+        colors = nexTopAppBarColors()
     )
 }

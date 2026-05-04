@@ -15,37 +15,79 @@ import androidx.compose.ui.unit.sp
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 
 private val LightColorScheme = lightColorScheme(
-    primary              = NexPrimary,
-    onPrimary            = NexOnPrimary,
-    primaryContainer     = NexPrimaryContainer,
-    onPrimaryContainer   = NexOnPrimaryContainer,
-    secondary            = NexSecondary,
-    background           = NexBackground,
-    surface              = NexSurface,
-    onSurface            = NexOnSurface,
-    surfaceVariant       = NexSurfaceVariant,
-    outline              = NexOutline,
-    error                = NexError
+    primary = NexPrimary,
+    onPrimary = NexOnPrimary,
+    primaryContainer = NexPrimaryContainer,
+    onPrimaryContainer = NexOnPrimaryContainer,
+    secondary = NexSecondary,
+    onSecondary = NexOnSecondary,
+    secondaryContainer = NexSecondaryContainer,
+    onSecondaryContainer = NexOnSecondaryContainer,
+    tertiary = NexTertiary,
+    onTertiary = NexOnTertiary,
+    tertiaryContainer = NexTertiaryContainer,
+    onTertiaryContainer = NexOnTertiaryContainer,
+    background = NexBackground,
+    onBackground = NexOnSurface,
+    surface = NexSurface,
+    onSurface = NexOnSurface,
+    surfaceVariant = NexSurfaceVariant,
+    onSurfaceVariant = NexOnSurfaceVariant,
+    surfaceContainerLowest = NexSurfaceContainerLowest,
+    surfaceContainerLow = NexSurfaceContainerLow,
+    surfaceContainer = NexSurfaceContainer,
+    surfaceContainerHigh = NexSurfaceContainerHigh,
+    surfaceContainerHighest = NexSurfaceContainerHighest,
+    surfaceDim = NexSurfaceDim,
+    surfaceBright = NexSurfaceBright,
+    inverseSurface = NexInverseSurface,
+    inverseOnSurface = NexInverseOnSurface,
+    inversePrimary = NexInversePrimary,
+    outline = NexOutline,
+    outlineVariant = NexOutlineVariant,
+    error = NexError,
+    onError = NexOnError,
+    errorContainer = NexErrorContainer,
+    onErrorContainer = NexOnErrorContainer,
+    surfaceTint = NexPrimary
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary                    = NexPrimaryDark,
-    onPrimary                  = NexOnPrimaryDark,
-    primaryContainer           = NexPrimaryContainerDark,
-    onPrimaryContainer         = NexOnPrimaryContainerDark,
-    secondary                  = NexSecondaryDark,
-    background                 = NexBackgroundDark,
-    surface                    = NexSurfaceDark,
-    onSurface                  = NexOnSurfaceDark,
-    onSurfaceVariant           = NexOnSurfaceVariantDark,
-    surfaceVariant             = NexSurfaceVariantDark,
-    surfaceContainerLowest     = NexSurfaceContainerLowestDark,
-    surfaceContainerLow        = NexSurfaceContainerLowDark,
-    surfaceContainer           = NexSurfaceContainerDark,
-    surfaceContainerHigh       = NexSurfaceContainerHighDark,
-    surfaceContainerHighest    = NexSurfaceContainerHighestDark,
-    outline                    = NexOutlineDark,
-    error                      = NexErrorDark
+    primary = NexPrimaryDark,
+    onPrimary = NexOnPrimaryDark,
+    primaryContainer = NexPrimaryContainerDark,
+    onPrimaryContainer = NexOnPrimaryContainerDark,
+    secondary = NexSecondaryDark,
+    onSecondary = NexOnSecondaryDark,
+    secondaryContainer = NexSecondaryContainerDark,
+    onSecondaryContainer = NexOnSecondaryContainerDark,
+    tertiary = NexTertiaryDark,
+    onTertiary = NexOnTertiaryDark,
+    tertiaryContainer = NexTertiaryContainerDark,
+    onTertiaryContainer = NexOnTertiaryContainerDark,
+    background = NexBackgroundDark,
+    onBackground = NexOnSurfaceDark,
+    surface = NexSurfaceDark,
+    onSurface = NexOnSurfaceDark,
+    onSurfaceVariant = NexOnSurfaceVariantDark,
+    surfaceVariant = NexSurfaceVariantDark,
+    surfaceContainerLowest = NexSurfaceContainerLowestDark,
+    surfaceContainerLow = NexSurfaceContainerLowDark,
+    surfaceContainer = NexSurfaceContainerDark,
+    surfaceContainerHigh = NexSurfaceContainerHighDark,
+    surfaceContainerHighest = NexSurfaceContainerHighestDark,
+    surfaceDim = NexSurfaceDimDark,
+    surfaceBright = NexSurfaceBrightDark,
+    inverseSurface = NexInverseSurfaceDark,
+    inverseOnSurface = NexInverseOnSurfaceDark,
+    inversePrimary = NexInversePrimaryDark,
+    outline = NexOutlineDark,
+    outlineVariant = NexOutlineVariantDark,
+    error = NexErrorDark,
+    onError = NexOnErrorDark,
+    errorContainer = NexErrorContainerDark,
+    onErrorContainer = NexOnErrorContainerDark,
+    surfaceTint = NexPrimaryDark
 )
 
 /**
@@ -109,23 +151,26 @@ private fun buildColorScheme(
 
     // Apply true-dark (OLED black) surface overrides when requested.
     val surfaceAdjusted = if (trueDark && darkTheme) base.copy(
-        background                 = NexTrueDarkBackground,
-        surface                    = NexTrueDarkSurface,
-        surfaceVariant             = NexTrueDarkSurfaceVariant,
-        surfaceContainerLowest     = NexTrueDarkSurfaceContainerLowest,
-        surfaceContainerLow        = NexTrueDarkSurfaceContainerLow,
-        surfaceContainer           = NexTrueDarkSurfaceContainer,
-        surfaceContainerHigh       = NexTrueDarkSurfaceContainerHigh,
-        surfaceContainerHighest    = NexTrueDarkSurfaceContainerHighest
+        background = NexTrueDarkBackground,
+        surface = NexTrueDarkSurface,
+        surfaceVariant = NexTrueDarkSurfaceVariant,
+        surfaceContainerLowest = NexTrueDarkSurfaceContainerLowest,
+        surfaceContainerLow = NexTrueDarkSurfaceContainerLow,
+        surfaceContainer = NexTrueDarkSurfaceContainer,
+        surfaceContainerHigh = NexTrueDarkSurfaceContainerHigh,
+        surfaceContainerHighest = NexTrueDarkSurfaceContainerHighest,
+        surfaceDim = NexTrueDarkBackground,
+        surfaceBright = NexTrueDarkSurfaceContainerHighest
     ) else base
 
     // Overlay the accent palette on top of the adjusted base.
     val palette = accentPalette(darkTheme, accent)
     return surfaceAdjusted.copy(
-        primary            = palette.primary,
-        onPrimary          = palette.onPrimary,
-        primaryContainer   = palette.primaryContainer,
-        onPrimaryContainer = palette.onPrimaryContainer
+        primary = palette.primary,
+        onPrimary = palette.onPrimary,
+        primaryContainer = palette.primaryContainer,
+        onPrimaryContainer = palette.onPrimaryContainer,
+        surfaceTint = palette.primary
     )
 }
 
@@ -134,11 +179,17 @@ private fun buildColorScheme(
  * Used when fontScale != 1.0 to honour the user's preferred text size.
  */
 fun buildTypography(fontScale: Float): Typography = Typography(
+    displaySmall = scaledTextStyle(fontScale, FontWeight.SemiBold, 36, 44, 0f),
+    headlineLarge = scaledTextStyle(fontScale, FontWeight.SemiBold, 32, 40, 0f),
+    headlineMedium = scaledTextStyle(fontScale, FontWeight.SemiBold, 28, 36, 0f),
+    headlineSmall = scaledTextStyle(fontScale, FontWeight.SemiBold, 24, 32, 0f),
     bodyLarge = scaledTextStyle(fontScale, FontWeight.Normal, 16, 26, 0.15f),
     bodyMedium = scaledTextStyle(fontScale, FontWeight.Normal, 14, 20, 0.25f),
     bodySmall = scaledTextStyle(fontScale, FontWeight.Normal, 12, 16, 0.4f),
     titleLarge = scaledTextStyle(fontScale, FontWeight.SemiBold, 22, 28, 0f),
     titleMedium = scaledTextStyle(fontScale, FontWeight.Medium, 16, 24, 0.15f),
+    titleSmall = scaledTextStyle(fontScale, FontWeight.Medium, 14, 20, 0.1f),
+    labelLarge = scaledTextStyle(fontScale, FontWeight.SemiBold, 14, 20, 0.1f),
     labelSmall = scaledTextStyle(fontScale, FontWeight.Medium, 11, 16, 0.5f),
     labelMedium = scaledTextStyle(fontScale, FontWeight.Medium, 12, 16, 0.5f)
 )
@@ -160,13 +211,13 @@ private fun scaledTextStyle(
 /**
  * Main NexNote theme.
  *
- * [darkTheme]   — controls the base color scheme; follows system by default.
- * [trueDark]    — when true and dark, replaces surfaces with pure black (OLED).
- * [fontScale]   — sp multiplier applied to the entire typography (0.85 / 1.0 / 1.15).
- * [accentColor] — replaces the primary color family across the whole scheme.
+ * [darkTheme]   - controls the base color scheme; follows system by default.
+ * [trueDark]    - when true and dark, replaces surfaces with pure black (OLED).
+ * [fontScale]   - sp multiplier applied to the entire typography (0.85 / 1.0 / 1.15).
+ * [accentColor] - replaces the primary color family across the whole scheme.
  *
- * Dynamic color (Material You) is intentionally disabled to keep a stable visual
- * identity independent of the user's wallpaper.
+ * The selected accent acts as the app key color so existing color preferences
+ * keep working across light, dark, system, and true-dark modes.
  */
 @Composable
 fun NexNoteTheme(
@@ -182,6 +233,7 @@ fun NexNoteTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography  = typography,
+        shapes      = NexNoteShapes,
         content     = content
     )
 }

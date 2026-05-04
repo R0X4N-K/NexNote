@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.ui.screen.trash
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,8 +13,6 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.util.DateUtils
 
 @Composable
@@ -33,7 +33,12 @@ internal fun TrashNoteCard(
         modifier  = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors    = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f)
         )
     ) {
         TrashNoteCardContent(note, onRestore, onDeletePermanently)
@@ -108,24 +113,22 @@ private fun TrashNoteActions(
 
 @Composable
 private fun RestoreNoteButton(onRestore: () -> Unit) {
-    IconButton(onClick = onRestore) {
-        Icon(
-            imageVector        = Icons.Default.RestoreFromTrash,
-            contentDescription = "Restore note",
-            tint               = MaterialTheme.colorScheme.primary
-        )
-    }
+    NexIconButton(
+        imageVector = Icons.Default.RestoreFromTrash,
+        contentDescription = "Restore note",
+        onClick = onRestore,
+        selected = true
+    )
 }
 
 @Composable
 private fun DeleteNoteButton(onDeletePermanently: () -> Unit) {
-    IconButton(onClick = onDeletePermanently) {
-        Icon(
-            imageVector        = Icons.Default.DeleteForever,
-            contentDescription = "Delete permanently",
-            tint               = MaterialTheme.colorScheme.error
-        )
-    }
+    NexIconButton(
+        imageVector = Icons.Default.DeleteForever,
+        contentDescription = "Delete permanently",
+        onClick = onDeletePermanently,
+        destructive = true
+    )
 }
 
 private fun noteDisplayTitle(note: Note): String {

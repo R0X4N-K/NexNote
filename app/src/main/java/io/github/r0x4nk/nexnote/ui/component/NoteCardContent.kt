@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,9 +76,13 @@ private fun rememberNoteCardVisuals(note: Note): NoteCardVisuals {
     return NoteCardVisuals(
         primaryColor = primaryColor,
         containerColor = note.backgroundColor?.let { adaptNoteColor(it, isDark) }
-            ?: MaterialTheme.colorScheme.surfaceVariant,
-        cardElevation = if (note.isPinned) 3.dp else 1.dp,
-        accentAlpha = if (note.isPinned) 0.80f else 0.18f
+            ?: if (note.isPinned) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+        cardElevation = if (note.isPinned) 2.dp else 0.dp,
+        accentAlpha = if (note.isPinned) 0.95f else 0.34f
     )
 }
 
@@ -128,7 +133,11 @@ private fun NoteCardSurface(
             .combinedClickable(onClick = onClick, onLongClick = onPin),
         elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
         colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
-        shape = MaterialTheme.shapes.medium
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.36f)
+        )
     ) {
         NoteCardBody(
             note = note,
@@ -172,7 +181,7 @@ private fun NoteCardBody(
 private fun NoteCardAccentStrip(primaryColor: Color, accentAlpha: Float) {
     Box(
         modifier = Modifier
-            .width(3.dp)
+            .width(4.dp)
             .fillMaxHeight()
             .background(primaryColor.copy(alpha = accentAlpha))
     )

@@ -21,6 +21,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -80,29 +81,53 @@ private fun ExportScreenContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        ExportScopeSelector(
-            selectedScope = uiState.scope,
-            hasInitialNote = hasInitialNote,
-            onScopeSelect = actions.onScopeSelect
-        )
-        if (uiState.scope == ExportScope.DateRange) {
-            DateRangeSelector(
-                dateFrom = uiState.dateFrom,
-                dateTo = uiState.dateTo,
-                onRangeSelected = actions.onDateRangeSelect
+        ExportSection {
+            ExportScopeSelector(
+                selectedScope = uiState.scope,
+                hasInitialNote = hasInitialNote,
+                onScopeSelect = actions.onScopeSelect
             )
         }
-        ExportFormatSelector(
-            selectedFormat = uiState.format,
-            onFormatSelect = actions.onFormatSelect
-        )
-        ExportSummary(noteCount = uiState.notes.size)
+        if (uiState.scope == ExportScope.DateRange) {
+            ExportSection {
+                DateRangeSelector(
+                    dateFrom = uiState.dateFrom,
+                    dateTo = uiState.dateTo,
+                    onRangeSelected = actions.onDateRangeSelect
+                )
+            }
+        }
+        ExportSection {
+            ExportFormatSelector(
+                selectedFormat = uiState.format,
+                onFormatSelect = actions.onFormatSelect
+            )
+            Spacer(Modifier.height(12.dp))
+            ExportSummary(noteCount = uiState.notes.size)
+        }
         Spacer(Modifier.height(4.dp))
         ExportButton(
             uiState = uiState,
             noteCount = uiState.notes.size,
             onClick = actions.onExportClick
         )
+    }
+}
+
+@Composable
+private fun ExportSection(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            content()
+        }
     }
 }
 
@@ -126,6 +151,7 @@ private fun ExportScopeSelector(
                 selected = selectedScope == scope,
                 onClick = { onScopeSelect(scope) },
                 shape = SegmentedButtonDefaults.itemShape(idx, scopeOptions.size),
+                colors = exportSegmentedButtonColors(),
                 label = { Text(scope.label) }
             )
         }
@@ -147,6 +173,7 @@ private fun ExportFormatSelector(
                 selected = selectedFormat == format,
                 onClick = { onFormatSelect(format) },
                 shape = SegmentedButtonDefaults.itemShape(idx, formatOptions.size),
+                colors = exportSegmentedButtonColors(),
                 label = { Text(format.label) }
             )
         }
@@ -174,7 +201,8 @@ private fun ExportButton(
     Button(
         modifier = Modifier.fillMaxWidth(),
         enabled = noteCount > 0 && !uiState.isExporting,
-        onClick = onClick
+        onClick = onClick,
+        shape = MaterialTheme.shapes.extraLarge
     ) {
         if (uiState.isExporting) {
             CircularProgressIndicator(
@@ -187,3 +215,13 @@ private fun ExportButton(
         }
     }
 }
+
+@Composable
+private fun exportSegmentedButtonColors() = SegmentedButtonDefaults.colors(
+    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    activeBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
+    inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant
+)

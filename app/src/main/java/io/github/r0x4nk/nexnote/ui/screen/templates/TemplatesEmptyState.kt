@@ -1,23 +1,21 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 
 @Composable
 internal fun TemplatesLoadingState(padding: PaddingValues) {
-    androidx.compose.foundation.layout.Box(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding),
@@ -32,25 +30,20 @@ internal fun TemplatesEmptyState(
     isSearchActive: Boolean,
     padding: PaddingValues
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(padding)
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(padding),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = if (isSearchActive) "No results" else "No templates",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = if (isSearchActive) "Try different words"
-            else "Use the + button to create a custom template",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+        NexEmptyState(
+            icon = if (isSearchActive) Icons.Default.ManageSearch else Icons.Default.Description,
+            title = if (isSearchActive) "No results" else "No templates",
+            message = if (isSearchActive) {
+                "Try different words"
+            } else {
+                "Use the + button to create a custom template"
+            }
         )
     }
 }

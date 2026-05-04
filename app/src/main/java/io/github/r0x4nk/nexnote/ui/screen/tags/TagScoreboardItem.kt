@@ -6,7 +6,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,9 +21,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.util.DateUtils
 
 @Composable
@@ -45,19 +45,31 @@ internal fun TagScoreboardItem(
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        TagScoreboardHeader(
-            tag = tag,
-            maxCount = maxCount,
-            isExpanded = isExpanded,
-            onTagClick = onTagClick,
-            onDeleteClick = onDeleteClick
-        )
-        ExpandedNotesSection(
-            isExpanded = isExpanded,
-            notes = notes,
-            onNoteClick = onNoteClick
-        )
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = if (isExpanded) {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.58f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = if (isExpanded) 2.dp else 1.dp
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            TagScoreboardHeader(
+                tag = tag,
+                maxCount = maxCount,
+                isExpanded = isExpanded,
+                onTagClick = onTagClick,
+                onDeleteClick = onDeleteClick
+            )
+            ExpandedNotesSection(
+                isExpanded = isExpanded,
+                notes = notes,
+                onNoteClick = onNoteClick
+            )
+        }
     }
 }
 
@@ -113,8 +125,8 @@ private fun TagUsageColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f)
         )
     }
 }
@@ -135,17 +147,13 @@ private fun ExpandCollapseIcon(isExpanded: Boolean) {
 
 @Composable
 private fun DeleteTagButton(tagName: String, onDeleteClick: () -> Unit) {
-    IconButton(
+    NexIconButton(
+        imageVector = Icons.Default.Delete,
+        contentDescription = "Delete #$tagName",
         onClick = onDeleteClick,
+        destructive = true,
         modifier = Modifier.size(36.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.Delete,
-            contentDescription = "Delete #$tagName",
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-            modifier = Modifier.size(18.dp)
-        )
-    }
+    )
 }
 
 @Composable
@@ -171,7 +179,6 @@ private fun ExpandedNotesContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             .padding(horizontal = 24.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {

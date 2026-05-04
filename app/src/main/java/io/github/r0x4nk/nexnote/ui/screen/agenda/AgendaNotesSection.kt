@@ -10,6 +10,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -62,7 +66,7 @@ internal fun NotesSectionHeader(year: Int, month: Int, day: Int) {
     }
     Text(
         text = "Notes for $label",
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
     )
@@ -116,10 +120,10 @@ private fun AgendaEmptyState(isSearchActive: Boolean = false) {
             .padding(horizontal = 32.dp, vertical = 24.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = if (isSearchActive) "No results" else "No notes on this day",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+        NexEmptyState(
+            icon = if (isSearchActive) Icons.Default.ManageSearch else Icons.Default.EventBusy,
+            title = if (isSearchActive) "No results" else "No notes on this day",
+            message = if (isSearchActive) "Try different words" else "This date is clear"
         )
     }
 }

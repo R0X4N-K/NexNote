@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -19,9 +20,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 
 @Composable
 internal fun EditorToolbar(
@@ -53,60 +54,67 @@ internal fun EditorToolbar(
     onToggleColorPicker: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Surface(
         modifier = modifier
             .background(noteBackground)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+        tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(rememberScrollState()),
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            EditorToolbarIcon(
-                onClick = onTogglePreview,
-                imageVector = if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
-                contentDescription = if (showPreview) "Back to editing" else "Preview",
-                tint = if (showPreview) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            EditorToolbarIcon(
-                onClick = onUndo,
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Undo",
-                enabled = canUndo
-            )
-            EditorToolbarIcon(
-                onClick = onRedo,
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "Redo",
-                enabled = canRedo
-            )
-            if (!isTemplateMode) {
-                EditorToolbarIcon(onInsertImage, Icons.Default.Image, "Insert image")
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EditorToolbarIcon(
+                    onClick = onTogglePreview,
+                    imageVector = if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
+                    contentDescription = if (showPreview) "Back to editing" else "Preview",
+                    selected = showPreview
+                )
+                EditorToolbarIcon(
+                    onClick = onUndo,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Undo",
+                    enabled = canUndo
+                )
+                EditorToolbarIcon(
+                    onClick = onRedo,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Redo",
+                    enabled = canRedo
+                )
+                if (!isTemplateMode) {
+                    EditorToolbarIcon(onInsertImage, Icons.Default.Image, "Insert image")
+                }
+                EditorToolbarIcon(onInsertChecklist, Icons.Default.CheckBox, "Insert checklist")
+                EditorLinkMenu(
+                    onInsertWebLink = onInsertWebLink,
+                    onInsertNoteLink = onInsertNoteLink
+                )
             }
-            EditorToolbarIcon(onInsertChecklist, Icons.Default.CheckBox, "Insert checklist")
-            EditorLinkMenu(
-                onInsertWebLink = onInsertWebLink,
-                onInsertNoteLink = onInsertNoteLink
-            )
-        }
-        if (!isTemplateMode) {
+            if (!isTemplateMode) {
+                EditorToolbarIcon(
+                    onClick = onToggleColorPicker,
+                    imageVector = Icons.Default.Palette,
+                    contentDescription = "Note background color",
+                    selected = hasCustomColor
+                )
+            }
             EditorToolbarIcon(
-                onClick = onToggleColorPicker,
-                imageVector = Icons.Default.Palette,
-                contentDescription = "Note background color",
-                tint = if (hasCustomColor) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                onClick = onThemeToggle,
+                imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
+                contentDescription = if (isDarkTheme) "Switch to light theme" else "Switch to dark theme"
             )
         }
-        EditorToolbarIcon(
-            onClick = onThemeToggle,
-            imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
-            contentDescription = if (isDarkTheme) "Switch to light theme" else "Switch to dark theme"
-        )
     }
 }
 
@@ -150,15 +158,14 @@ private fun EditorToolbarIcon(
     onClick: () -> Unit,
     imageVector: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
-    tint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    selected: Boolean = false
 ) {
-    val iconTint = if (enabled) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f)
-    IconButton(onClick = onClick, enabled = enabled) {
-        Icon(
-            imageVector = imageVector,
-            contentDescription = contentDescription,
-            tint = iconTint
-        )
-    }
+    NexIconButton(
+        imageVector = imageVector,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        enabled = enabled,
+        selected = selected
+    )
 }

@@ -44,7 +44,7 @@ internal fun AccentColorPicker(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         swatches.forEach { (accent, swatch) ->
             AccentColorSwatch(
@@ -64,7 +64,7 @@ private fun AccentColorSwatch(
     isSelected: Boolean,
     onSelect: (AccentColor) -> Unit
 ) {
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
 
     Box(
         contentAlignment = Alignment.Center,
@@ -79,7 +79,7 @@ private fun AccentColorSwatch(
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.Check,
-                contentDescription = "Selected",
+                contentDescription = "${accent.name.lowercase()} accent selected",
                 tint = Color.White,
                 modifier = Modifier.size(18.dp)
             )
@@ -93,14 +93,14 @@ private fun Modifier.accentColorSwatchStyle(
     swatch: Color,
     onClick: () -> Unit
 ): Modifier {
-    return size(44.dp)
+    return size(46.dp)
         .clip(CircleShape)
         .border(
-            width = if (isSelected) 3.dp else 0.dp,
+            width = if (isSelected) 2.dp else 0.dp,
             color = borderColor,
             shape = CircleShape
         )
-        .padding(if (isSelected) 3.dp else 0.dp)
+        .padding(if (isSelected) 4.dp else 0.dp)
         .clip(CircleShape)
         .background(swatch)
         .clickable(onClick = onClick)

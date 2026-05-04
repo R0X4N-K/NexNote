@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,8 +12,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Template
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 
 @Composable
 internal fun TemplateCard(
@@ -33,9 +33,14 @@ internal fun TemplateCard(
         onClick = onApply,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -85,21 +90,18 @@ private fun TemplateCardActions(
     onDelete: (() -> Unit)?
 ) {
     if (onEdit != null) {
-        IconButton(onClick = onEdit) {
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = "Edit",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        }
+        NexIconButton(
+            imageVector = Icons.Default.Edit,
+            contentDescription = "Edit",
+            onClick = onEdit
+        )
     }
     if (onDelete != null) {
-        IconButton(onClick = onDelete) {
-            Icon(
-                Icons.Default.Delete,
-                contentDescription = "Delete",
-                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-            )
-        }
+        NexIconButton(
+            imageVector = Icons.Default.Delete,
+            contentDescription = "Delete",
+            onClick = onDelete,
+            destructive = true
+        )
     }
 }

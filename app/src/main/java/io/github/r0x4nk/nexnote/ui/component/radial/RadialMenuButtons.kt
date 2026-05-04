@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -27,6 +28,7 @@ import kotlin.math.roundToInt
 private val SCROLL_BUTTON_SIZE_DP  = 36.dp
 private val SCROLL_BUTTON_GAP_DP   = 10.dp   // gap between scroll buttons and FAB top
 private val SCROLL_BUTTON_SPACE_DP =  6.dp   // vertical gap between the two scroll buttons
+private val FAB_SHAPE = RoundedCornerShape(18.dp)
 
 private data class ScrollShortcutButtonLayout(
     val buttonX: Float,
@@ -35,17 +37,17 @@ private data class ScrollShortcutButtonLayout(
     val sizePx: Float
 )
 
-// ── Scroll shortcut buttons ───────────────────────────────────────────────────
+// Scroll shortcut buttons.
 
 /**
  * Renders a "scroll to top" and "scroll to bottom" button stacked above the
  * FAB, horizontally centred on it.
  *
  * The buttons are smaller than the FAB (36 dp vs 56 dp) and use a lighter
- * surface colour so they feel secondary — present but unobtrusive.
+ * surface color so they feel secondary: present but unobtrusive.
  *
  * Layout (bottom-to-top):
- *   FAB  ←  [SCROLL_BUTTON_GAP_DP]  ←  bottom-button  ←  [SCROLL_BUTTON_SPACE_DP]  ←  top-button
+ *   FAB <- [SCROLL_BUTTON_GAP_DP] <- bottom-button <- [SCROLL_BUTTON_SPACE_DP] <- top-button
  */
 @Composable
 internal fun ScrollShortcutButtons(
@@ -125,10 +127,10 @@ private fun ScrollShortcutButton(
     }
 }
 
-// ── Static floating action button ─────────────────────────────────────────────
+// Static floating action button.
 
 /**
- * Non-draggable circular button at the fixed pixel position ([fabX], [fabY]).
+ * Non-draggable rounded button at the fixed pixel position ([fabX], [fabY]).
  *
  * When the menu is open the icon is always Close. When closed the icon is
  * [closedIcon], which each screen can set via [RadialMenuController.fabIcon]
@@ -152,14 +154,14 @@ internal fun StaticMenuButton(
         modifier = modifier
             .offset { IntOffset(fabX.roundToInt(), fabY.roundToInt()) }
             .size(buttonSizeDp)
-            .shadow(elevation = 6.dp, shape = CircleShape, clip = false)
-            .clip(CircleShape)
+            .shadow(elevation = 8.dp, shape = FAB_SHAPE, clip = false)
+            .clip(FAB_SHAPE)
             .background(MaterialTheme.colorScheme.primaryContainer)
             .clickable(onClick = onToggle)
     ) {
         Icon(
             imageVector        = if (isMenuOpen) Icons.Default.Close else closedIcon,
-            contentDescription = if (isMenuOpen) "Chiudi menu" else "Apri menu",
+            contentDescription = if (isMenuOpen) "Close menu" else "Open menu",
             tint               = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier           = androidx.compose.ui.Modifier.size(24.dp)
         )

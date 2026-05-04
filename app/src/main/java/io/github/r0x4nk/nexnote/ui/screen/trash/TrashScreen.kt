@@ -5,8 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -16,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,30 +71,35 @@ private fun TrashTopBar(
     onEmptyTrash: () -> Unit
 ) {
     TopAppBar(
-        title = { Text("Trash") },
+        title = {
+            Text(
+                text = "Trash",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
         navigationIcon = { TrashBackButton(onBack) },
         actions = {
             if (showEmptyTrash) TrashEmptyButton(onEmptyTrash)
-        }
+        },
+        colors = nexTopAppBarColors()
     )
 }
 
 @Composable
 private fun TrashBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack) {
-        Icon(
-            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Go back"
-        )
-    }
+    NexIconButton(
+        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+        contentDescription = "Go back",
+        onClick = onBack
+    )
 }
 
 @Composable
 private fun TrashEmptyButton(onEmptyTrash: () -> Unit) {
-    IconButton(onClick = onEmptyTrash) {
-        Icon(
-            imageVector        = Icons.Default.DeleteForever,
-            contentDescription = "Empty trash"
-        )
-    }
+    NexIconButton(
+        imageVector = Icons.Default.DeleteForever,
+        contentDescription = "Empty trash",
+        onClick = onEmptyTrash,
+        destructive = true
+    )
 }

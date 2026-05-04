@@ -11,14 +11,11 @@ import androidx.compose.ui.Modifier
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.ui.component.NexSectionLabel
 
 @Composable
 internal fun SettingsSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary
-    )
+    NexSectionLabel(text = title)
 }
 
 @Composable
@@ -35,6 +32,7 @@ internal fun ThemeModePicker(
                 selected = selected == mode,
                 onClick = { onSelect(mode) },
                 shape = SegmentedButtonDefaults.itemShape(index, themeModes.size),
+                colors = settingsSegmentedButtonColors(),
                 label = { Text(themeLabels[index]) }
             )
         }
@@ -55,6 +53,7 @@ internal fun FontScalePicker(
                 selected = selected == scale,
                 onClick = { onSelect(scale) },
                 shape = SegmentedButtonDefaults.itemShape(index, fontScales.size),
+                colors = settingsSegmentedButtonColors(),
                 label = { Text(fontLabels[index]) }
             )
         }
@@ -75,8 +74,19 @@ internal fun NoteCardStylePicker(
                 selected = selected == style,
                 onClick = { onSelect(style) },
                 shape = SegmentedButtonDefaults.itemShape(index, styles.size),
+                colors = settingsSegmentedButtonColors(),
                 label = { Text(labels[index]) }
             )
         }
     }
 }
+
+@Composable
+private fun settingsSegmentedButtonColors() = SegmentedButtonDefaults.colors(
+    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    activeBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
+    inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant
+)

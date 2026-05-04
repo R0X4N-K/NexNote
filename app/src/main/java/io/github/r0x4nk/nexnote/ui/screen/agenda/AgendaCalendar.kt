@@ -21,12 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.util.DateUtils
 import java.util.Calendar
@@ -58,18 +60,30 @@ private fun AgendaCalendarContent(
     today: AgendaToday,
     actions: AgendaActions
 ) {
-    Column {
-        WeekdayHeader()
-        CalendarGrid(
-            cells = calendarCells,
-            selectedDay = uiState.selectedDay,
-            daysWithNotes = daysWithNotes,
-            todayDay = today.dayFor(uiState.displayedYear, uiState.displayedMonth),
-            onDayClick = { day ->
-                actions.onSelectDate(uiState.displayedYear, uiState.displayedMonth, day)
-            }
-        )
-        HorizontalDivider(Modifier.padding(top = 4.dp))
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
+    ) {
+        Column(Modifier.padding(vertical = 8.dp)) {
+            WeekdayHeader()
+            CalendarGrid(
+                cells = calendarCells,
+                selectedDay = uiState.selectedDay,
+                daysWithNotes = daysWithNotes,
+                todayDay = today.dayFor(uiState.displayedYear, uiState.displayedMonth),
+                onDayClick = { day ->
+                    actions.onSelectDate(uiState.displayedYear, uiState.displayedMonth, day)
+                }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 6.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
+        }
     }
 }
 
@@ -222,7 +236,7 @@ private fun DayCell(
     val circleBg = if (isSelected) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.surface
+        Color.Transparent
     }
     val textColor = dayTextColor(isSelected, isToday)
     val dotColor = dayDotColor(hasDot, isSelected)
@@ -258,7 +272,7 @@ private fun dayTextColor(isSelected: Boolean, isToday: Boolean) = when {
 
 @Composable
 private fun dayDotColor(hasDot: Boolean, isSelected: Boolean) = when {
-    !hasDot -> MaterialTheme.colorScheme.surface
+    !hasDot -> Color.Transparent
     isSelected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
     else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
 }

@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.settings
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -19,6 +22,7 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,14 +36,23 @@ internal fun SettingsScreenContent(
     onTimezoneChange: (String) -> Unit
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Settings") }) }
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
+                colors = nexTopAppBarColors()
+            )
+        }
     ) { innerPadding ->
         SettingsList(
             uiState = uiState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
+                .padding(innerPadding),
             onThemeModeChange = onThemeModeChange,
             onAccentColorChange = onAccentColorChange,
             onFontScaleChange = onFontScaleChange,
@@ -61,17 +74,15 @@ private fun SettingsList(
     onLeftHandedChange: (Boolean) -> Unit,
     onTimezoneChange: (String) -> Unit
 ) {
-    LazyColumn(modifier = modifier) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+    ) {
         appearanceSection(uiState.themeMode, onThemeModeChange)
-        settingsDivider()
         accentColorSection(uiState.accentColor, onAccentColorChange)
-        settingsDivider()
         textSection(uiState.fontScale, onFontScaleChange)
-        settingsDivider()
         noteAppearanceSection(uiState.noteCardStyle, onNoteCardStyleChange)
-        settingsDivider()
         accessibilitySection(uiState.isLeftHanded, onLeftHandedChange)
-        settingsDivider()
         timezoneSection(uiState, onTimezoneChange)
     }
 }
@@ -81,13 +92,14 @@ private fun LazyListScope.appearanceSection(
     onSelect: (ThemeMode) -> Unit
 ) {
     item {
-        Spacer(Modifier.height(16.dp))
-        SettingsSectionHeader("Appearance")
-        Spacer(Modifier.height(8.dp))
-        ThemeModePicker(
-            selected = selected,
-            onSelect = onSelect
-        )
+        SettingsSectionSurface {
+            SettingsSectionHeader("Appearance")
+            Spacer(Modifier.height(10.dp))
+            ThemeModePicker(
+                selected = selected,
+                onSelect = onSelect
+            )
+        }
     }
 }
 
@@ -96,13 +108,14 @@ private fun LazyListScope.accentColorSection(
     onSelect: (AccentColor) -> Unit
 ) {
     item {
-        Spacer(Modifier.height(16.dp))
-        SettingsSectionHeader("Accent color")
-        Spacer(Modifier.height(12.dp))
-        AccentColorPicker(
-            selected = selected,
-            onSelect = onSelect
-        )
+        SettingsSectionSurface {
+            SettingsSectionHeader("Accent color")
+            Spacer(Modifier.height(14.dp))
+            AccentColorPicker(
+                selected = selected,
+                onSelect = onSelect
+            )
+        }
     }
 }
 
@@ -111,13 +124,14 @@ private fun LazyListScope.textSection(
     onSelect: (FontScale) -> Unit
 ) {
     item {
-        Spacer(Modifier.height(16.dp))
-        SettingsSectionHeader("Text")
-        Spacer(Modifier.height(8.dp))
-        FontScalePicker(
-            selected = selected,
-            onSelect = onSelect
-        )
+        SettingsSectionSurface {
+            SettingsSectionHeader("Text")
+            Spacer(Modifier.height(10.dp))
+            FontScalePicker(
+                selected = selected,
+                onSelect = onSelect
+            )
+        }
     }
 }
 
@@ -126,13 +140,14 @@ private fun LazyListScope.noteAppearanceSection(
     onSelect: (NoteCardStyle) -> Unit
 ) {
     item {
-        Spacer(Modifier.height(16.dp))
-        SettingsSectionHeader("Note appearance")
-        Spacer(Modifier.height(8.dp))
-        NoteCardStylePicker(
-            selected = selected,
-            onSelect = onSelect
-        )
+        SettingsSectionSurface {
+            SettingsSectionHeader("Note appearance")
+            Spacer(Modifier.height(10.dp))
+            NoteCardStylePicker(
+                selected = selected,
+                onSelect = onSelect
+            )
+        }
     }
 }
 
@@ -141,13 +156,14 @@ private fun LazyListScope.accessibilitySection(
     onToggle: (Boolean) -> Unit
 ) {
     item {
-        Spacer(Modifier.height(16.dp))
-        SettingsSectionHeader("Accessibility")
-        Spacer(Modifier.height(8.dp))
-        LeftHandedToggle(
-            isLeftHanded = isLeftHanded,
-            onToggle = onToggle
-        )
+        SettingsSectionSurface {
+            SettingsSectionHeader("Accessibility")
+            Spacer(Modifier.height(10.dp))
+            LeftHandedToggle(
+                isLeftHanded = isLeftHanded,
+                onToggle = onToggle
+            )
+        }
     }
 }
 
@@ -156,21 +172,32 @@ private fun LazyListScope.timezoneSection(
     onSelect: (String) -> Unit
 ) {
     item {
-        Spacer(Modifier.height(16.dp))
-        SettingsSectionHeader("Timezone")
-        Spacer(Modifier.height(8.dp))
-        TimezoneDropdown(
-            selectedId = uiState.timezoneId,
-            availableTimezones = uiState.availableTimezones,
-            onSelect = onSelect
-        )
-        Spacer(Modifier.height(24.dp))
+        SettingsSectionSurface {
+            SettingsSectionHeader("Timezone")
+            Spacer(Modifier.height(10.dp))
+            TimezoneDropdown(
+                selectedId = uiState.timezoneId,
+                availableTimezones = uiState.availableTimezones,
+                onSelect = onSelect
+            )
+        }
+        Spacer(Modifier.height(96.dp))
     }
 }
 
-private fun LazyListScope.settingsDivider() {
-    item {
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider()
+@Composable
+private fun SettingsSectionSurface(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 1.dp
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            content()
+        }
     }
 }

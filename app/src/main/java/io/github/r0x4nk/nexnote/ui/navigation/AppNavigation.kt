@@ -140,10 +140,10 @@ private fun FloatingBottomBar(content: @Composable RowScope.() -> Unit) {
                 .widthIn(max = 420.dp)
                 .fillMaxWidth(),
             shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp,
+            tonalElevation = 3.dp,
+            shadowElevation = 8.dp,
             border = BorderStroke(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
@@ -176,9 +176,9 @@ private fun RowScope.AppBottomNavItem(
         icon = { Icon(item.icon, contentDescription = item.label) },
         alwaysShowLabel = false,
         colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = MaterialTheme.colorScheme.primary,
-            selectedTextColor = MaterialTheme.colorScheme.primary,
-            indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
         )

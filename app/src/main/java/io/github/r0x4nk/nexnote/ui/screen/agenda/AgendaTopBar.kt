@@ -6,14 +6,15 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 import io.github.r0x4nk.nexnote.util.DateUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +31,8 @@ internal fun AgendaTopBar(
     TopAppBar(
         title = { AgendaMonthTitle(monthTitle) },
         navigationIcon = { AgendaPreviousMonthButton(actions.onPreviousMonth) },
-        actions = { AgendaMonthActions(actions) }
+        actions = { AgendaMonthActions(actions) },
+        colors = nexTopAppBarColors()
     )
 }
 
@@ -38,6 +40,7 @@ internal fun AgendaTopBar(
 private fun AgendaMonthTitle(monthTitle: String) {
     Text(
         text = monthTitle,
+        style = MaterialTheme.typography.headlineSmall,
         modifier = Modifier.fillMaxWidth(),
         textAlign = TextAlign.Center
     )
@@ -45,23 +48,24 @@ private fun AgendaMonthTitle(monthTitle: String) {
 
 @Composable
 private fun AgendaPreviousMonthButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-            contentDescription = "Previous month"
-        )
-    }
+    NexIconButton(
+        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+        contentDescription = "Previous month",
+        onClick = onClick
+    )
 }
 
 @Composable
 private fun AgendaMonthActions(actions: AgendaActions) {
-    IconButton(onClick = actions.onGoToToday) {
-        Icon(Icons.Default.CalendarToday, contentDescription = "Go to today")
-    }
-    IconButton(onClick = actions.onNextMonth) {
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = "Next month"
-        )
-    }
+    NexIconButton(
+        imageVector = Icons.Default.CalendarToday,
+        contentDescription = "Go to today",
+        onClick = actions.onGoToToday,
+        selected = true
+    )
+    NexIconButton(
+        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+        contentDescription = "Next month",
+        onClick = actions.onNextMonth
+    )
 }

@@ -12,13 +12,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.component.NexSectionLabel
 
 @Composable
 internal fun TemplatesCollection(
@@ -145,10 +144,8 @@ private fun TemplatesGrid(
 
 @Composable
 private fun SectionHeader(title: String) {
-    Text(
+    NexSectionLabel(
         text = title,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(vertical = 4.dp)
     )
 }

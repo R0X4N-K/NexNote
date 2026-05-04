@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -48,7 +49,7 @@ internal fun NoteCardPreview(content: AnnotatedString) {
     Text(
         text = content,
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis
     )
@@ -70,7 +71,7 @@ internal fun NoteCardFooter(
         Text(
             text = DateUtils.formatRelative(note.lastModifiedDate),
             style = dateStyle,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.86f)
         )
         if (note.isMarkdown) {
             Text(
@@ -97,8 +98,15 @@ private fun NoteCardPinButton(
         modifier = Modifier
             .padding(start = 4.dp)
             .clip(CircleShape)
+            .background(
+                if (isPinned) {
+                    primaryColor.copy(alpha = 0.12f)
+                } else {
+                    Color.Transparent
+                }
+            )
             .clickable(onClick = onPin)
-            .padding(4.dp),
+            .padding(6.dp),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -107,7 +115,7 @@ private fun NoteCardPinButton(
             tint = if (isPinned) {
                 primaryColor
             } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
             },
             modifier = Modifier.size(16.dp)
         )
