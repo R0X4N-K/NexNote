@@ -21,12 +21,14 @@ class MarkdownParserTest {
     }
 
     @Test
-    fun parseBlocks_largeText_isNotCached() {
+    fun parseBlocks_largeText_availableViaSingleSlotCache() {
         val text = "x".repeat(100_001)
 
-        parseBlocks(text)
+        val blocks = parseBlocks(text)
 
-        assertNull(MarkdownParser.getCached(text, linkColor))
+        // Large texts bypass the bounded LRU cache but are still available via
+        // the single-slot last-parse holder, ensuring warmup results are never lost.
+        assertEquals(blocks, MarkdownParser.getCached(text, linkColor))
     }
 
     @Test
