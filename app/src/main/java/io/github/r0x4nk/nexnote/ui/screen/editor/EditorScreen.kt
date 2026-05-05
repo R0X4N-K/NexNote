@@ -107,6 +107,7 @@ fun EditorScreen(
     EditorContentAnimationsReadyEffect(uiState, state)
     EditorContentSyncEffect(uiState, state)
     EditorDirectPreviewWarmupEffect(uiState, state)
+    EditorBackgroundPreParseEffect(uiState)
     EditorPreviewScrollRestorationEffect(uiState, state, density)
     EditorKeyboardTagBarEffect(isKeyboardVisible, state)
     EditorRadialMenuBindings(

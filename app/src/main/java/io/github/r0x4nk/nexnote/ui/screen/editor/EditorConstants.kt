@@ -9,6 +9,11 @@ internal const val DIRECT_PREVIEW_FIRST_COMPOSITION_DELAY_MS = 220L
 internal const val MARKDOWN_CHECKLIST_SNIPPET = "\n- [ ] "
 internal const val MARKDOWN_WEB_LINK_SNIPPET = "\n[text](url)"
 
+// Background pre-parse: debounce time before parsing content for preview cache warmth.
+internal const val BACKGROUND_PREPARSE_DEBOUNCE_MS = 800L
+// Skip background pre-parse for very short notes where parsing is trivially fast.
+internal const val PREPARSE_MIN_CHARS = 500
+
 // Ordered by hue. null represents "no custom color" (theme default surface).
 internal val NOTE_COLOR_PALETTE: List<Int?> = listOf(
     null,

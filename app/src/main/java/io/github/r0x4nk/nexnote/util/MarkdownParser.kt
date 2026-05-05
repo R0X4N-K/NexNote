@@ -33,15 +33,40 @@ object MarkdownParser {
     }
 
     /**
-     * Returns the cached parse result for [text] + [linkColor], if present.
-     * UI code uses this to show a synchronous initial value before background
-     * parsing completes.
+     * Single-slot cache holding the most recently parsed result regardless of
+     * content size. Uses a single volatile reference (not two separate fields) to
+     * guarantee atomicity between key and result — preventing torn reads when the
+     * warmup thread updates the slot concurrently with a main-thread [getCached]
+     * read.
+     *
+     * This ensures that results produced by the preview warmup phase are
+     * immediately available to [getCached] even for notes that exceed the LRU
+     * cache size limit, eliminating the blank gap between animation end and
+     * rendered content.
      */
-    fun getCached(text: String, linkColor: Color): List<MarkdownBlock>? =
-        synchronized(blocksCache) {
-            if (!text.isCacheable()) return@synchronized null
-            blocksCache[CacheKey(text, linkColor.value)]
+    private data class LastParseEntry(val key: CacheKey, val blocks: List<MarkdownBlock>)
+
+    @Volatile
+    private var lastParse: LastParseEntry? = null
+
+    /**
+     * Returns the cached parse result for [text] + [linkColor], if present.
+     * Checks both the bounded LRU cache (for smaller notes) and the single-slot
+     * last-parse holder (for any size), so a preceding [parseBlocks] warmup call
+     * always provides an immediate hit.
+     */
+    fun getCached(text: String, linkColor: Color): List<MarkdownBlock>? {
+        val key = CacheKey(text, linkColor.value)
+
+        // Check single-slot last-parse first (works for any content size)
+        lastParse?.let { entry ->
+            if (entry.key == key) return entry.blocks
         }
+
+        // Fall back to the bounded LRU cache for smaller notes
+        if (!text.isCacheable()) return null
+        return synchronized(blocksCache) { blocksCache[key] }
+    }
 
     /**
      * Converts a markdown [text] string into a styled [AnnotatedString].
@@ -58,23 +83,37 @@ object MarkdownParser {
         }
 
     /**
-     * Splits [text] into display blocks and caches the result by content and
-     * link color. Safe to call from any thread.
+     * Splits [text] into display blocks, caches the result, and returns it.
+     * Safe to call from any thread.
+     *
+     * Results are stored in:
+     * - The bounded LRU cache (for notes ≤ [MAX_CACHEABLE_CONTENT_CHARS])
+     * - The single-slot last-parse holder (always, regardless of size)
+     *
+     * The single-slot holder guarantees that a warmup call immediately before
+     * composition provides a synchronous hit via [getCached], even for very
+     * large notes that would otherwise exceed the LRU cache size limit.
      */
     fun parseBlocks(text: String, linkColor: Color): List<MarkdownBlock> {
-        if (!text.isCacheable()) {
-            return parseMarkdownBlocks(text, linkColor)
-        }
-
         val key = CacheKey(text, linkColor.value)
-        synchronized(blocksCache) {
-            blocksCache[key]
-        }?.let { return it }
+
+        // Check LRU cache first
+        if (text.isCacheable()) {
+            synchronized(blocksCache) { blocksCache[key] }?.let {
+                lastParse = LastParseEntry(key, it)
+                return it
+            }
+        }
 
         val result = parseMarkdownBlocks(text, linkColor)
-        synchronized(blocksCache) {
-            blocksCache[key] = result
+
+        // Store in bounded LRU cache if within size limit
+        if (text.isCacheable()) {
+            synchronized(blocksCache) { blocksCache[key] = result }
         }
+        // Always update single-slot holder so the next getCached() hits
+        lastParse = LastParseEntry(key, result)
+
         return result
     }
 

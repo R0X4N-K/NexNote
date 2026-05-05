@@ -10,6 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+/**
+ * Handles the warmup phase when a note is opened directly in preview mode.
+ * Parses markdown blocks off-thread and populates the single-slot cache before
+ * the loading placeholder is dismissed, ensuring instant content display.
+ */
 @Composable
 internal fun EditorDirectPreviewWarmupEffect(
     uiState: EditorUiState,
@@ -29,6 +34,34 @@ internal fun EditorDirectPreviewWarmupEffect(
 
         if (state.isDirectPreviewWarmupPending(warmupKey)) {
             state.completedDirectPreviewWarmupKey = warmupKey
+        }
+    }
+}
+
+/**
+ * Background pre-parse that keeps the single-slot block cache warm while the
+ * user is editing. When the user eventually toggles to preview, the parsed
+ * blocks are already available via [MarkdownParser.getCached], so the preview
+ * composable can render on its very first frame — no blank gap.
+ *
+ * Debounces by [BACKGROUND_PREPARSE_DEBOUNCE_MS] to avoid excessive work during
+ * rapid typing. Only runs in edit mode (not during preview or loading).
+ */
+@Composable
+internal fun EditorBackgroundPreParseEffect(
+    uiState: EditorUiState
+) {
+    val linkColor = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(uiState.content, uiState.contentVersion) {
+        // Only pre-parse while in edit mode with non-trivial content
+        if (uiState.isLoading || uiState.showPreview || uiState.content.length < PREPARSE_MIN_CHARS) {
+            return@LaunchedEffect
+        }
+
+        delay(BACKGROUND_PREPARSE_DEBOUNCE_MS)
+        withContext(Dispatchers.Default) {
+            MarkdownParser.parseBlocks(text = uiState.content, linkColor = linkColor)
         }
     }
 }
