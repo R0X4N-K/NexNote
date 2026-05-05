@@ -19,12 +19,14 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +50,14 @@ fun nexTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
     actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
 )
 
+/**
+ * Compact icon button used across the app in toolbars, top bars, and action rows.
+ *
+ * Uses a fixed 36dp touch target with a clipped circular background so the selection
+ * indicator and ripple never overflow the parent container bounds. We override
+ * [LocalMinimumInteractiveComponentSize] to prevent Material3 from expanding the
+ * hit area beyond our explicit size, which previously caused visual clipping.
+ */
 @Composable
 fun NexIconButton(
     imageVector: ImageVector,
@@ -60,20 +70,22 @@ fun NexIconButton(
 ) {
     val colors = nexIconButtonColors(selected = selected, destructive = destructive, enabled = enabled)
 
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(colors.container)
-    ) {
-        Icon(
-            imageVector = imageVector,
-            contentDescription = contentDescription,
-            tint = colors.content,
-            modifier = Modifier.size(22.dp)
-        )
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(colors.container)
+        ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = contentDescription,
+                tint = colors.content,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 
