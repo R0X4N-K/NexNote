@@ -129,7 +129,7 @@ private fun EditorMarkdownPreview(
         markdown = uiState.content,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         imageFileProvider = imageFileProvider,
         highlightRanges = state.visibleContentHighlightRanges(),
         activeHighlightRange = state.activeContentHighlightRange(),
@@ -154,7 +154,7 @@ private fun EditorContentField(
         activeSearchRange = state.activeSearchHighlightRange(),
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 16.dp)
+            .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 12.dp)
             .focusRequester(state.contentFocusRequester)
     )
 }

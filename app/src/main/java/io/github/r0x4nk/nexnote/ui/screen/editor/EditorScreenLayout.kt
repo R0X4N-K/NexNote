@@ -171,6 +171,8 @@ private fun EditorScreenBody(
             onToggleColorPicker = actions.onToggleColorPicker,
             modifier = Modifier.fillMaxWidth()
         )
+        // Metadata is placed between toolbar and divider to reclaim bottom space
+        EditorMetadataArea(content.uiState, actions.onCreationDateTap)
         EditorColorPickerPanel(
             content.uiState,
             content.state,
@@ -178,7 +180,7 @@ private fun EditorScreenBody(
             actions.onBackgroundColorChange
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-        EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
+        // Tags appear above the title for quicker contextual orientation
         if (!content.uiState.isTemplateMode) {
             EditorTagsPanel(
                 content.tagsForCurrentNote,
@@ -188,6 +190,7 @@ private fun EditorScreenBody(
                 actions.onClearTagSelection
             )
         }
+        EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
         EditorContentModeBox(
             content.uiState,
             content.imageFileProvider,
@@ -197,7 +200,6 @@ private fun EditorScreenBody(
             actions.onNoteLinkAutocompleteSelected,
             actions.onPreviewNoteLinkClick
         )
-        EditorMetadataArea(content.uiState, actions.onCreationDateTap)
     }
 }
 
@@ -239,7 +241,7 @@ private fun EditorTitleArea(
         onNext = { state.contentFocusRequester.requestFocus() },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .focusRequester(state.titleFocusRequester)
     )
 }
@@ -286,7 +288,7 @@ private fun EditorMetadataArea(
             onCreationDateTap = onCreationDateTap,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp, vertical = 2.dp)
         )
     }
 }

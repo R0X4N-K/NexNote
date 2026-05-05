@@ -57,7 +57,7 @@ internal fun EditorToolbar(
     Surface(
         modifier = modifier
             .background(noteBackground)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         tonalElevation = 1.dp
