@@ -39,13 +39,22 @@ internal fun EditorDirectPreviewWarmupEffect(
 }
 
 /**
- * Background pre-parse that keeps the single-slot block cache warm while the
- * user is editing. When the user eventually toggles to preview, the parsed
- * blocks are already available via [MarkdownParser.getCached], so the preview
- * composable can render on its very first frame — no blank gap.
+ * Background pre-parse that keeps both preview caches warm while the user is
+ * editing.
+ *
+ * The preview's first composition consults two caches:
+ *  1. [MarkdownParser.getCached] for the parsed block list, and
+ *  2. [buildMarkdownBlockSourceRanges] for the per-block source ranges used by
+ *     scroll restoration and search highlighting.
+ *
+ * If either cache is cold when the user toggles to preview, the missing
+ * computation runs synchronously inside Compose's `remember` block in
+ * [EditorScreen] and stalls the main thread proportionally to the note size.
+ * Warming both off-thread here keeps the preview toggle instant even for very
+ * long notes.
  *
  * Debounces by [BACKGROUND_PREPARSE_DEBOUNCE_MS] to avoid excessive work during
- * rapid typing. Only runs in edit mode (not during preview or loading).
+ * rapid typing, and only runs in edit mode (not during preview or loading).
  */
 @Composable
 internal fun EditorBackgroundPreParseEffect(
@@ -61,7 +70,10 @@ internal fun EditorBackgroundPreParseEffect(
 
         delay(BACKGROUND_PREPARSE_DEBOUNCE_MS)
         withContext(Dispatchers.Default) {
+            // Prime the parsed-blocks cache and the source-range cache in
+            // parallel; the preview reads from both on its first frame.
             MarkdownParser.parseBlocks(text = uiState.content, linkColor = linkColor)
+            buildMarkdownBlockSourceRanges(uiState.content)
         }
     }
 }
