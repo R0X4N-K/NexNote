@@ -1,26 +1,31 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextRange
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.ui.component.buildMarkdownBlockSourceRanges
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
-import io.github.r0x4nk.nexnote.util.handleSmartEnter
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EditorScreen(
     noteId: Long,
@@ -41,6 +46,7 @@ fun EditorScreen(
     val state = rememberEditorScreenState(noteId, templateId, editTemplateId)
     val context = LocalContext.current
     val density = LocalDensity.current
+    val focusManager = LocalFocusManager.current
     val imageFileProvider = remember(viewModel) { viewModel::getImageFile }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val systemDark = isSystemInDarkTheme()
@@ -103,9 +109,37 @@ fun EditorScreen(
             )
         }
     }
+    val launchImagePickerAfterCommit: () -> Unit = {
+        commitActiveEditContent()
+        launchImagePickerAtCursor()
+    }
+    val navigateToTagOccurrence: (String) -> Unit = { tagName ->
+        commitActiveEditContent()
+        if (!uiState.showPreview) {
+            focusManager.clearFocus(force = true)
+        }
+        state.showColorPicker = false
+        viewModel.onTagChipClick(tagName)
+    }
+
+    val shouldMaintainPreviewSourceRanges =
+        uiState.showPreview || state.pendingContentScrollAnchor != null
+    val currentSourceRanges = remember(uiState.content, shouldMaintainPreviewSourceRanges) {
+        if (shouldMaintainPreviewSourceRanges) {
+            buildMarkdownBlockSourceRanges(uiState.content)
+        } else {
+            emptyList()
+        }
+    }
+    SideEffect {
+        if (shouldMaintainPreviewSourceRanges || state.currentSourceRanges.isNotEmpty()) {
+            state.currentSourceRanges = currentSourceRanges
+        }
+    }
 
     EditorContentAnimationsReadyEffect(uiState, state)
     EditorContentSyncEffect(uiState, state)
+    EditorPendingContentCommitEffect(uiState, state, viewModel)
     EditorDirectPreviewWarmupEffect(uiState, state)
     EditorBackgroundPreParseEffect(uiState)
     EditorPreviewScrollRestorationEffect(uiState, state, density)
@@ -115,7 +149,8 @@ fun EditorScreen(
         showPreview = uiState.showPreview,
         isTemplateMode = uiState.isTemplateMode,
         contentScrollState = state.contentScrollState,
-        launchImagePickerAtCursor = launchImagePickerAtCursor,
+        previewListState = state.previewListState,
+        launchImagePickerAtCursor = launchImagePickerAfterCommit,
         onInsertNoteLink = openNoteLinkPicker,
         onToggleColorPicker = toggleColorPicker,
         insertAtCursor = insertAtCursor,
@@ -140,6 +175,7 @@ fun EditorScreen(
     )
 
     val openSearch: () -> Unit = {
+        commitActiveEditContent()
         state.highlightRange = null
         state.pendingTagScroll = null
         state.showColorPicker = false
@@ -213,14 +249,19 @@ fun EditorScreen(
         ),
         actions = EditorScreenActions(
             onBack = handleBack,
-            onExport = onExport,
+            onExport = onExport?.let { export ->
+                {
+                    commitActiveEditContent()
+                    export()
+                }
+            },
             onMarkdownToggle = {
                 NexNoteDebugLog.editor(event = "markdownToggleClicked", details = uiState.debugEditorSummary())
                 commitActiveEditContent()
                 viewModel.onMarkdownToggle()
             },
             onTogglePreview = togglePreviewPreservingScroll,
-            onInsertImage = launchImagePickerAtCursor,
+            onInsertImage = launchImagePickerAfterCommit,
             onInsertNoteLink = openNoteLinkPicker,
             insertAtCursor = insertAtCursor,
             onNoteLinkAutocompleteSelected = replaceNoteLinkAutocomplete,
@@ -229,37 +270,34 @@ fun EditorScreen(
             onToggleColorPicker = toggleColorPicker,
             onBackgroundColorChange = viewModel::onBackgroundColorChange,
             onTitleChange = viewModel::onTitleChange,
-            onTagClick = viewModel::onTagChipClick,
+            onTagClick = navigateToTagOccurrence,
             onClearTagSelection = viewModel::clearTagSelectionInEditor,
-            onContentValueChange = { newValue ->
-                NexNoteDebugLog.editor(
-                    event = "contentValueChangeReceived",
-                    details = "previous=${state.contentFieldValue.debugTextFieldValueSummary()} " +
-                        "incoming=${newValue.debugTextFieldValueSummary()} " +
-                        "model=${uiState.debugEditorSummary()}"
-                )
+            onContentEdited = {
                 state.highlightRange = null
                 state.pendingTagScroll = null
-                val handled = handleSmartEnter(state.contentFieldValue, newValue)
-                NexNoteDebugLog.editor(
-                    event = "contentValueChangeHandled",
-                    details = "handled=${handled.debugTextFieldValueSummary()}"
-                )
-                state.setContentFieldValue(handled)
-                state.noteSearch = state.noteSearch.refresh(handled.text)
-                viewModel.onContentChange(
-                    value = handled.text,
-                    selectionOffset = handled.selection.end
-                )
+                state.markContentEdited()
+            },
+            onContentSelectionChange = { selection ->
+                val textLength = state.contentTextFieldState.text.length
+                val safeSelection = selection.coerceInText(textLength)
+                if (
+                    state.contentFieldValue.text.length == textLength &&
+                    state.contentFieldValue.selection != safeSelection
+                ) {
+                    state.contentFieldValue = state.contentFieldValue.copy(selection = safeSelection)
+                }
+                viewModel.onContentSelectionChange(safeSelection.end)
             },
             onUndo = {
                 state.highlightRange = null
                 state.pendingTagScroll = null
+                commitActiveEditContent()
                 viewModel.undoContentChange()
             },
             onRedo = {
                 state.highlightRange = null
                 state.pendingTagScroll = null
+                commitActiveEditContent()
                 viewModel.redoContentChange()
             },
             onCreationDateTap = { state.showDatePicker = true },
@@ -296,4 +334,11 @@ private fun EditorUiState.debugEditorSummary(): String {
 private fun androidx.compose.ui.text.input.TextFieldValue.debugTextFieldValueSummary(): String {
     return "selection=${selection.start}-${selection.end} " +
         NexNoteDebugLog.textSummary("text", text)
+}
+
+private fun TextRange.coerceInText(textLength: Int): TextRange {
+    return TextRange(
+        start = start.coerceIn(0, textLength),
+        end = end.coerceIn(0, textLength)
+    )
 }

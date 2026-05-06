@@ -6,6 +6,15 @@ internal data class MarkdownSourceRange(
 )
 
 private const val MAX_SOURCE_RANGE_CACHE_ENTRIES = 30
+private const val MAX_SOURCE_RANGE_CACHEABLE_CONTENT_CHARS = 100_000
+
+private data class SourceRangeCacheEntry(
+    val markdown: String,
+    val ranges: List<MarkdownSourceRange>
+)
+
+@Volatile
+private var lastSourceRangeBuild: SourceRangeCacheEntry? = null
 
 private val sourceRangeCache = object : LinkedHashMap<String, List<MarkdownSourceRange>>(
     MAX_SOURCE_RANGE_CACHE_ENTRIES,
@@ -25,9 +34,20 @@ private val previewTableLine = Regex("""^\s*\|.+\|\s*$""")
 private val previewTableSeparatorLine = Regex("""^\s*\|(\s*:?-+:?\s*\|)+\s*$""")
 
 internal fun buildMarkdownBlockSourceRanges(markdown: String): List<MarkdownSourceRange> {
-    synchronized(sourceRangeCache) {
-        sourceRangeCache[markdown]
-    }?.let { return it }
+    lastSourceRangeBuild?.let { entry ->
+        if (entry.markdown === markdown || entry.markdown == markdown) {
+            return entry.ranges
+        }
+    }
+
+    if (markdown.isSourceRangeCacheable()) {
+        synchronized(sourceRangeCache) {
+            sourceRangeCache[markdown]
+        }?.let { ranges ->
+            lastSourceRangeBuild = SourceRangeCacheEntry(markdown, ranges)
+            return ranges
+        }
+    }
 
     val result = if (markdown.isEmpty()) {
         listOf(MarkdownSourceRange(start = 0, end = 0))
@@ -35,11 +55,17 @@ internal fun buildMarkdownBlockSourceRanges(markdown: String): List<MarkdownSour
         MarkdownSourceRangeBuilder(markdown).build()
     }
 
-    synchronized(sourceRangeCache) {
-        sourceRangeCache[markdown] = result
+    if (markdown.isSourceRangeCacheable()) {
+        synchronized(sourceRangeCache) {
+            sourceRangeCache[markdown] = result
+        }
     }
+    lastSourceRangeBuild = SourceRangeCacheEntry(markdown, result)
     return result
 }
+
+private fun String.isSourceRangeCacheable(): Boolean =
+    length <= MAX_SOURCE_RANGE_CACHEABLE_CONTENT_CHARS
 
 private class MarkdownSourceRangeBuilder(
     private val markdown: String

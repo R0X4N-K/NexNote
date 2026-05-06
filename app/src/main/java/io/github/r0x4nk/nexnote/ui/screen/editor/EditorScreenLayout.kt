@@ -29,7 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import java.io.File
@@ -63,7 +63,8 @@ internal data class EditorScreenActions(
     val onTitleChange: (String) -> Unit,
     val onTagClick: (String) -> Unit,
     val onClearTagSelection: () -> Unit,
-    val onContentValueChange: (TextFieldValue) -> Unit,
+    val onContentEdited: () -> Unit,
+    val onContentSelectionChange: (TextRange) -> Unit,
     val onUndo: () -> Unit,
     val onRedo: () -> Unit,
     val onCreationDateTap: () -> Unit,
@@ -196,7 +197,8 @@ private fun EditorScreenBody(
             content.imageFileProvider,
             content.noteLinkTargets,
             content.state,
-            actions.onContentValueChange,
+            actions.onContentEdited,
+            actions.onContentSelectionChange,
             actions.onNoteLinkAutocompleteSelected,
             actions.onPreviewNoteLinkClick
         )

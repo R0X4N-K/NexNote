@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.CheckBox
@@ -25,6 +26,7 @@ internal fun EditorRadialMenuBindings(
     showPreview: Boolean,
     isTemplateMode: Boolean,
     contentScrollState: ScrollState,
+    previewListState: LazyListState,
     launchImagePickerAtCursor: () -> Unit,
     onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
@@ -33,7 +35,7 @@ internal fun EditorRadialMenuBindings(
     scope: CoroutineScope
 ) {
     RadialMenuFabHideEffect(hide = isKeyboardVisible)
-    EditorRadialMenuScrollBindings(contentScrollState, scope)
+    EditorRadialMenuScrollBindings(showPreview, contentScrollState, previewListState, scope)
     RadialMenuEffect(
         items = rememberEditorRadialMenuItems(
             launchImagePickerAtCursor,
@@ -50,13 +52,29 @@ internal fun EditorRadialMenuBindings(
 
 @Composable
 private fun EditorRadialMenuScrollBindings(
+    showPreview: Boolean,
     contentScrollState: ScrollState,
+    previewListState: LazyListState,
     scope: CoroutineScope
 ) {
     RadialMenuScrollEffect(
-        onScrollToTop = { scope.launch { contentScrollState.animateScrollTo(0) } },
+        onScrollToTop = {
+            scope.launch {
+                if (showPreview) {
+                    previewListState.animateScrollToPreviewTop()
+                } else {
+                    contentScrollState.animateScrollTo(0)
+                }
+            }
+        },
         onScrollToBottom = {
-            scope.launch { contentScrollState.animateScrollTo(contentScrollState.maxValue) }
+            scope.launch {
+                if (showPreview) {
+                    previewListState.animateScrollToPreviewBottom()
+                } else {
+                    contentScrollState.animateScrollTo(contentScrollState.maxValue)
+                }
+            }
         }
     )
 }

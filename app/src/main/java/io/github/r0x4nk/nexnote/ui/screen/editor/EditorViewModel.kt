@@ -197,6 +197,11 @@ class EditorViewModel(
         scheduleAutosave()
     }
 
+    fun onContentSelectionChange(selectionOffset: Int?) {
+        val safeSelectionOffset = selectionOffset?.coerceIn(0, _uiState.value.content.length)
+        contentHistory.updateCurrentSelection(safeSelectionOffset)
+    }
+
     fun undoContentChange() {
         NexNoteDebugLog.viewModel(event = "undoContentChange", details = uiState.value.debugViewModelSummary())
         contentHistory.undo()?.let(::applyHistorySnapshot)
@@ -389,13 +394,6 @@ class EditorViewModel(
         const val NEW_TEMPLATE_ID = -1L
 
         private const val AUTOSAVE_DELAY_MS = 1_500L
-
-        /**
-         * Hard limit on note/template content length in characters.
-         * BasicTextField measures the entire text on every composition, so very
-         * large strings cause proportionally more layout work.
-         */
-        private const val MAX_CONTENT_LENGTH = 500_000
 
         fun factory(
             noteId: Long,

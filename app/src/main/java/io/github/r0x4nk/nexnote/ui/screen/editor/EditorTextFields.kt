@@ -7,29 +7,36 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.insert
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import io.github.r0x4nk.nexnote.util.markdownListContinuationForLine
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.yield
 
 @OptIn(ExperimentalFoundationApi::class)
 private class TextHighlightOutputTransformation(
@@ -105,10 +112,10 @@ internal fun TitleField(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ContentField(
-    value: TextFieldValue,
     textFieldState: TextFieldState,
     scrollState: ScrollState,
-    onValueChange: (TextFieldValue) -> Unit,
+    onContentEdited: () -> Unit,
+    onSelectionChange: (TextRange) -> Unit = {},
     onLayoutResult: (TextLayoutResult) -> Unit = {},
     highlightRange: IntRange? = null,
     searchRanges: List<IntRange> = emptyList(),
@@ -118,7 +125,17 @@ internal fun ContentField(
     val fallbackHighlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
     val searchHighlightColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)
     val activeSearchHighlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f)
-    val expectedValue = rememberUpdatedState(value)
+    val contentEditEvents = remember {
+        MutableSharedFlow<Unit>(
+            extraBufferCapacity = 64,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST
+        )
+    }
+    val inputTransformation = remember(contentEditEvents) {
+        EditorContentInputTransformation {
+            contentEditEvents.tryEmit(Unit)
+        }
+    }
     val outputTransformation = remember(
         highlightRange,
         searchRanges,
@@ -141,22 +158,23 @@ internal fun ContentField(
         }
     }
 
-    LaunchedEffect(textFieldState) {
-        snapshotFlow { textFieldState.toTextFieldValue() }
-            .userTextFieldChanges(expectedText = { expectedValue.value.text })
-            .collect { onValueChange(it) }
+    LaunchedEffect(textFieldState, contentEditEvents) {
+        contentEditEvents.conflate().collect {
+            yield()
+            onContentEdited()
+        }
     }
 
-    LaunchedEffect(value.text, value.selection.start, value.selection.end, textFieldState) {
-        val currentValue = textFieldState.toTextFieldValue()
-        if (EditorTextFieldSyncPolicy.canApplyRecomposedValue(currentValue, value)) {
-            textFieldState.setTextFieldValue(value)
-        }
+    LaunchedEffect(textFieldState) {
+        snapshotFlow { textFieldState.selection }
+            .distinctUntilChanged()
+            .collect { onSelectionChange(it) }
     }
 
     BasicTextField(
         state = textFieldState,
         modifier = modifier,
+        inputTransformation = inputTransformation,
         textStyle = MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface
         ),
@@ -167,9 +185,68 @@ internal fun ContentField(
             getResult()?.let(onLayoutResult)
         },
         decorator = TextFieldDecorator { inner ->
-            ContentFieldDecoration(textFieldState.text.toString(), inner)
+            ContentFieldDecoration(textFieldState.text.isEmpty(), inner)
         }
     )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private class EditorContentInputTransformation(
+    private val onContentEdited: () -> Unit
+) : InputTransformation {
+    override fun TextFieldBuffer.transformInput() {
+        if (changes.changeCount == 0) return
+
+        if (length > MAX_CONTENT_LENGTH) {
+            revertAllChanges()
+            return
+        }
+
+        continueMarkdownListIfNeeded()
+
+        if (length > MAX_CONTENT_LENGTH) {
+            revertAllChanges()
+            return
+        }
+
+        if (changes.changeCount > 0) {
+            onContentEdited()
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun TextFieldBuffer.continueMarkdownListIfNeeded() {
+    if (changes.changeCount != 1) return
+
+    val range = changes.getRange(0)
+    val originalRange = changes.getOriginalRange(0)
+    if (!originalRange.collapsed || range.max - range.min != 1) return
+
+    val insertedAt = range.min
+    if (insertedAt !in 0 until length || charAt(insertedAt) != '\n') return
+
+    val cursorPos = insertedAt + 1
+    if (!selection.collapsed || selection.end != cursorPos) return
+
+    val insertion = markdownListContinuationForLine(lineBefore(insertedAt)) ?: return
+    insert(cursorPos, insertion)
+    selection = TextRange(cursorPos + insertion.length)
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun TextFieldBuffer.lineBefore(offset: Int): String {
+    val end = offset.coerceIn(0, length)
+    var start = end
+    while (start > 0 && charAt(start - 1) != '\n') {
+        start--
+    }
+
+    return buildString(end - start) {
+        for (index in start until end) {
+            append(charAt(index))
+        }
+    }
 }
 
 /**
@@ -202,11 +279,11 @@ internal fun Flow<TextFieldValue>.userTextFieldChanges(
 
 @Composable
 private fun ContentFieldDecoration(
-    text: String,
+    isEmpty: Boolean,
     inner: @Composable () -> Unit
 ) {
     Box(contentAlignment = Alignment.TopStart) {
-        if (text.isEmpty()) {
+        if (isEmpty) {
             Text(
                 text = "Write something…",
                 style = MaterialTheme.typography.bodyLarge,

@@ -15,6 +15,16 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 
+/**
+ * Builds a callback that toggles between edit and preview while preserving the
+ * approximate scroll position.
+ *
+ * When leaving **preview** the current viewport anchor is mapped back to a
+ * source character offset via the lazy preview layout. When leaving
+ * **edit** the cursor-area pixel Y is converted to a character offset via the
+ * [TextLayoutResult]. Either way the offset is stored in
+ * [ContentScrollAnchor] and picked up by [EditorPreviewScrollRestorationEffect].
+ */
 @Composable
 internal fun rememberTogglePreviewPreservingScroll(
     state: EditorScreenState,
@@ -27,7 +37,6 @@ internal fun rememberTogglePreviewPreservingScroll(
     val showPreviewRef = rememberUpdatedState(showPreview)
     val contentRef = rememberUpdatedState(content)
     val contentVersionRef = rememberUpdatedState(contentVersion)
-    val previewSourceLayoutsRef = rememberUpdatedState(state.previewSourceLayouts)
     val textLayoutResultRef = rememberUpdatedState(state.textLayoutResult)
     val contentViewportHeightPxRef = rememberUpdatedState(state.contentViewportHeightPx)
 
@@ -48,13 +57,16 @@ internal fun rememberTogglePreviewPreservingScroll(
                 )
             }
             val currentContent = state.currentContentTextFieldValue()
-            val viewportHeight = contentViewportHeightPxRef.value.coerceAtLeast(1)
-            val centerY = state.contentScrollState.value +
-                viewportHeight * CONTENT_SCROLL_ANCHOR_FRACTION
             val anchorOffset = if (showPreviewRef.value) {
-                previewSourceLayoutsRef.value.sourceOffsetForPreviewY(centerY)
-                    ?: currentContent.selection.end.coerceIn(0, currentContent.text.length)
+                sourceOffsetForPreviewViewportAnchor(
+                    sourceRanges = state.currentSourceRanges,
+                    layoutInfo = state.previewListState.layoutInfo,
+                    viewportFraction = CONTENT_SCROLL_ANCHOR_FRACTION
+                ).coerceIn(0, currentContent.text.length)
             } else {
+                val viewportHeight = contentViewportHeightPxRef.value.coerceAtLeast(1)
+                val centerY = state.contentScrollState.value +
+                    viewportHeight * CONTENT_SCROLL_ANCHOR_FRACTION
                 editModeAnchorOffset(state, currentContent, centerY, textLayoutResultRef.value, density)
             }
             state.pendingContentScrollAnchor = ContentScrollAnchor(charOffset = anchorOffset)
@@ -81,7 +93,7 @@ private fun editModeAnchorOffset(
         layout.getOffsetForPosition(Offset(x = 0f, y = textY))
     } else {
         currentContent.selection.end
-    }.coerceIn(0, state.contentFieldValue.text.length)
+    }.coerceIn(0, currentContent.text.length)
 }
 
 @Composable
@@ -91,7 +103,7 @@ internal fun rememberInsertAtCursor(
 ): (String) -> Unit {
     return remember(state.contentFieldValueState, viewModel) {
         { insertion ->
-            val current = state.contentFieldValue
+            val current = state.currentContentTextFieldValue()
             val cursor = current.selection.end
             val before = current.text.substring(0, cursor)
             val after = current.text.substring(cursor)
@@ -106,6 +118,7 @@ internal fun rememberInsertAtCursor(
             )
             state.setContentFieldValue(TextFieldValue(newText, TextRange(nextCursor)))
             viewModel.onContentChange(newText, nextCursor)
+            state.markContentCommitted()
         }
     }
 }
@@ -117,7 +130,7 @@ internal fun rememberReplaceNoteLinkAutocomplete(
 ): (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit {
     return remember(state.contentFieldValueState, viewModel) {
         { match, target ->
-            val current = state.contentFieldValue
+            val current = state.currentContentTextFieldValue()
             val start = match.start.coerceIn(0, current.text.length)
             val end = match.endExclusive.coerceIn(start, current.text.length)
             val insertion = noteLinkMarkdownFor(target)
@@ -130,6 +143,7 @@ internal fun rememberReplaceNoteLinkAutocomplete(
             )
             state.setContentFieldValue(TextFieldValue(newText, TextRange(nextCursor)))
             viewModel.onContentChange(newText, nextCursor)
+            state.markContentCommitted()
         }
     }
 }
@@ -159,7 +173,7 @@ internal fun rememberLaunchImagePickerAtCursor(
 
     return remember(state.contentFieldValueState, imageLauncher, state.pendingImageInsertionOffsetState) {
         {
-            val current = state.contentFieldValueState.value
+            val current = state.currentContentTextFieldValue()
             state.pendingImageInsertionOffsetState.value =
                 current.selection.end.coerceIn(0, current.text.length)
             imageLauncher.launch(
@@ -176,7 +190,7 @@ private fun handlePickedImage(
     viewModel: EditorViewModel
 ) {
     val insertionOffset = state.pendingImageInsertionOffsetState.value
-        ?: state.contentFieldValueState.value.selection.end
+        ?: state.currentContentTextFieldValue().selection.end
     state.pendingImageInsertionOffsetState.value = null
     uri?.let {
         val resolver = context.applicationContext.contentResolver

@@ -13,6 +13,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
+/**
+ * Marks the content animations as enabled once the underlying note has emitted
+ * its first persisted [EditorUiState.lastModifiedDate]. Holding off on the
+ * AnimatedContent transition until the note is loaded prevents the entry
+ * animation from playing over a still-empty editor on cold open.
+ */
 @Composable
 internal fun EditorContentAnimationsReadyEffect(
     uiState: EditorUiState,
@@ -25,6 +31,16 @@ internal fun EditorContentAnimationsReadyEffect(
     }
 }
 
+/**
+ * Pushes ViewModel content into the [TextFieldState] whenever the model emits a
+ * new [EditorUiState.contentVersion] (e.g. on initial load, undo/redo, or
+ * external content replacement).
+ *
+ * Re-keying on `noteId`, `templateId`, `isTemplateMode`, and `contentVersion`
+ * keeps the editor immune to spurious recompositions: as long as the model has
+ * not advanced its content version, the field state is left alone and typing
+ * cannot be clobbered by a stale model snapshot.
+ */
 @Composable
 internal fun EditorContentSyncEffect(
     uiState: EditorUiState,
@@ -52,10 +68,56 @@ internal fun EditorContentSyncEffect(
                 NexNoteDebugLog.textSummary("content", uiState.content)
         )
         state.setContentFieldValue(syncedValue)
+        state.markContentCommitted()
         state.syncedContentVersion = uiState.contentVersion
     }
 }
 
+/**
+ * Debounces user edits before flushing them into the ViewModel.
+ *
+ * Each keystroke bumps [EditorScreenState.contentEditRevision]; this effect
+ * waits [CONTENT_MODEL_SYNC_DEBOUNCE_MS] of quiet, then commits the field's
+ * current text and selection in one shot. This keeps every keystroke off the
+ * persistence hot path while still committing fast enough that autosave,
+ * search, and undo see fresh content within a fraction of a second.
+ */
+@Composable
+internal fun EditorPendingContentCommitEffect(
+    uiState: EditorUiState,
+    state: EditorScreenState,
+    viewModel: EditorViewModel
+) {
+    val revision = state.contentEditRevision
+    LaunchedEffect(revision) {
+        if (revision == 0 || !state.hasPendingContentCommit) return@LaunchedEffect
+
+        delay(CONTENT_MODEL_SYNC_DEBOUNCE_MS)
+        if (!state.hasPendingContentCommit || revision != state.contentEditRevision) {
+            return@LaunchedEffect
+        }
+
+        state.commitContentTextFieldValue(
+            modelContent = uiState.content,
+            modelContentVersion = uiState.contentVersion,
+            onContentChange = viewModel::onContentChange
+        )
+        if (state.noteSearch.isActive) {
+            state.noteSearch = state.noteSearch.refresh(state.contentFieldValue.text)
+        }
+    }
+}
+
+/**
+ * Restores the scroll position after toggling between edit and preview modes.
+ *
+ * In **preview mode** the anchor is mapped to a lazy item plus an intra-item
+ * offset, so the preview keeps the same approximate viewport position without
+ * eagerly composing every markdown block.
+ *
+ * In **edit mode** the anchor is mapped to a pixel Y via [TextLayoutResult]
+ * and the [ScrollState] scrolls to that position.
+ */
 @Composable
 internal fun EditorPreviewScrollRestorationEffect(
     uiState: EditorUiState,
@@ -64,55 +126,87 @@ internal fun EditorPreviewScrollRestorationEffect(
 ) {
     LaunchedEffect(uiState.showPreview, state.pendingContentScrollAnchor) {
         val anchor = state.pendingContentScrollAnchor ?: return@LaunchedEffect
+        // Wait two frames so the new content mode has been laid out.
         withFrameNanos { }
         withFrameNanos { }
 
-        val viewportHeight = state.contentViewportHeightPx.coerceAtLeast(1)
         val anchorOffset = anchor.charOffset.coerceIn(0, state.contentFieldValue.text.length)
-        val anchorY = restoredAnchorY(state, uiState.showPreview, anchorOffset, density)
-        val targetScroll = if (anchorY != null) {
-            (anchorY - viewportHeight * anchor.viewportFraction)
-                .toInt()
-                .coerceIn(0, state.contentScrollState.maxValue)
+
+        if (uiState.showPreview) {
+            restorePreviewScroll(state, anchorOffset)
         } else {
-            state.contentScrollState.value.coerceIn(0, state.contentScrollState.maxValue)
+            restoreEditScroll(state, anchorOffset, anchor.viewportFraction, density)
         }
 
-        state.contentScrollState.scrollTo(targetScroll)
         delay(50)
         state.isRestoringContentScroll[0] = false
         state.pendingContentScrollAnchor = null
     }
 }
 
-private suspend fun restoredAnchorY(
+/**
+ * Scrolls the preview [LazyColumn] to the source position represented by [anchorOffset].
+ * Gracefully no-ops when source ranges or items are not yet available.
+ */
+private suspend fun restorePreviewScroll(
     state: EditorScreenState,
-    showPreview: Boolean,
+    anchorOffset: Int
+) {
+    state.previewListState.scrollToSourceOffset(
+        sourceRanges = state.currentSourceRanges,
+        sourceOffset = anchorOffset,
+        viewportFraction = CONTENT_SCROLL_ANCHOR_FRACTION,
+        animated = false
+    )
+}
+
+/**
+ * Scrolls the edit [BasicTextField] so the line at [anchorOffset] sits at
+ * the given viewport fraction.
+ */
+private suspend fun restoreEditScroll(
+    state: EditorScreenState,
+    anchorOffset: Int,
+    viewportFraction: Float,
+    density: Density
+) {
+    val viewportHeight = state.contentViewportHeightPx.coerceAtLeast(1)
+    val anchorY = editAnchorY(state, anchorOffset, density)
+    val targetScroll = if (anchorY != null) {
+        (anchorY - viewportHeight * viewportFraction)
+            .toInt()
+            .coerceIn(0, state.contentScrollState.maxValue)
+    } else {
+        state.contentScrollState.value.coerceIn(0, state.contentScrollState.maxValue)
+    }
+    state.contentScrollState.scrollTo(targetScroll)
+}
+
+private suspend fun editAnchorY(
+    state: EditorScreenState,
     anchorOffset: Int,
     density: Density
 ): Float? {
-    return if (showPreview) {
-        val layouts = withTimeoutOrNull(500) {
-            snapshotFlow { state.previewSourceLayouts }.first { it.isNotEmpty() }
-        }.orEmpty()
-        layouts.previewYForSourceOffset(anchorOffset)
+    val layout = withTimeoutOrNull(500) {
+        snapshotFlow { state.textLayoutResult }
+            .first { it != null && it.layoutInput.text.text == state.contentFieldValue.text }
+    }
+    val contentTopPadPx = with(density) { 8.dp.roundToPx() }
+    return if (layout != null) {
+        state.setContentFieldValue(
+            state.contentFieldValue.copy(selection = TextRange(anchorOffset))
+        )
+        contentTopPadPx + layout.getCursorRect(anchorOffset).top
     } else {
-        val layout = withTimeoutOrNull(500) {
-            snapshotFlow { state.textLayoutResult }
-                .first { it != null && it.layoutInput.text.text == state.contentFieldValue.text }
-        }
-        val contentTopPadPx = with(density) { 8.dp.roundToPx() }
-        if (layout != null) {
-            state.setContentFieldValue(
-                state.contentFieldValue.copy(selection = TextRange(anchorOffset))
-            )
-            contentTopPadPx + layout.getCursorRect(anchorOffset).top
-        } else {
-            null
-        }
+        null
     }
 }
 
+/**
+ * Hides the floating tag bar while the soft keyboard is visible so the user
+ * has the maximum vertical room to type, and restores it when the keyboard
+ * goes away — unless the user has explicitly pinned the tag bar.
+ */
 @Composable
 internal fun EditorKeyboardTagBarEffect(
     isKeyboardVisible: Boolean,
@@ -132,6 +226,10 @@ internal fun EditorKeyboardTagBarEffect(
     }
 }
 
+/**
+ * Surfaces transient ViewModel errors as snackbars and clears them once shown,
+ * so each error is reported exactly once per emission.
+ */
 @Composable
 internal fun EditorErrorSnackbarEffect(
     uiState: EditorUiState,
@@ -146,6 +244,13 @@ internal fun EditorErrorSnackbarEffect(
     }
 }
 
+/**
+ * Requests initial focus when the editor opens.
+ *
+ * - Template-creation flow: focus the title so the user can name the template.
+ * - Brand-new note: focus the content field so typing starts immediately.
+ * - Existing note: keep the previous focus owner (no-op).
+ */
 @Composable
 internal fun EditorInitialFocusEffect(
     noteId: Long,

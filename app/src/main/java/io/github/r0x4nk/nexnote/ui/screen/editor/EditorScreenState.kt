@@ -2,6 +2,8 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -17,7 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
-import io.github.r0x4nk.nexnote.ui.component.MarkdownPreviewBlockLayout
+import io.github.r0x4nk.nexnote.ui.component.MarkdownSourceRange
 
 internal data class ContentScrollAnchor(
     val charOffset: Int,
@@ -35,6 +37,7 @@ internal data class DirectPreviewWarmupKey(
 internal class EditorScreenState(
     val snackbarHostState: SnackbarHostState,
     val contentScrollState: ScrollState,
+    val previewListState: LazyListState,
     val titleFocusRequester: FocusRequester,
     val contentFocusRequester: FocusRequester,
     val searchFocusRequester: FocusRequester,
@@ -55,10 +58,13 @@ internal class EditorScreenState(
     var highlightRange by mutableStateOf<IntRange?>(null)
     var noteSearch by mutableStateOf(NoteSearchState.Empty)
     var pendingTagScroll by mutableStateOf<TagSearchState?>(null)
-    var previewSourceLayouts by mutableStateOf<List<MarkdownPreviewBlockLayout>>(emptyList())
+    /** Source ranges for each parsed markdown block, updated when content changes. */
+    var currentSourceRanges by mutableStateOf<List<MarkdownSourceRange>>(emptyList())
     var contentViewportHeightPx by mutableStateOf(0)
     var completedDirectPreviewWarmupKey by mutableStateOf<DirectPreviewWarmupKey?>(null)
     var syncedContentVersion by mutableStateOf(-1)
+    var contentEditRevision by mutableStateOf(0)
+    var hasPendingContentCommit by mutableStateOf(false)
 
     val isTagSearchScrolling = arrayOf(false)
     val isNoteSearchScrolling = arrayOf(false)
@@ -75,6 +81,15 @@ internal class EditorScreenState(
         set(value) {
             pendingContentScrollAnchorState.value = value
         }
+
+    fun markContentEdited() {
+        contentEditRevision += 1
+        hasPendingContentCommit = true
+    }
+
+    fun markContentCommitted() {
+        hasPendingContentCommit = false
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -86,6 +101,7 @@ internal fun rememberEditorScreenState(
 ): EditorScreenState = key(noteId, templateId, editTemplateId) {
     val snackbarHostState = remember { SnackbarHostState() }
     val contentScrollState = rememberScrollState()
+    val previewListState = rememberLazyListState()
     val titleFocusRequester = remember { FocusRequester() }
     val contentFocusRequester = remember { FocusRequester() }
     val searchFocusRequester = remember { FocusRequester() }
@@ -98,6 +114,7 @@ internal fun rememberEditorScreenState(
         EditorScreenState(
             snackbarHostState = snackbarHostState,
             contentScrollState = contentScrollState,
+            previewListState = previewListState,
             titleFocusRequester = titleFocusRequester,
             contentFocusRequester = contentFocusRequester,
             searchFocusRequester = searchFocusRequester,

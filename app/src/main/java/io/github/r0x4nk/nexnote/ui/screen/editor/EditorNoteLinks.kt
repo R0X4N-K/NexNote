@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -33,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -97,14 +100,21 @@ internal fun NoteLinkPickerDialog(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun BoxScope.EditorNoteLinkAutocompletePopup(
-    contentValue: TextFieldValue,
+    textFieldState: TextFieldState,
+    contentRevision: Int,
+    modelContentVersion: Int,
     targets: List<NoteLinkTarget>,
     enabled: Boolean,
     onTargetSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit
 ) {
-    val match = remember(contentValue) { findNoteLinkAutocompleteMatch(contentValue) }
+    val contentText = textFieldState.text
+    val selection = textFieldState.selection
+    val match = remember(contentRevision, modelContentVersion, contentText.length, selection) {
+        findNoteLinkAutocompleteMatch(contentText, selection)
+    }
     val suggestions = remember(targets, match?.query) {
         filterNoteLinkTargets(targets, match?.query.orEmpty(), limit = AUTOCOMPLETE_LIMIT)
     }
@@ -141,13 +151,21 @@ internal fun noteLinkMarkdownFor(target: NoteLinkTarget): String =
     NoteLinkMarkdown.create(target.id, target.title)
 
 internal fun findNoteLinkAutocompleteMatch(value: TextFieldValue): NoteLinkAutocompleteMatch? {
-    if (!value.selection.collapsed) return null
+    return findNoteLinkAutocompleteMatch(value.text, value.selection)
+}
 
-    val cursor = value.selection.end.coerceIn(0, value.text.length)
-    val triggerIndex = value.text.lastIndexOf("[[", startIndex = (cursor - 1).coerceAtLeast(0))
-    if (triggerIndex == -1 || triggerIndex > cursor) return null
+internal fun findNoteLinkAutocompleteMatch(
+    text: CharSequence,
+    selection: TextRange
+): NoteLinkAutocompleteMatch? {
+    if (!selection.collapsed) return null
 
-    val query = value.text.substring(triggerIndex + 2, cursor)
+    val cursor = selection.end.coerceIn(0, text.length)
+    val triggerIndex = text.lastIndexOfNoteLinkTriggerBefore(cursor) ?: return null
+    val queryStart = triggerIndex + NOTE_LINK_TRIGGER.length
+    if (cursor < queryStart) return null
+
+    val query = text.substring(queryStart, cursor)
     if (!query.isValidNoteLinkQuery()) return null
 
     return NoteLinkAutocompleteMatch(
@@ -156,6 +174,34 @@ internal fun findNoteLinkAutocompleteMatch(value: TextFieldValue): NoteLinkAutoc
         query = query.removePrefix("note:").trim()
     )
 }
+
+private fun CharSequence.lastIndexOfNoteLinkTriggerBefore(cursor: Int): Int? {
+    if (cursor <= 0) return null
+
+    val searchEnd = (cursor - 1).coerceAtMost(length - 1)
+    val searchStart = (cursor - NOTE_LINK_TRIGGER.length - MAX_AUTOCOMPLETE_QUERY_LENGTH)
+        .coerceAtLeast(0)
+
+    for (index in searchEnd downTo searchStart) {
+        if (isNoteLinkTriggerAt(index)) return index
+    }
+
+    return null
+}
+
+private fun CharSequence.isNoteLinkTriggerAt(index: Int): Boolean {
+    if (index < 0 || index + NOTE_LINK_TRIGGER.length > length) return false
+    return NOTE_LINK_TRIGGER.indices.all { triggerOffset ->
+        this[index + triggerOffset] == NOTE_LINK_TRIGGER[triggerOffset]
+    }
+}
+
+private fun CharSequence.substring(startIndex: Int, endIndex: Int): String =
+    buildString(endIndex - startIndex) {
+        for (index in startIndex until endIndex) {
+            append(this@substring[index])
+        }
+    }
 
 internal fun filterNoteLinkTargets(
     targets: List<NoteLinkTarget>,
@@ -242,3 +288,4 @@ private fun String.isValidNoteLinkQuery(): Boolean =
 
 private const val AUTOCOMPLETE_LIMIT = 6
 private const val MAX_AUTOCOMPLETE_QUERY_LENGTH = 80
+private const val NOTE_LINK_TRIGGER = "[["

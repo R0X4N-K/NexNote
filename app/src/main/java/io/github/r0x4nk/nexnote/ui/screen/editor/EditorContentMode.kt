@@ -14,13 +14,12 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.ui.component.MarkdownPreview
 import java.io.File
@@ -37,7 +36,8 @@ internal fun ColumnScope.EditorContentModeBox(
     imageFileProvider: (String) -> File,
     noteLinkTargets: List<NoteLinkTarget>,
     state: EditorScreenState,
-    onContentValueChange: (TextFieldValue) -> Unit,
+    onContentEdited: () -> Unit,
+    onContentSelectionChange: (TextRange) -> Unit,
     onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     onPreviewNoteLinkClick: (Long) -> Unit
 ) {
@@ -49,7 +49,6 @@ internal fun ColumnScope.EditorContentModeBox(
             .weight(1f)
             .fillMaxWidth()
             .onSizeChanged { size -> state.contentViewportHeightPx = size.height }
-            .then(contentModeScrollModifier(contentTarget, state))
     ) {
         AnimatedContent(
             targetState = contentTarget,
@@ -61,7 +60,7 @@ internal fun ColumnScope.EditorContentModeBox(
                     directPreviewOpening = uiState.openedDirectlyInPreview && uiState.showPreview
                 )
             },
-            modifier = contentModeAnimatedContentModifier(contentTarget),
+            modifier = Modifier.fillMaxSize(),
             label = "content_mode"
         ) { target ->
             when (target) {
@@ -72,37 +71,18 @@ internal fun ColumnScope.EditorContentModeBox(
                     EditorMarkdownPreview(uiState, imageFileProvider, state, onPreviewNoteLinkClick)
                 }
                 EditorContentTarget.Edit -> {
-                    EditorContentField(state, onContentValueChange)
+                    EditorContentField(state, onContentEdited, onContentSelectionChange)
                 }
             }
         }
         EditorNoteLinkAutocompletePopup(
-            contentValue = state.contentFieldValue,
+            textFieldState = state.contentTextFieldState,
+            contentRevision = state.contentEditRevision,
+            modelContentVersion = uiState.contentVersion,
             targets = noteLinkTargets,
             enabled = !uiState.showPreview && !state.noteSearch.isActive,
             onTargetSelected = onNoteLinkAutocompleteSelected
         )
-    }
-}
-
-private fun contentModeScrollModifier(
-    contentTarget: EditorContentTarget,
-    state: EditorScreenState
-): Modifier {
-    return if (contentTarget == EditorContentTarget.Edit) {
-        Modifier
-    } else {
-        Modifier.verticalScroll(state.contentScrollState)
-    }
-}
-
-private fun contentModeAnimatedContentModifier(
-    contentTarget: EditorContentTarget
-): Modifier {
-    return if (contentTarget == EditorContentTarget.Edit) {
-        Modifier.fillMaxSize()
-    } else {
-        Modifier.fillMaxWidth()
     }
 }
 
@@ -127,27 +107,28 @@ private fun EditorMarkdownPreview(
 ) {
     MarkdownPreview(
         markdown = uiState.content,
+        lazyListState = state.previewListState,
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(horizontal = 8.dp, vertical = 8.dp),
         imageFileProvider = imageFileProvider,
         highlightRanges = state.visibleContentHighlightRanges(),
         activeHighlightRange = state.activeContentHighlightRange(),
-        onNoteLinkClick = onPreviewNoteLinkClick,
-        onSourceLayoutsChange = { layouts -> state.previewSourceLayouts = layouts }
+        onNoteLinkClick = onPreviewNoteLinkClick
     )
 }
 
 @Composable
 private fun EditorContentField(
     state: EditorScreenState,
-    onContentValueChange: (TextFieldValue) -> Unit
+    onContentEdited: () -> Unit,
+    onContentSelectionChange: (TextRange) -> Unit
 ) {
     ContentField(
-        value = state.contentFieldValue,
         textFieldState = state.contentTextFieldState,
         scrollState = state.contentScrollState,
-        onValueChange = onContentValueChange,
+        onContentEdited = onContentEdited,
+        onSelectionChange = onContentSelectionChange,
         onLayoutResult = { state.textLayoutResult = it },
         highlightRange = state.fallbackContentHighlightRange(),
         searchRanges = state.searchContentHighlightRanges(),

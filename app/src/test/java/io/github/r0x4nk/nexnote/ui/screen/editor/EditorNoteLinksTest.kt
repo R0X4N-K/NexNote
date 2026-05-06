@@ -24,6 +24,27 @@ class EditorNoteLinksTest {
     }
 
     @Test
+    fun findNoteLinkAutocompleteMatch_ignoresCursorInsideOpeningTrigger() {
+        val value = TextFieldValue(
+            text = "See [[note:1|Project]]",
+            selection = TextRange("See [".length)
+        )
+
+        assertNull(findNoteLinkAutocompleteMatch(value))
+    }
+
+    @Test
+    fun findNoteLinkAutocompleteMatch_ignoresTriggerOutsideQueryWindow() {
+        val text = "[[" + "a".repeat(81)
+        val value = TextFieldValue(
+            text = text,
+            selection = TextRange(text.length)
+        )
+
+        assertNull(findNoteLinkAutocompleteMatch(value))
+    }
+
+    @Test
     fun findNoteLinkAutocompleteMatch_ignoresClosedLink() {
         val value = TextFieldValue(
             text = "See [[note:1|Project]]",
@@ -31,6 +52,17 @@ class EditorNoteLinksTest {
         )
 
         assertNull(findNoteLinkAutocompleteMatch(value))
+    }
+
+    @Test
+    fun findNoteLinkAutocompleteMatch_readsOnlyTheCursorWindowFromCharSequence() {
+        val text = WindowOnlyCharSequence("Prefix ".repeat(20) + "See [[proj")
+
+        val match = findNoteLinkAutocompleteMatch(text, TextRange(text.length))
+
+        assertEquals(text.length - "[[proj".length, match?.start)
+        assertEquals(text.length, match?.endExclusive)
+        assertEquals("proj", match?.query)
     }
 
     @Test
@@ -51,5 +83,21 @@ class EditorNoteLinksTest {
 
         assertEquals("[[note:7|A risky title]]", markdown)
         assertTrue(markdown.contains("note:7"))
+    }
+
+    private class WindowOnlyCharSequence(
+        private val value: String
+    ) : CharSequence {
+        override val length: Int get() = value.length
+
+        override fun get(index: Int): Char = value[index]
+
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
+            error("Autocomplete must not request a full subsequence")
+        }
+
+        override fun toString(): String {
+            error("Autocomplete must not copy the full editor text")
+        }
     }
 }

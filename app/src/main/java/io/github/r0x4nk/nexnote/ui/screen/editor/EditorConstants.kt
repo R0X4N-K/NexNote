@@ -4,6 +4,8 @@ internal const val TAG_SCROLL_VISIBILITY_THRESHOLD_PX = 28
 internal const val CONTENT_SCROLL_ANCHOR_FRACTION = 0.5f
 internal const val DEFAULT_UNDO_HISTORY_DEBOUNCE_MS = 400L
 internal const val DEFAULT_UNDO_HISTORY_MAX_SNAPSHOTS = 50
+internal const val CONTENT_MODEL_SYNC_DEBOUNCE_MS = 250L
+internal const val MAX_CONTENT_LENGTH = 500_000
 // Keeps heavy first preview composition out of the navigation enter animation.
 internal const val DIRECT_PREVIEW_FIRST_COMPOSITION_DELAY_MS = 220L
 internal const val MARKDOWN_CHECKLIST_SNIPPET = "\n- [ ] "

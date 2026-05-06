@@ -52,7 +52,7 @@ fun handleSmartEnter(old: TextFieldValue, new: TextFieldValue): TextFieldValue {
     val prevLineStart    = textBeforeCursor.lastIndexOf('\n') + 1  // 0 if no prior newline
     val prevLine         = textBeforeCursor.substring(prevLineStart)
 
-    val insertion = computeListContinuation(prevLine) ?: return new
+    val insertion = markdownListContinuationForLine(prevLine) ?: return new
 
     // Splice the marker right after the newly inserted newline.
     val newText = new.text.substring(0, cursorPos) + insertion + new.text.substring(cursorPos)
@@ -99,7 +99,7 @@ fun insertStandaloneMarkdownBlock(
  * Returns the continuation string (e.g. `"- "`, `"2. "`, `"  - [ ] "`), or
  * `null` if [line] is not a list item.
  */
-private fun computeListContinuation(line: String): String? {
+internal fun markdownListContinuationForLine(line: String): String? {
     if (line.isBlank()) return null
 
     val trimmed = line.trimStart()

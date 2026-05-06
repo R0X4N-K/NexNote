@@ -13,6 +13,8 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 object NexNoteDebugLog {
     const val TAG = "NexNoteDebug"
     private const val SAMPLE_LIMIT = 120
+    private const val FULL_HASH_LIMIT = 8_192
+    private const val PARTIAL_HASH_SAMPLE_LIMIT = 512
     val isEnabled: Boolean
         get() = BuildConfig.DEBUG
 
@@ -60,7 +62,7 @@ object NexNoteDebugLog {
     fun textSummary(label: String, text: String): String {
         if (!isEnabled) return ""
         return "$label.len=${text.length} " +
-            "$label.hash=${text.hashCode()} " +
+            "$label.hash=${text.debugFingerprint()} " +
             "$label.sample=\"${text.debugSample()}\""
     }
 
@@ -70,7 +72,7 @@ object NexNoteDebugLog {
         return "$label.id=${note.id} " +
             "$label.titleLen=${note.title.length} " +
             "$label.contentLen=${note.content.length} " +
-            "$label.contentHash=${note.content.hashCode()} " +
+            "$label.contentHash=${note.content.debugFingerprint()} " +
             "$label.markdown=${note.isMarkdown} " +
             "$label.preview=${note.isPreviewMode} " +
             "$label.modified=${note.lastModifiedDate} " +
@@ -131,5 +133,13 @@ object NexNoteDebugLog {
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\"", "\\\"")
+    }
+
+    private fun String.debugFingerprint(): String {
+        if (length <= FULL_HASH_LIMIT) return hashCode().toString()
+
+        val headHash = take(PARTIAL_HASH_SAMPLE_LIMIT).hashCode()
+        val tailHash = takeLast(PARTIAL_HASH_SAMPLE_LIMIT).hashCode()
+        return "partial:$headHash:$tailHash"
     }
 }

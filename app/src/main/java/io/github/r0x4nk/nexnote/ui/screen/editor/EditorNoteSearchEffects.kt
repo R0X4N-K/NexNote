@@ -42,6 +42,14 @@ private fun EditorNoteSearchRefreshEffect(state: EditorScreenState) {
     }
 }
 
+/**
+ * Scrolls to the currently active search match.
+ *
+ * In **preview mode** the match is mapped to a lazy preview item and an
+ * intra-item offset, so repeated matches in the same block do not all jump to
+ * the block top.
+ * In **edit mode** the pixel Y is resolved from the [TextLayoutResult].
+ */
 @Composable
 private fun EditorNoteSearchScrollEffect(
     showPreview: Boolean,
@@ -55,20 +63,42 @@ private fun EditorNoteSearchScrollEffect(
 
         state.isNoteSearchScrolling[0] = true
         try {
-            if (!showPreview) state.selectNoteSearchRange(currentMatch)
-
-            val viewportHeight = state.contentViewportHeightPx.coerceAtLeast(1)
-            val targetY = noteSearchTargetY(currentMatch, showPreview, state, density)
-                ?: return@LaunchedEffect
-            val targetScroll = (targetY - viewportHeight * CONTENT_SCROLL_ANCHOR_FRACTION)
-                .toInt()
-                .coerceIn(0, state.contentScrollState.maxValue)
-
-            state.contentScrollState.animateScrollTo(targetScroll)
+            if (showPreview) {
+                scrollPreviewToSearchMatch(currentMatch, state)
+            } else {
+                scrollEditToSearchMatch(currentMatch, state, density)
+            }
         } finally {
             state.isNoteSearchScrolling[0] = false
         }
     }
+}
+
+private suspend fun scrollPreviewToSearchMatch(
+    match: IntRange,
+    state: EditorScreenState
+) {
+    state.previewListState.scrollToSourceOffset(
+        sourceRanges = state.currentSourceRanges,
+        sourceOffset = match.first,
+        viewportFraction = CONTENT_SCROLL_ANCHOR_FRACTION,
+        animated = true
+    )
+}
+
+private suspend fun scrollEditToSearchMatch(
+    match: IntRange,
+    state: EditorScreenState,
+    density: Density
+) {
+    state.selectNoteSearchRange(match)
+
+    val targetY = editModeNoteSearchTargetY(match, state, density) ?: return
+    val viewportHeight = state.contentViewportHeightPx.coerceAtLeast(1)
+    val targetScroll = (targetY - viewportHeight * CONTENT_SCROLL_ANCHOR_FRACTION)
+        .toInt()
+        .coerceIn(0, state.contentScrollState.maxValue)
+    state.contentScrollState.animateScrollTo(targetScroll)
 }
 
 private fun EditorScreenState.selectNoteSearchRange(range: IntRange) {
@@ -76,33 +106,6 @@ private fun EditorScreenState.selectNoteSearchRange(range: IntRange) {
     val safeStart = range.first.coerceIn(0, contentLength)
     val safeEnd = (range.last + 1).coerceIn(safeStart, contentLength)
     setContentFieldValue(contentFieldValue.copy(selection = TextRange(safeStart, safeEnd)))
-}
-
-private suspend fun noteSearchTargetY(
-    range: IntRange,
-    showPreview: Boolean,
-    state: EditorScreenState,
-    density: Density
-): Float? {
-    return if (showPreview) {
-        previewNoteSearchTargetY(range, state)
-    } else {
-        editModeNoteSearchTargetY(range, state, density)
-    }
-}
-
-private suspend fun previewNoteSearchTargetY(
-    range: IntRange,
-    state: EditorScreenState
-): Float? {
-    val sourceOffset = range.first
-    val layouts = withTimeoutOrNull(500) {
-        snapshotFlow { state.previewSourceLayouts }.first { layouts ->
-            layouts.any { it.containsSourceOffset(sourceOffset) }
-        }
-    }.orEmpty()
-
-    return layouts.previewYForSourceOffset(sourceOffset)
 }
 
 private suspend fun editModeNoteSearchTargetY(
