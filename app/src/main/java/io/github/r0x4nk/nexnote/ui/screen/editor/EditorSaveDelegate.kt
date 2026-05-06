@@ -23,7 +23,8 @@ internal class EditorSaveDelegate(
     private val saveTemplate: SaveTemplateUseCase,
     private val indexNoteTags: IndexNoteTagsUseCase?,
     private val scope: CoroutineScope,
-    private val autosaveDelayMs: Long
+    private val autosaveDelayMs: Long,
+    private val tagIndexDedup: TagIndexDedupPolicy = TagIndexDedupPolicy()
 ) {
     private val saveMutex = Mutex()
     private var autosaveJob: Job? = null
@@ -106,7 +107,7 @@ internal class EditorSaveDelegate(
             details = NexNoteDebugLog.noteSummary("note", note)
         )
         val savedId = saveNote(note)
-        indexNoteTags?.invoke(savedId, snapshot.content)
+        maybeIndexNoteTags(savedId, snapshot.content)
 
         uiState.update { current ->
             val changedDuringSave = EditorSaveChangePolicy.hasUnsavedNoteChanges(
@@ -157,6 +158,34 @@ internal class EditorSaveDelegate(
                 isSaving = false,
                 isDirty = changedDuringSave
             )
+        }
+    }
+
+    /**
+     * Re-indexes the note's hashtags only when content has actually changed
+     * since the last successful indexing. Saves triggered by title, colour,
+     * markdown-mode or preview-mode changes therefore do not re-walk the full
+     * content nor touch every existing tag row in the database — a meaningful
+     * win on long notes where the autosave runs every [autosaveDelayMs].
+     *
+     * On failure the dedup hash is forgotten so the next save retries the
+     * index, preventing transient errors from leaving the tag table stale.
+     */
+    private suspend fun maybeIndexNoteTags(savedId: Long, content: String) {
+        val indexer = indexNoteTags ?: return
+        if (!tagIndexDedup.shouldIndexAndRemember(savedId, content)) {
+            NexNoteDebugLog.persistence(
+                event = "indexNoteTagsSkipped",
+                details = "reason=unchanged savedId=$savedId contentLen=${content.length}"
+            )
+            return
+        }
+
+        try {
+            indexer(savedId, content)
+        } catch (e: Throwable) {
+            tagIndexDedup.forgetLastIndex()
+            throw e
         }
     }
 
