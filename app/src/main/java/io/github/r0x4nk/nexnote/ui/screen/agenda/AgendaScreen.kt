@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 
 @Composable
 fun AgendaScreen(
@@ -33,7 +37,13 @@ fun AgendaScreen(
     val density = LocalDensity.current
     val listState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
-    val actions = rememberAgendaActions(viewModel, onNoteClick)
+    val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
+    var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    val actions = rememberAgendaActions(
+        viewModel = viewModel,
+        onNoteClick = onNoteClick,
+        onRequestNoteActions = { note -> activeActionsNote = note }
+    )
 
     val isToolbarSticky by remember {
         derivedStateOf { listState.firstVisibleItemIndex > CONTROLS_ROW_INDEX }
@@ -51,6 +61,7 @@ fun AgendaScreen(
         onUndoTrash = actions.onUndoTrash,
         onConfirmTrash = actions.onConfirmTrash
     )
+    AgendaNoteActionMessagesEffect(viewModel, snackbarHostState)
     AgendaCalendarVisibilityEffects(
         isSearchActive = uiState.isSearchActive,
         isToolbarSticky = isToolbarSticky,
@@ -90,4 +101,24 @@ fun AgendaScreen(
         },
         actions = actions
     )
+
+    NoteActionsSheet(
+        note = activeActionsNote,
+        clipboardCallbacks = clipboardCallbacks,
+        onDuplicate = actions.onDuplicateNote,
+        onDelete = actions.onRequestTrash,
+        onDismiss = { activeActionsNote = null }
+    )
+}
+
+@Composable
+private fun AgendaNoteActionMessagesEffect(
+    viewModel: AgendaViewModel,
+    snackbarHostState: SnackbarHostState
+) {
+    LaunchedEffect(viewModel, snackbarHostState) {
+        viewModel.noteActionMessages.collect { message ->
+            snackbarHostState.showSnackbar(message = message)
+        }
+    }
 }

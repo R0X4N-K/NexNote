@@ -26,7 +26,7 @@ import kotlinx.coroutines.delay
  * Swipe left (EndToStart) → vertical collapse animation → [onTrash].
  * Tap → [onClick].
  * Pin button (top-right of card header) → [onPin] toggles the pinned state.
- * Long-press → [onPin] (same action, alternative gesture).
+ * Long-press → [onLongPress].
  *
  * [noteCardStyle] controls how much information is shown:
  *   - TITLE_ONLY: title and date only (most compact).
@@ -45,7 +45,8 @@ fun NoteCard(
     noteCardStyle: NoteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
     titleHighlightRanges: List<IntRange> = emptyList(),
     contentHighlightRanges: List<IntRange> = emptyList(),
-    onPin: () -> Unit = {}
+    onPin: () -> Unit = {},
+    onLongPress: () -> Unit = {}
 ) {
     val collapsedState = remember { mutableStateOf(false) }
     val dismissState = rememberNoteCardDismissState(collapsedState)
@@ -64,6 +65,7 @@ fun NoteCard(
             note = note,
             onClick = { if (!collapsedState.value) onClick() },
             onPin = onPin,
+            onLongPress = onLongPress,
             noteCardStyle = noteCardStyle,
             titleHighlightRanges = titleHighlightRanges,
             contentHighlightRanges = contentHighlightRanges

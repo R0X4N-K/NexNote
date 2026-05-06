@@ -10,15 +10,25 @@ import io.github.r0x4nk.nexnote.NexNoteApp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageDescUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SearchTagsUseCase
+import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
+import io.github.r0x4nk.nexnote.ui.common.displayLabel
+import io.github.r0x4nk.nexnote.ui.common.toTrashedNoteEvent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -89,13 +99,21 @@ class TagsViewModel(
     private val searchTags: SearchTagsUseCase,
     private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
     private val observeAllNotes: ObserveAllNotesUseCase,
-    private val deleteTag: DeleteTagUseCase
+    private val deleteTag: DeleteTagUseCase,
+    private val moveNoteToTrash: MoveNoteToTrashUseCase,
+    private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
+    private val duplicateNoteUseCase: DuplicateNoteUseCase
 ) : ViewModel() {
 
     private val _searchQuery     = MutableStateFlow("")
     private val _sortOrder       = MutableStateFlow(TagSortOrder.USAGE_DESC)
     private val _selectedTagName = MutableStateFlow<String?>(null)
     private val _activeDialog    = MutableStateFlow<TagsDialog>(TagsDialog.None)
+    private val _trashEvents = Channel<TrashedNoteEvent>(Channel.BUFFERED)
+    val trashEvents: Flow<TrashedNoteEvent> = _trashEvents.receiveAsFlow()
+
+    private val _noteActionMessages = Channel<String>(Channel.BUFFERED)
+    val noteActionMessages: Flow<String> = _noteActionMessages.receiveAsFlow()
 
     private val tagsFlow = buildTagsFlow(
         searchQuery = _searchQuery,
@@ -186,6 +204,38 @@ class TagsViewModel(
         }
     }
 
+    // ── Note actions ─────────────────────────────────────────────────────────
+
+    fun requestTrash(note: Note) {
+        val event = note.toTrashedNoteEvent()
+        viewModelScope.launch {
+            moveNoteToTrash(note.id)
+            _trashEvents.trySend(event)
+        }
+    }
+
+    fun confirmTrash(@Suppress("UNUSED_PARAMETER") noteId: Long) {
+        // No-op: the note was already moved to trash.
+    }
+
+    fun undoPendingTrash(noteId: Long) {
+        viewModelScope.launch { restoreNoteFromTrash(noteId) }
+    }
+
+    fun duplicateNote(note: Note) {
+        val noteLabel = note.displayLabel()
+        viewModelScope.launch {
+            try {
+                duplicateNoteUseCase(note)
+                _noteActionMessages.trySend("Duplicated \"$noteLabel\"")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
+            }
+        }
+    }
+
     // ── Factory ───────────────────────────────────────────────────────────────
 
     companion object {
@@ -202,7 +252,10 @@ class TagsViewModel(
                     searchTags = useCases.tags.searchTags,
                     observeFilteredNoteIds = useCases.tags.observeFilteredNoteIds,
                     observeAllNotes = useCases.notes.observeAllNotes,
-                    deleteTag = useCases.tags.deleteTag
+                    deleteTag = useCases.tags.deleteTag,
+                    moveNoteToTrash = useCases.notes.moveNoteToTrash,
+                    restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,
+                    duplicateNoteUseCase = useCases.notes.duplicateNote
                 )
             }
         }

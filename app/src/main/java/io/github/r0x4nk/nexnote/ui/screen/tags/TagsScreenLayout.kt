@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -30,6 +33,7 @@ import io.github.r0x4nk.nexnote.domain.model.Tag
 internal fun TagsScreenLayout(
     uiState: TagsUiState,
     scrollBehavior: TopAppBarScrollBehavior,
+    snackbarHostState: SnackbarHostState,
     searchFocusRequester: FocusRequester,
     isSearchActive: Boolean,
     showSortMenu: Boolean,
@@ -37,6 +41,11 @@ internal fun TagsScreenLayout(
 ) {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(snackbarData = data)
+            }
+        },
         topBar = {
             TagsTopBar(
                 uiState = uiState,
@@ -158,6 +167,7 @@ private fun TagsListItem(
         notes = if (tag.name == selectedTagName) notesForSelectedTag else emptyList(),
         onTagClick = { actions.onTagClick(tag.name) },
         onNoteClick = actions.onNoteClick,
+        onRequestNoteActions = actions.onRequestNoteActions,
         onDeleteClick = { actions.onDeleteClick(tag) }
     )
 }

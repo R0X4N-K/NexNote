@@ -43,6 +43,7 @@ internal fun HomeContent(
     onClearTagFilters: () -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (uiState.isLoading) {
@@ -59,6 +60,7 @@ internal fun HomeContent(
             onClearTagFilters = onClearTagFilters,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
+            onRequestNoteActions = onRequestNoteActions,
             modifier = modifier
         )
     }
@@ -86,6 +88,7 @@ private fun HomeLoadedContent(
     onClearTagFilters: () -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit,
     modifier: Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -97,7 +100,8 @@ private fun HomeLoadedContent(
             gridState = gridState,
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
-            onRequestTrash = onRequestTrash
+            onRequestTrash = onRequestTrash,
+            onRequestNoteActions = onRequestNoteActions
         )
     }
 }
@@ -145,7 +149,8 @@ private fun HomeNotesBody(
     gridState: LazyGridState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
-    onRequestTrash: (Note) -> Unit
+    onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     if (uiState.notes.isEmpty()) {
         EmptyState(
@@ -161,7 +166,8 @@ private fun HomeNotesBody(
             gridState = gridState,
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
-            onRequestTrash = onRequestTrash
+            onRequestTrash = onRequestTrash,
+            onRequestNoteActions = onRequestNoteActions
         )
     }
 }
@@ -174,14 +180,31 @@ private fun HomeNoteCollection(
     gridState: LazyGridState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
-    onRequestTrash: (Note) -> Unit
+    onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     val displayItems = rememberDisplayItems(uiState)
 
     if (uiState.viewMode == NoteListViewMode.GRID) {
-        HomeNoteGrid(displayItems, noteCardStyle, gridState, onNoteClick, onTogglePin, onRequestTrash)
+        HomeNoteGrid(
+            displayItems,
+            noteCardStyle,
+            gridState,
+            onNoteClick,
+            onTogglePin,
+            onRequestTrash,
+            onRequestNoteActions
+        )
     } else {
-        HomeNoteList(displayItems, noteCardStyle, listState, onNoteClick, onTogglePin, onRequestTrash)
+        HomeNoteList(
+            displayItems,
+            noteCardStyle,
+            listState,
+            onNoteClick,
+            onTogglePin,
+            onRequestTrash,
+            onRequestNoteActions
+        )
     }
 }
 
@@ -207,7 +230,8 @@ private fun HomeNoteGrid(
     gridState: LazyGridState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
-    onRequestTrash: (Note) -> Unit
+    onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -222,7 +246,15 @@ private fun HomeNoteGrid(
             key = { scored -> scored.note.id },
             contentType = { "note_card" }
         ) { scored ->
-            HomeNoteCard(scored, noteCardStyle, onNoteClick, onTogglePin, onRequestTrash, Modifier.animateItem())
+            HomeNoteCard(
+                scored,
+                noteCardStyle,
+                onNoteClick,
+                onTogglePin,
+                onRequestTrash,
+                onRequestNoteActions,
+                Modifier.animateItem()
+            )
         }
     }
 }
@@ -234,7 +266,8 @@ private fun HomeNoteList(
     listState: LazyListState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
-    onRequestTrash: (Note) -> Unit
+    onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -247,7 +280,15 @@ private fun HomeNoteList(
             key = { scored -> scored.note.id },
             contentType = { "note_card" }
         ) { scored ->
-            HomeNoteCard(scored, noteCardStyle, onNoteClick, onTogglePin, onRequestTrash, Modifier.animateItem())
+            HomeNoteCard(
+                scored,
+                noteCardStyle,
+                onNoteClick,
+                onTogglePin,
+                onRequestTrash,
+                onRequestNoteActions,
+                Modifier.animateItem()
+            )
         }
         item { Spacer(Modifier.height(32.dp)) }
     }
@@ -260,6 +301,7 @@ private fun HomeNoteCard(
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val note = scored.note
@@ -271,6 +313,7 @@ private fun HomeNoteCard(
         titleHighlightRanges = scored.titleRanges,
         contentHighlightRanges = scored.contentRanges,
         onPin = remember(note, onTogglePin) { { onTogglePin(note) } },
+        onLongPress = remember(note, onRequestNoteActions) { { onRequestNoteActions(note) } },
         modifier = modifier,
         onTrash = remember(note, onRequestTrash) { { onRequestTrash(note) } }
     )

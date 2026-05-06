@@ -47,6 +47,7 @@ internal fun LazyListScope.agendaNotesItems(
                 onClick = { actions.onNoteClick(note.id) },
                 noteCardStyle = noteCardStyle,
                 onPin = { actions.onTogglePin(note) },
+                onLongPress = { actions.onRequestNoteActions(note) },
                 modifier = Modifier
                     .padding(horizontal = 16.dp, vertical = 4.dp)
                     .animateItem(),
@@ -108,6 +109,7 @@ private fun AgendaGridNoteCard(
         onClick = { actions.onNoteClick(note.id) },
         noteCardStyle = noteCardStyle,
         onPin = { actions.onTogglePin(note) },
+        onLongPress = { actions.onRequestNoteActions(note) },
         onTrash = { actions.onRequestTrash(note) }
     )
 }

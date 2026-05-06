@@ -33,6 +33,24 @@ class InternalNoteImageStorageTest {
     }
 
     @Test
+    fun `copyImageToInternal avoids overwriting an image created in the same millisecond`() = runTest {
+        val storage = InternalNoteImageStorage(
+            filesDir = tempFolder.root,
+            currentTimeMillis = { 123L }
+        )
+        storage.getImageFile("images/note_42_img_123.jpg").parentFile?.mkdirs()
+        storage.getImageFile("images/note_42_img_123.jpg").writeText("existing")
+
+        val relativePath = storage.copyImageToInternal(noteId = 42L) {
+            ByteArrayInputStream("new image".toByteArray())
+        }
+
+        assertEquals("images/note_42_img_124.jpg", relativePath)
+        assertEquals("existing", storage.getImageFile("images/note_42_img_123.jpg").readText())
+        assertEquals("new image", storage.getImageFile(relativePath).readText())
+    }
+
+    @Test
     fun `copyImageToInternal fails when stream is null`() = runTest {
         val storage = InternalNoteImageStorage(
             filesDir = tempFolder.root,

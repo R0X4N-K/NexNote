@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
@@ -17,7 +18,9 @@ import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
+import io.github.r0x4nk.nexnote.ui.common.displayLabel
 import io.github.r0x4nk.nexnote.ui.common.toTrashedNoteEvent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +39,7 @@ class HomeViewModel(
     private val moveNoteToTrash: MoveNoteToTrashUseCase,
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     private val toggleNotePin: ToggleNotePinUseCase,
+    private val duplicateNoteUseCase: DuplicateNoteUseCase? = null,
     private val observeTemplates: ObserveTemplatesUseCase? = null,
     private val observeMostUsedTags: ObserveMostUsedTagsUseCase? = null,
     private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase? = null,
@@ -57,6 +61,9 @@ class HomeViewModel(
      */
     private val _trashEvents = Channel<TrashedNoteEvent>(Channel.BUFFERED)
     val trashEvents: Flow<TrashedNoteEvent> = _trashEvents.receiveAsFlow()
+
+    private val _noteActionMessages = Channel<String>(Channel.BUFFERED)
+    val noteActionMessages: Flow<String> = _noteActionMessages.receiveAsFlow()
 
     /**
      * Templates are loaded once and kept hot for the duration of the ViewModel.
@@ -244,6 +251,21 @@ class HomeViewModel(
 
     fun togglePin(note: Note) {
         viewModelScope.launch { toggleNotePin(note) }
+    }
+
+    fun duplicateNote(note: Note) {
+        val duplicate = duplicateNoteUseCase ?: return
+        val noteLabel = note.displayLabel()
+        viewModelScope.launch {
+            try {
+                duplicate(note)
+                _noteActionMessages.trySend("Duplicated \"$noteLabel\"")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
+            }
+        }
     }
 
     companion object {

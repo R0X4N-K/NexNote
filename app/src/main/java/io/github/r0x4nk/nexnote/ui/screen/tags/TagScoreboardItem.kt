@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,6 +43,7 @@ internal fun TagScoreboardItem(
     notes: List<Note>,
     onTagClick: () -> Unit,
     onNoteClick: (Long) -> Unit,
+    onRequestNoteActions: (Note) -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -67,7 +69,8 @@ internal fun TagScoreboardItem(
             ExpandedNotesSection(
                 isExpanded = isExpanded,
                 notes = notes,
-                onNoteClick = onNoteClick
+                onNoteClick = onNoteClick,
+                onRequestNoteActions = onRequestNoteActions
             )
         }
     }
@@ -160,21 +163,27 @@ private fun DeleteTagButton(tagName: String, onDeleteClick: () -> Unit) {
 private fun ExpandedNotesSection(
     isExpanded: Boolean,
     notes: List<Note>,
-    onNoteClick: (Long) -> Unit
+    onNoteClick: (Long) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     AnimatedVisibility(
         visible = isExpanded,
         enter = expandVertically(tween(150)) + fadeIn(tween(150)),
         exit = shrinkVertically(tween(130)) + fadeOut(tween(110))
     ) {
-        ExpandedNotesContent(notes = notes, onNoteClick = onNoteClick)
+        ExpandedNotesContent(
+            notes = notes,
+            onNoteClick = onNoteClick,
+            onRequestNoteActions = onRequestNoteActions
+        )
     }
 }
 
 @Composable
 private fun ExpandedNotesContent(
     notes: List<Note>,
-    onNoteClick: (Long) -> Unit
+    onNoteClick: (Long) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -185,7 +194,7 @@ private fun ExpandedNotesContent(
         if (notes.isEmpty()) {
             EmptyNotesText()
         } else {
-            NotesPreviewList(notes, onNoteClick)
+            NotesPreviewList(notes, onNoteClick, onRequestNoteActions)
         }
     }
 }
@@ -202,11 +211,16 @@ private fun EmptyNotesText() {
 @Composable
 private fun NotesPreviewList(
     notes: List<Note>,
-    onNoteClick: (Long) -> Unit
+    onNoteClick: (Long) -> Unit,
+    onRequestNoteActions: (Note) -> Unit
 ) {
     val displayed = notes.take(MAX_NOTES_SHOWN)
     displayed.forEach { note ->
-        NoteRowItem(note = note, onClick = { onNoteClick(note.id) })
+        NoteRowItem(
+            note = note,
+            onClick = { onNoteClick(note.id) },
+            onLongPress = { onRequestNoteActions(note) }
+        )
     }
     if (notes.size > MAX_NOTES_SHOWN) {
         Text(
@@ -219,11 +233,15 @@ private fun NotesPreviewList(
 }
 
 @Composable
-private fun NoteRowItem(note: Note, onClick: () -> Unit) {
+private fun NoteRowItem(
+    note: Note,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

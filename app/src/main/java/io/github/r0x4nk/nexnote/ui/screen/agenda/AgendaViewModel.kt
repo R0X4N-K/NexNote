@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.r0x4nk.nexnote.NexNoteApp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
@@ -18,8 +19,10 @@ import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
+import io.github.r0x4nk.nexnote.ui.common.displayLabel
 import io.github.r0x4nk.nexnote.ui.common.toTrashedNoteEvent
 import io.github.r0x4nk.nexnote.util.DateUtils
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +42,7 @@ class AgendaViewModel(
     private val moveNoteToTrash: MoveNoteToTrashUseCase,
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     private val toggleNotePin: ToggleNotePinUseCase,
+    private val duplicateNoteUseCase: DuplicateNoteUseCase? = null,
     private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase? = null,
     observeNoteCardStyle: ObserveNoteCardStyleUseCase? = null
 ) : ViewModel() {
@@ -61,6 +65,9 @@ class AgendaViewModel(
      */
     private val _trashEvents = Channel<TrashedNoteEvent>(Channel.BUFFERED)
     val trashEvents: Flow<TrashedNoteEvent> = _trashEvents.receiveAsFlow()
+
+    private val _noteActionMessages = Channel<String>(Channel.BUFFERED)
+    val noteActionMessages: Flow<String> = _noteActionMessages.receiveAsFlow()
 
     val noteCardStyle: StateFlow<NoteCardStyle> = (
         observeNoteCardStyle?.invoke() ?: flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
@@ -166,6 +173,21 @@ class AgendaViewModel(
         viewModelScope.launch { toggleNotePin(note) }
     }
 
+    fun duplicateNote(note: Note) {
+        val duplicate = duplicateNoteUseCase ?: return
+        val noteLabel = note.displayLabel()
+        viewModelScope.launch {
+            try {
+                duplicate(note)
+                _noteActionMessages.trySend("Duplicated \"$noteLabel\"")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
+            }
+        }
+    }
+
     // ── Search ────────────────────────────────────────────────────────────────
 
     fun onSearchQueryChange(query: String) {
@@ -257,6 +279,7 @@ class AgendaViewModel(
                     moveNoteToTrash = useCases.notes.moveNoteToTrash,
                     restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,
                     toggleNotePin = useCases.notes.toggleNotePin,
+                    duplicateNoteUseCase = useCases.notes.duplicateNote,
                     observeFilteredNoteIds = useCases.tags.observeFilteredNoteIds,
                     observeNoteCardStyle = useCases.preferences.observeNoteCardStyle
                 )

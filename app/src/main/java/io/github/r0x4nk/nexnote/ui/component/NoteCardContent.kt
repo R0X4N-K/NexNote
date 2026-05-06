@@ -45,6 +45,7 @@ internal fun NoteCardContent(
     note: Note,
     onClick: () -> Unit,
     onPin: () -> Unit,
+    onLongPress: () -> Unit,
     noteCardStyle: NoteCardStyle,
     titleHighlightRanges: List<IntRange>,
     contentHighlightRanges: List<IntRange>
@@ -61,6 +62,7 @@ internal fun NoteCardContent(
         note = note,
         onClick = onClick,
         onPin = onPin,
+        onLongPress = onLongPress,
         noteCardStyle = noteCardStyle,
         visuals = visuals,
         textState = textState
@@ -123,6 +125,7 @@ private fun NoteCardSurface(
     note: Note,
     onClick: () -> Unit,
     onPin: () -> Unit,
+    onLongPress: () -> Unit,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
@@ -130,7 +133,7 @@ private fun NoteCardSurface(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onPin),
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
         elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
         colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
         shape = MaterialTheme.shapes.large,

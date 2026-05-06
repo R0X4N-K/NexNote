@@ -18,7 +18,7 @@ class InternalNoteImageStorage(
         openInputStream: () -> InputStream?
     ): String = withContext(Dispatchers.IO) {
         ImageFileManager.ensureImageDir(filesDir)
-        val relativePath = ImageFileManager.buildRelativePath(noteId, currentTimeMillis())
+        val relativePath = buildUniqueRelativePath(noteId)
         val destination = ImageFileManager.getImageFile(filesDir, relativePath)
         val input = openInputStream()
             ?: throw IOException("Image input stream is unavailable")
@@ -44,4 +44,16 @@ class InternalNoteImageStorage(
 
     override fun getImageFile(relativePath: String): File =
         ImageFileManager.getImageFile(filesDir, relativePath)
+
+    private fun buildUniqueRelativePath(noteId: Long): String {
+        val baseTimestamp = currentTimeMillis()
+        var offset = 0L
+        while (true) {
+            val relativePath = ImageFileManager.buildRelativePath(noteId, baseTimestamp + offset)
+            if (!ImageFileManager.getImageFile(filesDir, relativePath).exists()) {
+                return relativePath
+            }
+            offset++
+        }
+    }
 }

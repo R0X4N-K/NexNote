@@ -10,6 +10,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.EmptyTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
@@ -57,7 +58,7 @@ internal class AppUseCases(
     preferencesRepository: IUserPreferencesRepository,
     imageStorage: NoteImageStorage
 ) {
-    val notes = NoteUseCases(noteRepository)
+    val notes = NoteUseCases(noteRepository, tagRepository, imageStorage)
     val tags = TagUseCases(tagRepository)
     val templates = TemplateUseCases(templateRepository)
     val preferences = PreferencesUseCases(preferencesRepository)
@@ -65,7 +66,9 @@ internal class AppUseCases(
 }
 
 internal class NoteUseCases internal constructor(
-    noteRepository: NoteRepository
+    noteRepository: NoteRepository,
+    tagRepository: TagRepository,
+    imageStorage: NoteImageStorage
 ) {
     val getNoteById = GetNoteByIdUseCase(noteRepository)
     val searchNotesScored = SearchNotesScoredUseCase(noteRepository)
@@ -81,6 +84,7 @@ internal class NoteUseCases internal constructor(
     val emptyTrash = EmptyTrashUseCase(noteRepository)
     val toggleNotePin = ToggleNotePinUseCase(noteRepository)
     val saveNote = SaveNoteUseCase(noteRepository)
+    val duplicateNote = DuplicateNoteUseCase(noteRepository, tagRepository, imageStorage)
     val setNotePreviewMode = SetNotePreviewModeUseCase(noteRepository)
 }
 

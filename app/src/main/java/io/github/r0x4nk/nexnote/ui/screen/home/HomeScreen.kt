@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,6 +33,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
@@ -57,8 +61,11 @@ fun HomeScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
+    var activeActionsNote by remember { mutableStateOf<Note?>(null) }
 
     TrashEventsEffect(viewModel, snackbarHostState)
+    NoteActionMessagesEffect(viewModel, snackbarHostState)
     DoubleBackToExitHandler()
     HomeRadialMenu(onNewNote = onNewNote, onTemplateClick = viewModel::showTemplatePicker) {
         viewModel.onSearchToggle(true)
@@ -92,9 +99,18 @@ fun HomeScreen(
             onClearTagFilters = viewModel::clearTagFilters,
             onTogglePin = viewModel::togglePin,
             onRequestTrash = viewModel::requestTrash,
+            onRequestNoteActions = { note -> activeActionsNote = note },
             modifier = Modifier.padding(innerPadding)
         )
     }
+
+    NoteActionsSheet(
+        note = activeActionsNote,
+        clipboardCallbacks = clipboardCallbacks,
+        onDuplicate = viewModel::duplicateNote,
+        onDelete = viewModel::requestTrash,
+        onDismiss = { activeActionsNote = null }
+    )
 
     if (uiState.showTemplatePicker) {
         TemplatePickerDialog(
@@ -105,6 +121,18 @@ fun HomeScreen(
             },
             onDismiss = viewModel::dismissTemplatePicker
         )
+    }
+}
+
+@Composable
+private fun NoteActionMessagesEffect(
+    viewModel: HomeViewModel,
+    snackbarHostState: SnackbarHostState
+) {
+    LaunchedEffect(viewModel, snackbarHostState) {
+        viewModel.noteActionMessages.collect { message ->
+            snackbarHostState.showSnackbar(message = message)
+        }
     }
 }
 

@@ -16,6 +16,7 @@ internal fun homeViewModelFactory(): ViewModelProvider.Factory = viewModelFactor
             moveNoteToTrash = useCases.notes.moveNoteToTrash,
             restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,
             toggleNotePin = useCases.notes.toggleNotePin,
+            duplicateNoteUseCase = useCases.notes.duplicateNote,
             observeTemplates = useCases.templates.observeTemplates,
             observeMostUsedTags = useCases.tags.observeMostUsedTags,
             observeFilteredNoteIds = useCases.tags.observeFilteredNoteIds,
