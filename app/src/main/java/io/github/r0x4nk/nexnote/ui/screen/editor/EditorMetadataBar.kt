@@ -58,7 +58,7 @@ internal fun MetadataBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .clickable(onClick = onCreationDateTap)
-                .padding(vertical = 2.dp)
+                .padding(vertical = 1.dp)
         )
     }
 }

@@ -243,7 +243,7 @@ private fun EditorTitleArea(
         onNext = { state.contentFocusRequester.requestFocus() },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .focusRequester(state.titleFocusRequester)
     )
 }
@@ -290,7 +290,7 @@ private fun EditorMetadataArea(
             onCreationDateTap = onCreationDateTap,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 2.dp)
+                .padding(horizontal = 12.dp)
         )
     }
 }

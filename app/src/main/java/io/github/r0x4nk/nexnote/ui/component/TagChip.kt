@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
  * @param dismissible Whether to show the dismiss icon.
  * @param onDismiss  Called when the dismiss icon is tapped (only relevant when
  *                   [dismissible] is true).
+ * @param compact Reduces the chip padding for dense editor tool rows.
  */
 @Composable
 fun TagChip(
@@ -46,7 +47,8 @@ fun TagChip(
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
     dismissible: Boolean = false,
-    onDismiss: (() -> Unit)? = null
+    onDismiss: (() -> Unit)? = null,
+    compact: Boolean = false
 ) {
     val containerColor = if (isSelected)
         MaterialTheme.colorScheme.primaryContainer
@@ -57,6 +59,13 @@ fun TagChip(
         MaterialTheme.colorScheme.onPrimaryContainer
     else
         MaterialTheme.colorScheme.onSurfaceVariant
+    val horizontalPadding = if (compact) 9.dp else 12.dp
+    val verticalPadding = if (compact) 4.dp else 7.dp
+    val textStyle = if (compact) {
+        MaterialTheme.typography.labelSmall
+    } else {
+        MaterialTheme.typography.labelMedium
+    }
 
     Surface(
         onClick      = onClick,
@@ -68,17 +77,17 @@ fun TagChip(
     ) {
         Row(
             modifier              = Modifier.padding(
-                start = 12.dp,
-                end = if (dismissible) 7.dp else 12.dp,
-                top = 7.dp,
-                bottom = 7.dp
+                start = horizontalPadding,
+                end = if (dismissible) 7.dp else horizontalPadding,
+                top = verticalPadding,
+                bottom = verticalPadding
             ),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text  = "#$tagName",
-                style = MaterialTheme.typography.labelMedium,
+                style = textStyle,
                 color = contentColor
             )
             if (dismissible && onDismiss != null) {

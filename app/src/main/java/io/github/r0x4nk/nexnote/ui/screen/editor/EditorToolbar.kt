@@ -57,15 +57,15 @@ internal fun EditorToolbar(
     Surface(
         modifier = modifier
             .background(noteBackground)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.extraLarge,
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 3.dp),
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(

@@ -1,11 +1,21 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -15,22 +25,26 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
-import io.github.r0x4nk.nexnote.ui.component.NexSearchField
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val EditorTopBarMinHeight = 44.dp
+private val EditorSearchFieldMinHeight = 36.dp
+
 @Composable
 internal fun EditorTopBar(
     isSaving: Boolean,
@@ -55,24 +69,39 @@ internal fun EditorTopBar(
         else -> "New note"
     }
 
-    TopAppBar(
-        title = {
-            EditorTopBarTitle(
-                displayTitle = displayTitle,
-                searchState = searchState,
-                searchFocusRequester = searchFocusRequester,
-                onSearchQueryChange = onSearchQueryChange,
-                onSearchNext = onSearchNext
-            )
-        },
-        navigationIcon = {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars),
+        color = containerColor,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = EditorTopBarMinHeight)
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             NexIconButton(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
                 onClick = onBack
             )
-        },
-        actions = {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 2.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                EditorTopBarTitle(
+                    displayTitle = displayTitle,
+                    searchState = searchState,
+                    searchFocusRequester = searchFocusRequester,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onSearchNext = onSearchNext
+                )
+            }
             EditorTopBarActions(
                 isSaving = isSaving,
                 isMarkdown = isMarkdown,
@@ -84,15 +113,8 @@ internal fun EditorTopBar(
                 onSearchNext = onSearchNext,
                 onExport = onExport
             )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = containerColor,
-            scrolledContainerColor = containerColor,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    )
+        }
+    }
 }
 
 @Composable
@@ -127,16 +149,54 @@ private fun EditorSearchField(
     onValueChange: (String) -> Unit,
     onSearchNext: () -> Unit
 ) {
-    NexSearchField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = "Search in note",
-        modifier = Modifier
-            .fillMaxWidth(),
-        focusRequester = focusRequester,
-        textStyle = MaterialTheme.typography.titleMedium,
-        onSearch = onSearchNext
-    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .defaultMinSize(minHeight = EditorSearchFieldMinHeight)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.titleSmall.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearchNext() }),
+                decorationBox = { inner ->
+                    Box {
+                        if (value.isEmpty()) {
+                            Text(
+                                text = "Search in note",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                            )
+                        }
+                        inner()
+                    }
+                }
+            )
+        }
+    }
 }
 
 @Composable

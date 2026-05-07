@@ -29,8 +29,8 @@ internal fun NoteColorPicker(
         modifier = modifier
             .fillMaxWidth()
             .background(noteBackground)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         NOTE_COLOR_PALETTE.forEach { color ->
@@ -59,7 +59,7 @@ private fun NoteColorSwatch(
 
     Box(
         modifier = Modifier
-            .size(30.dp)
+            .size(28.dp)
             .clip(CircleShape)
             .background(swatchColor)
             .border(borderWidth, borderColor, CircleShape)
