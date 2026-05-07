@@ -1,15 +1,24 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import io.github.r0x4nk.nexnote.ui.component.MarkdownSourceRange
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val PREVIEW_ITEM_LAYOUT_TIMEOUT_MS = 500L
+private const val QUICK_SCROLL_DURATION_MS = 180
+private const val QUICK_SCROLL_ANIMATED_ITEM_DISTANCE = 12
+private const val PREVIEW_BOTTOM_SETTLE_ATTEMPTS = 6
+private const val PREVIEW_BOTTOM_SETTLE_DELAY_MS = 80L
 
 /**
  * Returns the block index whose source range contains [sourceOffset].
@@ -89,7 +98,8 @@ internal suspend fun LazyListState.scrollToSourceOffset(
 
 internal suspend fun LazyListState.animateScrollToPreviewTop() {
     if (awaitTotalItems() > 0) {
-        animateScrollToItem(index = 0)
+        quickAnimateToItem(index = 0, scrollOffset = 0)
+        scrollToItem(index = 0, scrollOffset = 0)
     }
 }
 
@@ -98,11 +108,25 @@ internal suspend fun LazyListState.animateScrollToPreviewBottom() {
     if (totalItems <= 0) return
 
     val lastIndex = totalItems - 1
-    animateScrollToItem(lastIndex)
+    quickAnimateToItem(index = lastIndex, scrollOffset = 0)
 
-    val itemInfo = awaitVisibleItemInfo(lastIndex) ?: return
-    val bottomAlignedOffset = (itemInfo.size - layoutInfo.viewportHeight()).coerceAtLeast(0)
-    animateScrollToItem(lastIndex, bottomAlignedOffset)
+    repeat(PREVIEW_BOTTOM_SETTLE_ATTEMPTS) { attempt ->
+        settleToPreviewBottom(lastIndex)
+        if (attempt < PREVIEW_BOTTOM_SETTLE_ATTEMPTS - 1) {
+            delay(PREVIEW_BOTTOM_SETTLE_DELAY_MS)
+            withFrameNanos { }
+        }
+    }
+}
+
+internal suspend fun ScrollState.animateQuickScrollToTop() {
+    animateScrollTo(0, animationSpec = tween(durationMillis = QUICK_SCROLL_DURATION_MS))
+    scrollTo(0)
+}
+
+internal suspend fun ScrollState.animateQuickScrollToBottom() {
+    animateScrollTo(maxValue, animationSpec = tween(durationMillis = QUICK_SCROLL_DURATION_MS))
+    scrollTo(maxValue)
 }
 
 internal fun previewItemScrollOffsetForSourceOffset(
@@ -116,6 +140,33 @@ internal fun previewItemScrollOffsetForSourceOffset(
     val range = sourceRanges.sourceRangeForItem(itemIndex)
     val targetY = itemHeight.coerceAtLeast(1) * range.progressAt(sourceOffset)
     return (targetY - viewportHeight.coerceAtLeast(1) * viewportFraction).roundToInt()
+}
+
+internal fun previewBottomScrollOffset(itemHeight: Int, viewportHeight: Int): Int =
+    (itemHeight - viewportHeight.coerceAtLeast(1)).coerceAtLeast(0)
+
+private suspend fun LazyListState.quickAnimateToItem(index: Int, scrollOffset: Int) {
+    val firstVisibleIndex = firstVisibleItemIndex
+    if (abs(firstVisibleIndex - index) > QUICK_SCROLL_ANIMATED_ITEM_DISTANCE) {
+        val stagingIndex = if (index > firstVisibleIndex) {
+            (index - QUICK_SCROLL_ANIMATED_ITEM_DISTANCE).coerceAtLeast(0)
+        } else {
+            (index + QUICK_SCROLL_ANIMATED_ITEM_DISTANCE)
+        }
+        scrollToItem(stagingIndex)
+    }
+    animateScrollToItem(index, scrollOffset)
+}
+
+private suspend fun LazyListState.settleToPreviewBottom(lastIndex: Int) {
+    val itemInfo = awaitVisibleItemInfo(lastIndex) ?: return
+    scrollToItem(
+        index = lastIndex,
+        scrollOffset = previewBottomScrollOffset(
+            itemHeight = itemInfo.size,
+            viewportHeight = layoutInfo.viewportHeight()
+        )
+    )
 }
 
 private suspend fun LazyListState.bringItemIntoView(

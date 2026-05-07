@@ -56,4 +56,14 @@ class EditorScrollMappingTest {
         assertEquals(760, laterOffset)
         assertTrue(laterOffset > startOffset)
     }
+
+    @Test
+    fun `preview bottom offset aligns tall last item with viewport bottom`() {
+        assertEquals(600, previewBottomScrollOffset(itemHeight = 1000, viewportHeight = 400))
+    }
+
+    @Test
+    fun `preview bottom offset lets short last item clamp to list end`() {
+        assertEquals(0, previewBottomScrollOffset(itemHeight = 240, viewportHeight = 400))
+    }
 }

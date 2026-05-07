@@ -1,7 +1,5 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.CheckBox
@@ -13,6 +11,8 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
@@ -25,8 +25,7 @@ internal fun EditorRadialMenuBindings(
     isKeyboardVisible: Boolean,
     showPreview: Boolean,
     isTemplateMode: Boolean,
-    contentScrollState: ScrollState,
-    previewListState: LazyListState,
+    state: EditorScreenState,
     launchImagePickerAtCursor: () -> Unit,
     onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
@@ -35,7 +34,7 @@ internal fun EditorRadialMenuBindings(
     scope: CoroutineScope
 ) {
     RadialMenuFabHideEffect(hide = isKeyboardVisible)
-    EditorRadialMenuScrollBindings(showPreview, contentScrollState, previewListState, scope)
+    EditorRadialMenuScrollBindings(showPreview, state, scope)
     RadialMenuEffect(
         items = rememberEditorRadialMenuItems(
             launchImagePickerAtCursor,
@@ -53,29 +52,41 @@ internal fun EditorRadialMenuBindings(
 @Composable
 private fun EditorRadialMenuScrollBindings(
     showPreview: Boolean,
-    contentScrollState: ScrollState,
-    previewListState: LazyListState,
+    state: EditorScreenState,
     scope: CoroutineScope
 ) {
     RadialMenuScrollEffect(
         onScrollToTop = {
             scope.launch {
                 if (showPreview) {
-                    previewListState.animateScrollToPreviewTop()
+                    state.previewListState.animateScrollToPreviewTop()
                 } else {
-                    contentScrollState.animateScrollTo(0)
+                    state.selectContentEdge(offset = 0)
+                    state.contentScrollState.animateQuickScrollToTop()
                 }
             }
         },
         onScrollToBottom = {
             scope.launch {
                 if (showPreview) {
-                    previewListState.animateScrollToPreviewBottom()
+                    state.previewListState.animateScrollToPreviewBottom()
                 } else {
-                    contentScrollState.animateScrollTo(contentScrollState.maxValue)
+                    state.selectContentEdge(offset = state.contentFieldValue.text.length)
+                    state.contentScrollState.animateQuickScrollToBottom()
                 }
             }
         }
+    )
+}
+
+private fun EditorScreenState.selectContentEdge(offset: Int) {
+    val current = currentContentTextFieldValue()
+    val safeOffset = offset.coerceIn(0, current.text.length)
+    setContentFieldValue(
+        TextFieldValue(
+            text = current.text,
+            selection = TextRange(safeOffset)
+        )
     )
 }
 
