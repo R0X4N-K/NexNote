@@ -51,13 +51,15 @@ internal fun EditorScreenState.commitContentTextFieldValue(
             rememberedValue = contentFieldValue,
             modelContent = modelContent,
             modelContentVersion = modelContentVersion,
-            syncedContentVersion = syncedContentVersion
+            syncedContentVersion = syncedContentVersion,
+            hasPendingFieldEdit = hasPendingContentCommit
         )
     )
     NexNoteDebugLog.editor(
         event = "commitContentTextFieldValueResolved",
         details = "resolved=${committedValue?.text?.let { NexNoteDebugLog.textSummary("text", it) } ?: "null"} " +
             "modelVersion=$modelContentVersion syncedVersion=$syncedContentVersion " +
+            "pendingEdit=$hasPendingContentCommit " +
             NexNoteDebugLog.textSummary("model", modelContent)
     )
     committedValue ?: return false

@@ -26,6 +26,24 @@ class EditorContentCommitPolicyTest {
     }
 
     @Test
+    fun `resolve accepts pending user clear even when remembered value has content`() {
+        val emptyValue = TextFieldValue("")
+
+        val resolved = EditorContentCommitPolicy.resolve(
+            input(
+                fieldValue = emptyValue,
+                rememberedValue = TextFieldValue("a", TextRange(1)),
+                modelContent = "a",
+                modelContentVersion = 1,
+                syncedContentVersion = 1,
+                hasPendingFieldEdit = true
+            )
+        )
+
+        assertEquals(emptyValue, resolved)
+    }
+
+    @Test
     fun `resolve skips empty field while loaded model has not synced yet`() {
         val resolved = EditorContentCommitPolicy.resolve(
             input(
@@ -79,14 +97,16 @@ class EditorContentCommitPolicyTest {
         rememberedValue: TextFieldValue,
         modelContent: String,
         modelContentVersion: Int,
-        syncedContentVersion: Int
+        syncedContentVersion: Int,
+        hasPendingFieldEdit: Boolean = false
     ): EditorContentCommitInput {
         return EditorContentCommitInput(
             fieldValue = fieldValue,
             rememberedValue = rememberedValue,
             modelContent = modelContent,
             modelContentVersion = modelContentVersion,
-            syncedContentVersion = syncedContentVersion
+            syncedContentVersion = syncedContentVersion,
+            hasPendingFieldEdit = hasPendingFieldEdit
         )
     }
 }
