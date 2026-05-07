@@ -7,6 +7,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import kotlinx.coroutines.delay
@@ -116,6 +118,7 @@ private fun DismissibleNoteCard(
     ) {
         SwipeToDismissBox(
             state = dismissState,
+            modifier = Modifier.clip(MaterialTheme.shapes.large),
             enableDismissFromStartToEnd = false,
             enableDismissFromEndToStart = true,
             backgroundContent = { NoteCardSwipeBackground(dismissState) }

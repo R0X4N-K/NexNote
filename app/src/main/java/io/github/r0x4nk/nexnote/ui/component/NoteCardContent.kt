@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.AnnotatedString
@@ -79,7 +80,7 @@ private fun rememberNoteCardVisuals(note: Note): NoteCardVisuals {
         primaryColor = primaryColor,
         containerColor = note.backgroundColor?.let { adaptNoteColor(it, isDark) }
             ?: if (note.isPinned) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                MaterialTheme.colorScheme.primaryContainer
             } else {
                 MaterialTheme.colorScheme.surfaceContainerHigh
             },
@@ -130,13 +131,15 @@ private fun NoteCardSurface(
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
 ) {
+    val shape = MaterialTheme.shapes.large
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
             .combinedClickable(onClick = onClick, onLongClick = onLongPress),
         elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
         colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
-        shape = MaterialTheme.shapes.large,
+        shape = shape,
         border = BorderStroke(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.36f)
