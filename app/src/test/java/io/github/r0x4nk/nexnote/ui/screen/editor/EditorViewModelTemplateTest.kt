@@ -25,7 +25,6 @@ class EditorViewModelTemplateTest : EditorViewModelTestBase() {
         runCurrent()
         val state = vm.uiState.value
         assertEquals("Template content", state.content)
-        assertTrue(state.isMarkdown)
         assertEquals(EditorViewModel.NO_ID, state.noteId)
     }
 

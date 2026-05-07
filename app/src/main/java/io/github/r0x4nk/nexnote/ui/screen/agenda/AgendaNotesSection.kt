@@ -11,8 +11,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.filled.EventBusy
-import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -123,7 +123,7 @@ private fun AgendaEmptyState(isSearchActive: Boolean = false) {
         contentAlignment = Alignment.Center
     ) {
         NexEmptyState(
-            icon = if (isSearchActive) Icons.Default.ManageSearch else Icons.Default.EventBusy,
+            icon = if (isSearchActive) Icons.AutoMirrored.Filled.ManageSearch else Icons.Default.EventBusy,
             title = if (isSearchActive) "No results" else "No notes on this day",
             message = if (isSearchActive) "Try different words" else "This date is clear"
         )

@@ -217,14 +217,6 @@ class EditorViewModel(
         contentHistory.clear()
     }
 
-    fun onMarkdownToggle() {
-        NexNoteDebugLog.viewModel(event = "onMarkdownToggle", details = uiState.value.debugViewModelSummary())
-        _uiState.update {
-            it.copy(isMarkdown = !it.isMarkdown, isDirty = true, showPreview = false)
-        }
-        scheduleAutosave()
-    }
-
     fun onCreationDateChange(newTimestamp: Long) {
         NexNoteDebugLog.viewModel(
             event = "onCreationDateChange",
@@ -429,7 +421,7 @@ class EditorViewModel(
 
 private fun EditorUiState.debugViewModelSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
-        "loading=$isLoading dirty=$isDirty saving=$isSaving markdown=$isMarkdown " +
+        "loading=$isLoading dirty=$isDirty saving=$isSaving " +
         "preview=$showPreview openedDirectlyInPreview=$openedDirectlyInPreview " +
         "contentVersion=$contentVersion selection=$contentSelectionOffset " +
         "${NexNoteDebugLog.textSummary("title", title)} " +

@@ -18,7 +18,6 @@ data class EditorUiState(
     val isLoading: Boolean = false,
     val title: String = "",
     val content: String = "",
-    val isMarkdown: Boolean = false,
     val showPreview: Boolean = false,
     val openedDirectlyInPreview: Boolean = false,
     val creationDate: Long = System.currentTimeMillis(),

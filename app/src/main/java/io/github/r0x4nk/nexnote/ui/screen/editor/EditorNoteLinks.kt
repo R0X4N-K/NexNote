@@ -27,6 +27,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,7 +110,8 @@ internal fun BoxScope.EditorNoteLinkAutocompletePopup(
     modelContentVersion: Int,
     targets: List<NoteLinkTarget>,
     enabled: Boolean,
-    onTargetSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit
+    onTargetSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
+    onVisibilityChange: (Boolean) -> Unit = {}
 ) {
     val contentText = textFieldState.text
     val selection = textFieldState.selection
@@ -119,6 +122,13 @@ internal fun BoxScope.EditorNoteLinkAutocompletePopup(
         filterNoteLinkTargets(targets, match?.query.orEmpty(), limit = AUTOCOMPLETE_LIMIT)
     }
     val isVisible = enabled && match != null && suggestions.isNotEmpty()
+
+    LaunchedEffect(isVisible) {
+        onVisibilityChange(isVisible)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onVisibilityChange(false) }
+    }
 
     AnimatedVisibility(
         visible = isVisible,

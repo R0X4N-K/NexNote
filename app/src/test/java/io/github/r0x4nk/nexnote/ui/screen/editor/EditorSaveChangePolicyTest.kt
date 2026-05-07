@@ -24,7 +24,6 @@ class EditorSaveChangePolicyTest {
     fun `hasUnsavedNoteChanges catches metadata edits during save`() {
         val savedSnapshot = noteState()
         val currentState = savedSnapshot.copy(
-            isMarkdown = !savedSnapshot.isMarkdown,
             backgroundColor = 0x00FFAA,
             imagePaths = savedSnapshot.imagePaths + "images/new.jpg"
         )
@@ -35,9 +34,9 @@ class EditorSaveChangePolicyTest {
     }
 
     @Test
-    fun `hasUnsavedTemplateChanges catches markdown edits during save`() {
+    fun `hasUnsavedTemplateChanges catches content edits during save`() {
         val savedSnapshot = templateState()
-        val currentState = savedSnapshot.copy(isMarkdown = !savedSnapshot.isMarkdown)
+        val currentState = savedSnapshot.copy(content = "Updated template body")
 
         assertTrue(
             EditorSaveChangePolicy.hasUnsavedTemplateChanges(savedSnapshot, currentState)
@@ -59,7 +58,6 @@ class EditorSaveChangePolicyTest {
             noteId = 7L,
             title = "Title",
             content = "Body",
-            isMarkdown = true,
             showPreview = false,
             creationDate = 1_000L,
             timezone = "Europe/Rome",
@@ -77,7 +75,6 @@ class EditorSaveChangePolicyTest {
             isTemplateMode = true,
             title = title,
             content = "Template body",
-            isMarkdown = false,
             isDirty = false,
             contentVersion = 1
         )

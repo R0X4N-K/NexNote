@@ -9,7 +9,7 @@ data class Note(
     val id: Long = 0,
     val title: String = "",
     val content: String = "",
-    val isMarkdown: Boolean = false,
+    val isMarkdown: Boolean = true,
     val creationDate: Long = System.currentTimeMillis(),
     val lastModifiedDate: Long = System.currentTimeMillis(),
     val timezone: String = java.util.TimeZone.getDefault().id,

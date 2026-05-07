@@ -16,11 +16,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Card for a single note in list and grid views.
@@ -51,7 +53,12 @@ fun NoteCard(
     onLongPress: () -> Unit = {}
 ) {
     val collapsedState = remember { mutableStateOf(false) }
-    val dismissState = rememberNoteCardDismissState(collapsedState)
+    val dismissState = rememberNoteCardDismissState()
+
+    CollapseOnEndToStartSwipeEffect(
+        dismissState = dismissState,
+        collapsedState = collapsedState
+    )
 
     TrashAfterCollapseEffect(
         collapsed = collapsedState.value,
@@ -75,18 +82,43 @@ fun NoteCard(
     }
 }
 
+/**
+ * Hosts a plain [SwipeToDismissBoxState]. The previous implementation gated the
+ * dismissal through a `confirmValueChange` callback that always returned `false`
+ * while opportunistically firing a side effect. That callback is deprecated in
+ * Material3: the recommended pattern is to let the swipe settle on a valid
+ * anchor and observe the resulting value externally — which we now do in
+ * [CollapseOnEndToStartSwipeEffect].
+ */
 @Composable
-private fun rememberNoteCardDismissState(
+private fun rememberNoteCardDismissState(): SwipeToDismissBoxState =
+    rememberSwipeToDismissBoxState()
+
+/**
+ * Bridges the swipe gesture to the vertical-collapse animation. When the
+ * [SwipeToDismissBoxState] settles on [SwipeToDismissBoxValue.EndToStart] we
+ * flip [collapsedState] so the surrounding [AnimatedVisibility] can shrink the
+ * card out, then [TrashAfterCollapseEffect] fires the trash callback once the
+ * exit animation has had time to play.
+ *
+ * `distinctUntilChanged` guards against re-firing if the state recomposes for
+ * other reasons while already at the EndToStart anchor.
+ */
+@Composable
+private fun CollapseOnEndToStartSwipeEffect(
+    dismissState: SwipeToDismissBoxState,
     collapsedState: MutableState<Boolean>
-): SwipeToDismissBoxState =
-    rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart && !collapsedState.value) {
-                collapsedState.value = true
+) {
+    LaunchedEffect(dismissState) {
+        snapshotFlow { dismissState.currentValue }
+            .distinctUntilChanged()
+            .collect { value ->
+                if (value == SwipeToDismissBoxValue.EndToStart && !collapsedState.value) {
+                    collapsedState.value = true
+                }
             }
-            false
-        }
-    )
+    }
+}
 
 @Composable
 private fun TrashAfterCollapseEffect(

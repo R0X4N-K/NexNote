@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,7 +37,7 @@ internal fun TemplatesEmptyState(
         contentAlignment = Alignment.Center
     ) {
         NexEmptyState(
-            icon = if (isSearchActive) Icons.Default.ManageSearch else Icons.Default.Description,
+            icon = if (isSearchActive) Icons.AutoMirrored.Filled.ManageSearch else Icons.Default.Description,
             title = if (isSearchActive) "No results" else "No templates",
             message = if (isSearchActive) {
                 "Try different words"

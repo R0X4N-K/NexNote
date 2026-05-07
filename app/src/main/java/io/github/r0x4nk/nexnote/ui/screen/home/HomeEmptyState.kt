@@ -1,8 +1,8 @@
 package io.github.r0x4nk.nexnote.ui.screen.home
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Note
-import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,7 +25,7 @@ internal fun EmptyState(
 
 private fun emptyStateIcon(isSearchActive: Boolean, hasTagFilter: Boolean): ImageVector =
     when {
-        isSearchActive -> Icons.Default.ManageSearch
+        isSearchActive -> Icons.AutoMirrored.Filled.ManageSearch
         hasTagFilter -> Icons.Default.Sell
         else -> Icons.AutoMirrored.Filled.Note
     }

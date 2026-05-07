@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -12,6 +13,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,10 +27,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Tag
@@ -42,6 +50,7 @@ internal data class EditorScreenScaffoldContent(
     val selectedTagsInEditor: String?,
     val noteBackground: Color,
     val isDarkTheme: Boolean,
+    val isKeyboardVisible: Boolean,
     val imageFileProvider: (String) -> File,
     val noteLinkTargets: List<NoteLinkTarget>,
     val state: EditorScreenState
@@ -50,7 +59,6 @@ internal data class EditorScreenScaffoldContent(
 internal data class EditorScreenActions(
     val onBack: () -> Unit,
     val onExport: (() -> Unit)?,
-    val onMarkdownToggle: () -> Unit,
     val onTogglePreview: () -> Unit,
     val onInsertImage: () -> Unit,
     val onInsertNoteLink: () -> Unit,
@@ -112,14 +120,12 @@ private fun EditorScreenTopBar(
 ) {
     EditorTopBar(
         isSaving = content.uiState.isSaving,
-        isMarkdown = content.uiState.isMarkdown,
         title = content.uiState.title,
         isTemplateMode = content.uiState.isTemplateMode,
         containerColor = content.noteBackground,
         searchState = content.state.noteSearch,
         searchFocusRequester = content.state.searchFocusRequester,
         onBack = actions.onBack,
-        onMarkdownToggle = actions.onMarkdownToggle,
         onSearchOpen = actions.onSearchOpen,
         onSearchClose = actions.onSearchClose,
         onSearchQueryChange = actions.onSearchQueryChange,
@@ -146,61 +152,124 @@ private fun EditorScreenBody(
     actions: EditorScreenActions,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    // While the link-type chooser is open, Material3's focusable popup briefly
+    // hides the IME. We treat that flag as a soft "keyboard intent" so the toolbar
+    // stays mounted and the dropdown can complete its interaction without flicker.
+    val keepOpenForLinkMenu = content.state.showLinkTypeMenu
+    val toolbarVisible = (content.isKeyboardVisible || keepOpenForLinkMenu) &&
+        !content.uiState.showPreview &&
+        !content.state.noteSearch.isActive &&
+        !content.state.showNoteLinkPicker &&
+        !content.uiState.isLoading
+    var toolbarHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val toolbarHeightDp = with(density) { toolbarHeightPx.toDp() }
+    val animatedToolbarPadding by animateDpAsState(
+        targetValue = if (toolbarVisible) toolbarHeightDp else 0.dp,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "toolbarPadding"
+    )
+
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(content.noteBackground)
-            .navigationBarsPadding()
-            .imePadding()
     ) {
-        EditorToolbar(
-            showPreview = content.uiState.showPreview,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(bottom = animatedToolbarPadding)
+        ) {
+            // Metadata is placed above mode tabs to keep the editor chrome compact.
+            EditorMetadataArea(content.uiState, actions.onCreationDateTap)
+            EditorModeTabsArea(content, actions)
+            EditorColorPickerPanel(
+                content.uiState,
+                content.state,
+                content.noteBackground,
+                actions.onBackgroundColorChange
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            // Tags appear above the title for quicker contextual orientation
+            if (!content.uiState.isTemplateMode) {
+                EditorTagsPanel(
+                    content.tagsForCurrentNote,
+                    content.selectedTagsInEditor,
+                    content.state,
+                    actions.onTagClick,
+                    actions.onClearTagSelection
+                )
+            }
+            EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
+            EditorContentModeBox(
+                content.uiState,
+                content.imageFileProvider,
+                content.noteLinkTargets,
+                content.state,
+                actions.onTogglePreview,
+                actions.onContentEdited,
+                actions.onContentSelectionChange,
+                actions.onNoteLinkAutocompleteSelected,
+                actions.onPreviewNoteLinkClick
+            )
+        }
+        EditorKeyboardToolbar(
+            visible = toolbarVisible,
             isTemplateMode = content.uiState.isTemplateMode,
             isDarkTheme = content.isDarkTheme,
             hasCustomColor = content.uiState.backgroundColor != null,
             canUndo = content.undoRedoState.canUndo,
             canRedo = content.undoRedoState.canRedo,
             noteBackground = content.noteBackground,
-            onTogglePreview = actions.onTogglePreview,
+            linkMenuExpanded = content.state.showLinkTypeMenu,
+            onLinkMenuExpandedChange = { expanded -> content.state.showLinkTypeMenu = expanded },
             onUndo = actions.onUndo,
             onRedo = actions.onRedo,
             onInsertImage = actions.onInsertImage,
             onInsertChecklist = { actions.insertAtCursor(MARKDOWN_CHECKLIST_SNIPPET) },
-            onInsertWebLink = { actions.insertAtCursor(MARKDOWN_WEB_LINK_SNIPPET) },
-            onInsertNoteLink = actions.onInsertNoteLink,
+            onInsertWebLink = {
+                // Close the chooser first so the toolbar can resume tracking the IME
+                // intent purely from the user's editing focus.
+                content.state.showLinkTypeMenu = false
+                actions.insertAtCursor(MARKDOWN_WEB_LINK_SNIPPET)
+            },
+            onInsertNoteLink = {
+                content.state.showLinkTypeMenu = false
+                actions.onInsertNoteLink()
+            },
             onThemeToggle = actions.onThemeToggle,
             onToggleColorPicker = actions.onToggleColorPicker,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .imePadding()
+                .navigationBarsPadding()
+                .fillMaxWidth()
+                .onSizeChanged { toolbarHeightPx = it.height }
+        )
+    }
+}
+
+@Composable
+private fun EditorModeTabsArea(
+    content: EditorScreenScaffoldContent,
+    actions: EditorScreenActions
+) {
+    AnimatedVisibility(
+        visible = !content.state.noteSearch.isActive,
+        enter = editorExpandEnter(),
+        exit = editorExpandExit()
+    ) {
+        EditorModeTabs(
+            showPreview = content.uiState.showPreview,
+            enabled = !content.uiState.isLoading,
+            onModeSelected = { targetPreview ->
+                if (targetPreview != content.uiState.showPreview) {
+                    actions.onTogglePreview()
+                }
+            },
             modifier = Modifier.fillMaxWidth()
-        )
-        // Metadata is placed between toolbar and divider to reclaim bottom space
-        EditorMetadataArea(content.uiState, actions.onCreationDateTap)
-        EditorColorPickerPanel(
-            content.uiState,
-            content.state,
-            content.noteBackground,
-            actions.onBackgroundColorChange
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-        // Tags appear above the title for quicker contextual orientation
-        if (!content.uiState.isTemplateMode) {
-            EditorTagsPanel(
-                content.tagsForCurrentNote,
-                content.selectedTagsInEditor,
-                content.state,
-                actions.onTagClick,
-                actions.onClearTagSelection
-            )
-        }
-        EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
-        EditorContentModeBox(
-            content.uiState,
-            content.imageFileProvider,
-            content.noteLinkTargets,
-            content.state,
-            actions.onContentEdited,
-            actions.onContentSelectionChange,
-            actions.onNoteLinkAutocompleteSelected,
-            actions.onPreviewNoteLinkClick
         )
     }
 }

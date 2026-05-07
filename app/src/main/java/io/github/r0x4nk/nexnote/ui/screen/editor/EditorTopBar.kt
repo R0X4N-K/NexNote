@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -48,14 +47,12 @@ private val EditorSearchFieldMinHeight = 36.dp
 @Composable
 internal fun EditorTopBar(
     isSaving: Boolean,
-    isMarkdown: Boolean,
     title: String,
     isTemplateMode: Boolean,
     containerColor: Color,
     searchState: NoteSearchState,
     searchFocusRequester: FocusRequester,
     onBack: () -> Unit,
-    onMarkdownToggle: () -> Unit,
     onSearchOpen: () -> Unit,
     onSearchClose: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
@@ -104,9 +101,7 @@ internal fun EditorTopBar(
             }
             EditorTopBarActions(
                 isSaving = isSaving,
-                isMarkdown = isMarkdown,
                 searchState = searchState,
-                onMarkdownToggle = onMarkdownToggle,
                 onSearchOpen = onSearchOpen,
                 onSearchClose = onSearchClose,
                 onSearchPrevious = onSearchPrevious,
@@ -202,9 +197,7 @@ private fun EditorSearchField(
 @Composable
 private fun EditorTopBarActions(
     isSaving: Boolean,
-    isMarkdown: Boolean,
     searchState: NoteSearchState,
-    onMarkdownToggle: () -> Unit,
     onSearchOpen: () -> Unit,
     onSearchClose: () -> Unit,
     onSearchPrevious: () -> Unit,
@@ -222,8 +215,6 @@ private fun EditorTopBarActions(
         )
     } else {
         EditorBrowsingActions(
-            isMarkdown = isMarkdown,
-            onMarkdownToggle = onMarkdownToggle,
             onSearchOpen = onSearchOpen,
             onExport = onExport
         )
@@ -277,8 +268,6 @@ private fun EditorSearchActions(
 
 @Composable
 private fun EditorBrowsingActions(
-    isMarkdown: Boolean,
-    onMarkdownToggle: () -> Unit,
     onSearchOpen: () -> Unit,
     onExport: (() -> Unit)?
 ) {
@@ -293,11 +282,5 @@ private fun EditorBrowsingActions(
         imageVector = Icons.Default.Search,
         contentDescription = "Search in note",
         onClick = onSearchOpen
-    )
-    NexIconButton(
-        imageVector = Icons.Default.Code,
-        contentDescription = if (isMarkdown) "Disable Markdown" else "Enable Markdown",
-        onClick = onMarkdownToggle,
-        selected = isMarkdown
     )
 }

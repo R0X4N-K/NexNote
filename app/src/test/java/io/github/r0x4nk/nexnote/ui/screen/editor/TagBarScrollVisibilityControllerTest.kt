@@ -57,6 +57,25 @@ class TagBarScrollVisibilityControllerTest {
     }
 
     @Test
+    fun `moving text downward uses the reveal threshold when it is lower`() {
+        val controller = TagBarScrollVisibilityController(
+            initialScroll = 100,
+            initialMaxScroll = 100,
+            thresholdPx = 28,
+            revealThresholdPx = 10
+        )
+
+        assertEquals(
+            TagBarVisibilityRequest.Show,
+            controller.onScrollChanged(
+                currentScroll = 90,
+                currentMaxScroll = 100,
+                isScrollInProgress = true
+            )
+        )
+    }
+
+    @Test
     fun `direction changes are handled inside the same scroll gesture`() {
         val controller = TagBarScrollVisibilityController(
             initialScroll = 100,

@@ -15,7 +15,6 @@ internal object EditorSaveChangePolicy {
     ): Boolean {
         return savedSnapshot.title != currentState.title ||
             savedSnapshot.content != currentState.content ||
-            savedSnapshot.isMarkdown != currentState.isMarkdown ||
             savedSnapshot.showPreview != currentState.showPreview ||
             savedSnapshot.creationDate != currentState.creationDate ||
             savedSnapshot.timezone != currentState.timezone ||
@@ -29,7 +28,6 @@ internal object EditorSaveChangePolicy {
         currentState: EditorUiState
     ): Boolean {
         return savedSnapshot.title.trim() != currentState.title.trim() ||
-            savedSnapshot.content != currentState.content ||
-            savedSnapshot.isMarkdown != currentState.isMarkdown
+            savedSnapshot.content != currentState.content
     }
 }

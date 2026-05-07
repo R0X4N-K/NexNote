@@ -17,7 +17,8 @@ internal enum class TagBarVisibilityRequest {
 internal class TagBarScrollVisibilityController(
     initialScroll: Int,
     initialMaxScroll: Int,
-    private val thresholdPx: Int = TAG_SCROLL_VISIBILITY_THRESHOLD_PX
+    private val thresholdPx: Int = TAG_SCROLL_VISIBILITY_THRESHOLD_PX,
+    private val revealThresholdPx: Int = thresholdPx.coerceAtMost(TAG_SCROLL_REVEAL_THRESHOLD_PX)
 ) {
     private var previousScroll = initialScroll.coerceIn(0, initialMaxScroll.coerceAtLeast(0))
     private var previousMaxScroll = initialMaxScroll.coerceAtLeast(0)
@@ -57,7 +58,12 @@ internal class TagBarScrollVisibilityController(
         }
 
         accumulatedDistance += abs(delta)
-        if (accumulatedDistance < thresholdPx) return null
+        val directionThresholdPx = when (direction) {
+            ScrollDirection.TextMovesDown -> revealThresholdPx
+            ScrollDirection.TextMovesUp -> thresholdPx
+            ScrollDirection.None -> thresholdPx
+        }
+        if (accumulatedDistance < directionThresholdPx) return null
 
         accumulatedDistance = 0
         return when (direction) {

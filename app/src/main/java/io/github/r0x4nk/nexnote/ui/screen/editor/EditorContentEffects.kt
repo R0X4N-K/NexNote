@@ -203,9 +203,9 @@ private suspend fun editAnchorY(
 }
 
 /**
- * Hides the floating tag bar while the soft keyboard is visible so the user
- * has the maximum vertical room to type, and restores it when the keyboard
- * goes away — unless the user has explicitly pinned the tag bar.
+ * Hides the floating tag bar when the soft keyboard first appears so the user
+ * has more vertical room to type. A small reverse scroll can reveal it again,
+ * and closing the keyboard restores it if this effect hid it.
  */
 @Composable
 internal fun EditorKeyboardTagBarEffect(

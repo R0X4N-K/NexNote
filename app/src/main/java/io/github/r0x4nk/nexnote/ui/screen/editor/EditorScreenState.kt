@@ -50,6 +50,19 @@ internal class EditorScreenState(
     var showDatePicker by mutableStateOf(false)
     var showColorPicker by mutableStateOf(false)
     var showNoteLinkPicker by mutableStateOf(false)
+
+    /**
+     * Whether the keyboard toolbar's link-type chooser dropdown is currently expanded.
+     *
+     * The state is hoisted here (instead of being local to the dropdown composable)
+     * because Material3's [androidx.compose.material3.DropdownMenu] uses a focusable
+     * popup that briefly steals window focus, which closes the IME. When the IME
+     * collapses, the toolbar's [androidx.compose.animation.AnimatedVisibility] would
+     * normally tear the dropdown down before the user can interact with it. Keeping
+     * the flag at the screen level lets the layout keep the toolbar mounted while the
+     * menu is open so the user can pick "Web link" or "Note link" without flicker.
+     */
+    var showLinkTypeMenu by mutableStateOf(false)
     var tagsVisible by mutableStateOf(true)
     var tagsPinned by mutableStateOf(false)
     var tagBarHiddenByKeyboard by mutableStateOf(false)
@@ -65,6 +78,7 @@ internal class EditorScreenState(
     var syncedContentVersion by mutableStateOf(-1)
     var contentEditRevision by mutableStateOf(0)
     var hasPendingContentCommit by mutableStateOf(false)
+    var isNoteLinkAutocompleteVisible by mutableStateOf(false)
 
     val isTagSearchScrolling = arrayOf(false)
     val isNoteSearchScrolling = arrayOf(false)

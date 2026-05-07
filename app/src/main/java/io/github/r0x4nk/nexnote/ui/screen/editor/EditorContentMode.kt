@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onSizeChanged
@@ -36,6 +38,7 @@ internal fun ColumnScope.EditorContentModeBox(
     imageFileProvider: (String) -> File,
     noteLinkTargets: List<NoteLinkTarget>,
     state: EditorScreenState,
+    onTogglePreview: () -> Unit,
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit,
     onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
@@ -43,12 +46,31 @@ internal fun ColumnScope.EditorContentModeBox(
 ) {
     val previewWarmupKey = uiState.directPreviewWarmupKey(MaterialTheme.colorScheme.primary)
     val contentTarget = editorContentTarget(uiState, state, previewWarmupKey)
+    val swipeDebouncer = remember { mutableLongStateOf(0L) }
+    val onDebouncedSwipeToggle = remember(onTogglePreview) {
+        {
+            val now = System.currentTimeMillis()
+            if (now - swipeDebouncer.longValue >= 150L) {
+                swipeDebouncer.longValue = now
+                onTogglePreview()
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .weight(1f)
             .fillMaxWidth()
             .onSizeChanged { size -> state.contentViewportHeightPx = size.height }
+            .editorContentSwipe(
+                enabled = contentTarget != EditorContentTarget.Loading &&
+                    !state.noteSearch.isActive &&
+                    !state.showColorPicker &&
+                    !state.isNoteLinkAutocompleteVisible,
+                showPreview = uiState.showPreview,
+                onSwipeToPreview = onDebouncedSwipeToggle,
+                onSwipeToEdit = onDebouncedSwipeToggle
+            )
     ) {
         AnimatedContent(
             targetState = contentTarget,
@@ -80,8 +102,11 @@ internal fun ColumnScope.EditorContentModeBox(
             contentRevision = state.contentEditRevision,
             modelContentVersion = uiState.contentVersion,
             targets = noteLinkTargets,
-            enabled = !uiState.showPreview && !state.noteSearch.isActive,
-            onTargetSelected = onNoteLinkAutocompleteSelected
+            enabled = !uiState.showPreview &&
+                !state.noteSearch.isActive &&
+                !state.showNoteLinkPicker,
+            onTargetSelected = onNoteLinkAutocompleteSelected,
+            onVisibilityChange = { state.isNoteLinkAutocompleteVisible = it }
         )
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -77,10 +78,7 @@ fun EditorScreen(
     val replaceNoteLinkAutocomplete = rememberReplaceNoteLinkAutocomplete(state, viewModel)
     val launchImagePickerAtCursor = rememberLaunchImagePickerAtCursor(context, state, viewModel)
     val openNoteLinkPicker: () -> Unit = {
-        state.highlightRange = null
-        state.pendingTagScroll = null
-        state.showColorPicker = false
-        state.showNoteLinkPicker = true
+        state.openNoteLinkPickerDetachedFromEditor(focusManager)
     }
     val toggleColorPicker: () -> Unit = {
         state.highlightRange = null
@@ -153,7 +151,6 @@ fun EditorScreen(
         onInsertNoteLink = openNoteLinkPicker,
         onToggleColorPicker = toggleColorPicker,
         insertAtCursor = insertAtCursor,
-        togglePreviewPreservingScroll = togglePreviewPreservingScroll,
         scope = scope
     )
     EditorErrorSnackbarEffect(uiState, state, viewModel)
@@ -163,7 +160,6 @@ fun EditorScreen(
         uiState = uiState,
         selectedTagsInEditor = selectedTagsInEditor,
         tagsForCurrentNote = tagsForCurrentNote,
-        isKeyboardVisible = isKeyboardVisible,
         state = state,
         density = density
     )
@@ -242,6 +238,7 @@ fun EditorScreen(
             selectedTagsInEditor = selectedTagsInEditor,
             noteBackground = noteBackground,
             isDarkTheme = isDarkTheme,
+            isKeyboardVisible = isKeyboardVisible,
             imageFileProvider = imageFileProvider,
             noteLinkTargets = noteLinkTargets,
             state = state
@@ -253,11 +250,6 @@ fun EditorScreen(
                     commitActiveEditContent()
                     export()
                 }
-            },
-            onMarkdownToggle = {
-                NexNoteDebugLog.editor(event = "markdownToggleClicked", details = uiState.debugEditorSummary())
-                commitActiveEditContent()
-                viewModel.onMarkdownToggle()
             },
             onTogglePreview = togglePreviewPreservingScroll,
             onInsertImage = launchImagePickerAfterCommit,
@@ -322,9 +314,21 @@ fun EditorScreen(
     EditorCreationDateDialog(uiState, state, viewModel)
 }
 
+private fun EditorScreenState.openNoteLinkPickerDetachedFromEditor(focusManager: FocusManager) {
+    highlightRange = null
+    pendingTagScroll = null
+    showColorPicker = false
+    isNoteLinkAutocompleteVisible = false
+
+    // The picker is a modal flow: release editor focus first so the IME cannot
+    // reopen the content field and dismiss the dialog during the toolbar exit.
+    focusManager.clearFocus(force = true)
+    showNoteLinkPicker = true
+}
+
 private fun EditorUiState.debugEditorSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
-        "loading=$isLoading dirty=$isDirty saving=$isSaving markdown=$isMarkdown " +
+        "loading=$isLoading dirty=$isDirty saving=$isSaving " +
         "preview=$showPreview contentVersion=$contentVersion selection=$contentSelectionOffset " +
         "${NexNoteDebugLog.textSummary("title", title)} " +
         NexNoteDebugLog.textSummary("content", content)

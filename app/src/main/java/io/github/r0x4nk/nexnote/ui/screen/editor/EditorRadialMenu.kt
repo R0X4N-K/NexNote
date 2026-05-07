@@ -3,12 +3,10 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.TextRange
@@ -30,7 +28,6 @@ internal fun EditorRadialMenuBindings(
     onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
     insertAtCursor: (String) -> Unit,
-    togglePreviewPreservingScroll: () -> Unit,
     scope: CoroutineScope
 ) {
     RadialMenuFabHideEffect(hide = isKeyboardVisible)
@@ -38,12 +35,10 @@ internal fun EditorRadialMenuBindings(
     RadialMenuEffect(
         items = rememberEditorRadialMenuItems(
             launchImagePickerAtCursor,
-            showPreview,
             isTemplateMode,
             onInsertNoteLink,
             onToggleColorPicker,
-            insertAtCursor,
-            togglePreviewPreservingScroll
+            insertAtCursor
         ),
         fabIcon = Icons.Default.Tune
     )
@@ -93,20 +88,16 @@ private fun EditorScreenState.selectContentEdge(offset: Int) {
 @Composable
 private fun rememberEditorRadialMenuItems(
     launchImagePickerAtCursor: () -> Unit,
-    showPreview: Boolean,
     isTemplateMode: Boolean,
     onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
-    insertAtCursor: (String) -> Unit,
-    togglePreviewPreservingScroll: () -> Unit
+    insertAtCursor: (String) -> Unit
 ): List<RadialMenuItem> = remember(
     launchImagePickerAtCursor,
-    showPreview,
     isTemplateMode,
     onInsertNoteLink,
     onToggleColorPicker,
-    insertAtCursor,
-    togglePreviewPreservingScroll
+    insertAtCursor
 ) {
     buildList {
         if (!isTemplateMode) {
@@ -153,13 +144,5 @@ private fun rememberEditorRadialMenuItems(
                 )
             )
         }
-        add(
-            RadialMenuItem(
-                icon = if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
-                label = "",
-                action = togglePreviewPreservingScroll,
-                contentDescription = if (showPreview) "Back to editing" else "Preview"
-            )
-        )
     }
 }

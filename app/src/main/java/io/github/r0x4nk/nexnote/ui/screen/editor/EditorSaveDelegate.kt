@@ -133,7 +133,7 @@ internal class EditorSaveDelegate(
             id = snapshot.templateId,
             name = snapshot.title.trim().ifBlank { "Template" },
             content = snapshot.content,
-            isMarkdown = snapshot.isMarkdown,
+            isMarkdown = EDITOR_MARKDOWN_ENABLED,
             isPredefined = false
         )
         NexNoteDebugLog.persistence(
@@ -206,7 +206,7 @@ internal class EditorSaveDelegate(
         id = state.noteId,
         title = state.title,
         content = state.content,
-        isMarkdown = state.isMarkdown,
+        isMarkdown = EDITOR_MARKDOWN_ENABLED,
         creationDate = state.creationDate,
         lastModifiedDate = state.lastModifiedDate ?: System.currentTimeMillis(),
         timezone = state.timezone,

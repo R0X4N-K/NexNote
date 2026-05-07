@@ -50,7 +50,6 @@ internal class EditorLoadDelegate(
             isLoading = false,
             title = note.title,
             content = note.content,
-            isMarkdown = note.isMarkdown,
             showPreview = note.isPreviewMode,
             openedDirectlyInPreview = note.isPreviewMode,
             creationDate = note.creationDate,
@@ -89,7 +88,6 @@ internal class EditorLoadDelegate(
             noteId = EditorViewModel.NO_ID,
             isLoading = false,
             content = template.content.replace("{{date}}", dateStr),
-            isMarkdown = template.isMarkdown,
             isDirty = true,
             contentVersion = 1
         )
@@ -134,7 +132,6 @@ internal class EditorLoadDelegate(
             templateId = template.id,
             title = template.name,
             content = template.content,
-            isMarkdown = template.isMarkdown,
             isDirty = false,
             contentVersion = 1
         )

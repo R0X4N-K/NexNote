@@ -2,7 +2,6 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -15,7 +14,6 @@ internal fun EditorTagEffects(
     uiState: EditorUiState,
     selectedTagsInEditor: String?,
     tagsForCurrentNote: List<Tag>,
-    isKeyboardVisible: Boolean,
     state: EditorScreenState,
     density: Density
 ) {
@@ -23,7 +21,7 @@ internal fun EditorTagEffects(
     EditorPendingTagScrollEffect(uiState, state, density)
     EditorSelectedTagClearEffect(selectedTagsInEditor, state)
     EditorTagsAppearVisibilityEffect(tagsForCurrentNote, state)
-    EditorTagAutoHideEffect(isKeyboardVisible, uiState.showPreview, state)
+    EditorTagAutoHideEffect(uiState.showPreview, state)
 }
 
 @Composable
@@ -133,19 +131,16 @@ private fun EditorTagsAppearVisibilityEffect(
  */
 @Composable
 private fun EditorTagAutoHideEffect(
-    isKeyboardVisible: Boolean,
     showPreview: Boolean,
     state: EditorScreenState
 ) {
-    val isKeyboardVisibleRef = rememberUpdatedState(isKeyboardVisible)
-
     if (showPreview) {
         LaunchedEffect(state.previewListState) {
-            previewTagAutoHide(state, isKeyboardVisibleRef::value)
+            previewTagAutoHide(state)
         }
     } else {
         LaunchedEffect(state.contentScrollState) {
-            editTagAutoHide(state, isKeyboardVisibleRef::value)
+            editTagAutoHide(state)
         }
     }
 }
@@ -153,8 +148,7 @@ private fun EditorTagAutoHideEffect(
 // ── Edit-mode tag auto-hide (pixel-based, unchanged logic) ──────────────────
 
 private suspend fun editTagAutoHide(
-    state: EditorScreenState,
-    isKeyboardVisible: () -> Boolean
+    state: EditorScreenState
 ) {
     val controller = TagBarScrollVisibilityController(
         initialScroll = state.contentScrollState.value,
@@ -167,7 +161,7 @@ private suspend fun editTagAutoHide(
             isInProgress = state.contentScrollState.isScrollInProgress
         )
     }.collect { scroll ->
-        if (!state.canAutoAdjustTags(isKeyboardVisible())) {
+        if (!state.canAutoAdjustTags()) {
             controller.syncTo(scroll.value, scroll.maxValue)
             return@collect
         }
@@ -191,8 +185,7 @@ private data class TagBarScrollSnapshot(
  * pair to determine direction without needing pixel-level total-scroll values.
  */
 private suspend fun previewTagAutoHide(
-    state: EditorScreenState,
-    isKeyboardVisible: () -> Boolean
+    state: EditorScreenState
 ) {
     var prevIndex = state.previewListState.firstVisibleItemIndex
     var prevOffset = state.previewListState.firstVisibleItemScrollOffset
@@ -206,7 +199,7 @@ private suspend fun previewTagAutoHide(
             isInProgress = state.previewListState.isScrollInProgress
         )
     }.collect { snapshot ->
-        if (!state.canAutoAdjustTagsPreview(isKeyboardVisible()) || !snapshot.isInProgress) {
+        if (!state.canAutoAdjustTagsPreview() || !snapshot.isInProgress) {
             prevIndex = snapshot.index
             prevOffset = snapshot.offset
             accumulatedDistance = 0
@@ -233,7 +226,11 @@ private suspend fun previewTagAutoHide(
         prevIndex = snapshot.index
         prevOffset = snapshot.offset
 
-        if (accumulatedDistance >= TAG_SCROLL_VISIBILITY_THRESHOLD_PX) {
+        val threshold = when (direction) {
+            TagBarVisibilityRequest.Show -> TAG_SCROLL_REVEAL_THRESHOLD_PX
+            TagBarVisibilityRequest.Hide -> TAG_SCROLL_VISIBILITY_THRESHOLD_PX
+        }
+        if (accumulatedDistance >= threshold) {
             accumulatedDistance = 0
             state.applyTagBarVisibilityRequest(direction)
         }
@@ -288,9 +285,8 @@ private fun EditorScreenState.applyTagBarVisibilityRequest(
     }
 }
 
-private fun EditorScreenState.canAutoAdjustTags(isKeyboardVisible: Boolean): Boolean {
-    return !isKeyboardVisible &&
-        !tagsPinned &&
+private fun EditorScreenState.canAutoAdjustTags(): Boolean {
+    return !tagsPinned &&
         !isTagSearchScrolling[0] &&
         !isNoteSearchScrolling[0] &&
         !isRestoringContentScroll[0] &&
@@ -301,9 +297,8 @@ private fun EditorScreenState.canAutoAdjustTags(isKeyboardVisible: Boolean): Boo
  * Preview-mode variant — uses [previewListState] item count instead of
  * [contentScrollState.maxValue] to decide whether the content is scrollable.
  */
-private fun EditorScreenState.canAutoAdjustTagsPreview(isKeyboardVisible: Boolean): Boolean {
-    return !isKeyboardVisible &&
-        !tagsPinned &&
+private fun EditorScreenState.canAutoAdjustTagsPreview(): Boolean {
+    return !tagsPinned &&
         !isTagSearchScrolling[0] &&
         !isNoteSearchScrolling[0] &&
         !isRestoringContentScroll[0] &&
