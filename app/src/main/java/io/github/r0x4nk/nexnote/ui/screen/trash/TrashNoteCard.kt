@@ -16,12 +16,22 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.buildNoteCardDisplayText
 import io.github.r0x4nk.nexnote.util.DateUtils
+
+private const val TRASH_NOTE_EXCERPT_MAX_LENGTH = 120
+
+private data class TrashNoteCardTextState(
+    val title: AnnotatedString,
+    val excerpt: AnnotatedString?
+)
 
 @Composable
 internal fun TrashNoteCard(
@@ -51,13 +61,15 @@ private fun TrashNoteCardContent(
     onRestore: () -> Unit,
     onDeletePermanently: () -> Unit
 ) {
+    val textState = rememberTrashNoteCardTextState(note)
+
     Column(
         modifier = Modifier.padding(
             start = 16.dp, top = 12.dp, bottom = 4.dp, end = 8.dp
         )
     ) {
-        TrashNoteTitle(note)
-        TrashNoteExcerpt(note)
+        TrashNoteTitle(textState.title)
+        TrashNoteExcerpt(textState.excerpt)
         Spacer(Modifier.height(4.dp))
         TrashNoteDate(note)
         TrashNoteActions(onRestore, onDeletePermanently)
@@ -65,9 +77,36 @@ private fun TrashNoteCardContent(
 }
 
 @Composable
-private fun TrashNoteTitle(note: Note) {
+private fun rememberTrashNoteCardTextState(note: Note): TrashNoteCardTextState {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    return remember(note.title, note.content, note.isMarkdown, primaryColor) {
+        TrashNoteCardTextState(
+            title = buildNoteCardDisplayText(
+                sourceText = noteDisplayTitle(note),
+                ranges = emptyList(),
+                linkColor = primaryColor,
+                highlightColor = primaryColor,
+                renderMarkdown = note.isMarkdown
+            ),
+            excerpt = if (note.title.isNotBlank() && note.content.isNotBlank()) {
+                buildNoteCardDisplayText(
+                    sourceText = note.content.take(TRASH_NOTE_EXCERPT_MAX_LENGTH),
+                    ranges = emptyList(),
+                    linkColor = primaryColor,
+                    highlightColor = primaryColor,
+                    renderMarkdown = note.isMarkdown
+                )
+            } else {
+                null
+            }
+        )
+    }
+}
+
+@Composable
+private fun TrashNoteTitle(title: AnnotatedString) {
     Text(
-        text     = noteDisplayTitle(note),
+        text     = title,
         style    = MaterialTheme.typography.titleMedium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
@@ -75,11 +114,11 @@ private fun TrashNoteTitle(note: Note) {
 }
 
 @Composable
-private fun TrashNoteExcerpt(note: Note) {
-    if (note.title.isNotBlank() && note.content.isNotBlank()) {
+private fun TrashNoteExcerpt(excerpt: AnnotatedString?) {
+    if (excerpt != null) {
         Spacer(Modifier.height(4.dp))
         Text(
-            text     = note.content.take(120),
+            text     = excerpt,
             style    = MaterialTheme.typography.bodyMedium,
             color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             maxLines = 2,

@@ -2,7 +2,6 @@ package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -19,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.AnnotatedString
@@ -102,8 +100,14 @@ private fun rememberNoteCardTextState(
         }
     }
     val effectiveRanges = if (note.title.isNotBlank()) titleHighlightRanges else emptyList()
-    val titleAnnotated = remember(displayTitle, effectiveRanges, primaryColor) {
-        buildNoteCardHighlightedText(displayTitle, effectiveRanges, primaryColor)
+    val titleAnnotated = remember(displayTitle, effectiveRanges, primaryColor, note.isMarkdown) {
+        buildNoteCardDisplayText(
+            sourceText = displayTitle,
+            ranges = effectiveRanges,
+            linkColor = primaryColor,
+            highlightColor = primaryColor,
+            renderMarkdown = note.isMarkdown
+        )
     }
 
     val previewText = remember(note.id, note.content) { note.content.take(160) }
@@ -114,8 +118,14 @@ private fun rememberNoteCardTextState(
             if (safeStart < safeEnd) safeStart..<safeEnd else null
         }
     }
-    val contentAnnotated = remember(previewText, clampedContentRanges, primaryColor) {
-        buildNoteCardHighlightedText(previewText, clampedContentRanges, primaryColor)
+    val contentAnnotated = remember(previewText, clampedContentRanges, primaryColor, note.isMarkdown) {
+        buildNoteCardDisplayText(
+            sourceText = previewText,
+            ranges = clampedContentRanges,
+            linkColor = primaryColor,
+            highlightColor = primaryColor,
+            renderMarkdown = note.isMarkdown
+        )
     }
 
     return NoteCardTextState(title = titleAnnotated, content = contentAnnotated)
@@ -135,8 +145,11 @@ private fun NoteCardSurface(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
+            .roundedCombinedClickableTarget(
+                shape = shape,
+                onClick = onClick,
+                onLongClick = onLongPress
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
         colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
         shape = shape,

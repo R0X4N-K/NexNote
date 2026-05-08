@@ -1,6 +1,8 @@
 package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.HorizontalDivider
@@ -9,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
+
+private const val PREVIEW_END_ANCHOR_KEY = "markdown_preview_end_anchor"
+private const val PREVIEW_END_ANCHOR_CONTENT_TYPE = "preview_end_anchor"
 
 /**
  * Renders the parsed markdown blocks inside a [LazyColumn].
@@ -41,6 +46,12 @@ internal fun MarkdownPreviewContent(
                 state       = state,
                 config      = config
             )
+        }
+        item(
+            key = PREVIEW_END_ANCHOR_KEY,
+            contentType = PREVIEW_END_ANCHOR_CONTENT_TYPE
+        ) {
+            Spacer(Modifier.height(1.dp))
         }
     }
 }

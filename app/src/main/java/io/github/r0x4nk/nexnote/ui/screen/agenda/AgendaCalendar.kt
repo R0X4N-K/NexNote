@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,7 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.ui.component.roundedClickableTarget
 import io.github.r0x4nk.nexnote.util.DateUtils
 import java.util.Calendar
 
@@ -242,12 +243,10 @@ private fun DayCell(
     val dotColor = dayDotColor(hasDot, isSelected)
 
     Column(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp, horizontal = 2.dp),
+        modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        DayCircle(day, circleBg, textColor, isToday, isSelected)
+        DayCircle(day, circleBg, textColor, isToday, isSelected, onClick)
         DayDot(dotColor)
     }
 }
@@ -283,7 +282,8 @@ private fun DayCircle(
     circleBg: androidx.compose.ui.graphics.Color,
     textColor: androidx.compose.ui.graphics.Color,
     isToday: Boolean,
-    isSelected: Boolean
+    isSelected: Boolean,
+    onClick: () -> Unit
 ) {
     val circleModifier = Modifier
         .size(32.dp)
@@ -297,11 +297,22 @@ private fun DayCircle(
             }
         )
 
-    Box(modifier = circleModifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = day.toString(),
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor
-        )
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .roundedClickableTarget(
+                shape = CircleShape,
+                role = Role.Button,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(modifier = circleModifier, contentAlignment = Alignment.Center) {
+            Text(
+                text = day.toString(),
+                style = MaterialTheme.typography.bodySmall,
+                color = textColor
+            )
+        }
     }
 }

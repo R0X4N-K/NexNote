@@ -18,13 +18,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.ui.component.MarkdownPreview
 import java.io.File
+
+private val EditorContentHorizontalPadding = 8.dp
+private val EditorContentTopPadding = 8.dp
+private val EditorContentDefaultBottomPadding = 12.dp
+private val EditorContentToolbarBottomPadding = 0.dp
 
 private enum class EditorContentTarget {
     Loading,
@@ -38,6 +45,7 @@ internal fun ColumnScope.EditorContentModeBox(
     imageFileProvider: (String) -> File,
     noteLinkTargets: List<NoteLinkTarget>,
     state: EditorScreenState,
+    keyboardToolbarVisible: Boolean,
     onTogglePreview: () -> Unit,
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit,
@@ -93,7 +101,12 @@ internal fun ColumnScope.EditorContentModeBox(
                     EditorMarkdownPreview(uiState, imageFileProvider, state, onPreviewNoteLinkClick)
                 }
                 EditorContentTarget.Edit -> {
-                    EditorContentField(state, onContentEdited, onContentSelectionChange)
+                    EditorContentField(
+                        state = state,
+                        keyboardToolbarVisible = keyboardToolbarVisible,
+                        onContentEdited = onContentEdited,
+                        onContentSelectionChange = onContentSelectionChange
+                    )
                 }
             }
         }
@@ -108,6 +121,14 @@ internal fun ColumnScope.EditorContentModeBox(
             onTargetSelected = onNoteLinkAutocompleteSelected,
             onVisibilityChange = { state.isNoteLinkAutocompleteVisible = it }
         )
+        if (contentTarget == EditorContentTarget.Preview) {
+            EditorPreviewReadingProgressBar(
+                lazyListState = state.previewListState,
+                sourceRanges = state.currentSourceRanges,
+                contentLength = uiState.content.length,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
     }
 }
 
@@ -135,7 +156,10 @@ private fun EditorMarkdownPreview(
         lazyListState = state.previewListState,
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(
+                horizontal = EditorContentHorizontalPadding,
+                vertical = EditorContentTopPadding
+            ),
         imageFileProvider = imageFileProvider,
         highlightRanges = state.visibleContentHighlightRanges(),
         activeHighlightRange = state.activeContentHighlightRange(),
@@ -146,6 +170,7 @@ private fun EditorMarkdownPreview(
 @Composable
 private fun EditorContentField(
     state: EditorScreenState,
+    keyboardToolbarVisible: Boolean,
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit
 ) {
@@ -160,10 +185,22 @@ private fun EditorContentField(
         activeSearchRange = state.activeSearchHighlightRange(),
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 12.dp)
+            .padding(
+                start = EditorContentHorizontalPadding,
+                top = EditorContentTopPadding,
+                end = EditorContentHorizontalPadding,
+                bottom = editorContentBottomPadding(keyboardToolbarVisible)
+            )
             .focusRequester(state.contentFocusRequester)
     )
 }
+
+private fun editorContentBottomPadding(keyboardToolbarVisible: Boolean): Dp =
+    if (keyboardToolbarVisible) {
+        EditorContentToolbarBottomPadding
+    } else {
+        EditorContentDefaultBottomPadding
+    }
 
 private fun EditorScreenState.visibleContentHighlightRanges(): List<IntRange> {
     val searchRanges = searchContentHighlightRanges()

@@ -208,6 +208,7 @@ private fun EditorScreenBody(
                 content.imageFileProvider,
                 content.noteLinkTargets,
                 content.state,
+                toolbarVisible,
                 actions.onTogglePreview,
                 actions.onContentEdited,
                 actions.onContentSelectionChange,

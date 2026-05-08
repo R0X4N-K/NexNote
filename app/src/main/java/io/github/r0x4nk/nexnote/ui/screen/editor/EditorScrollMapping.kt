@@ -15,10 +15,13 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val PREVIEW_ITEM_LAYOUT_TIMEOUT_MS = 500L
-private const val QUICK_SCROLL_DURATION_MS = 180
-private const val QUICK_SCROLL_ANIMATED_ITEM_DISTANCE = 12
-private const val PREVIEW_BOTTOM_SETTLE_ATTEMPTS = 6
-private const val PREVIEW_BOTTOM_SETTLE_DELAY_MS = 80L
+private const val QUICK_SCROLL_DURATION_MS = 90
+private const val QUICK_SCROLL_NEARBY_DISTANCE_PX = 1200
+private const val PREVIEW_END_FOLLOW_TIMEOUT_MS = 1800L
+private const val PREVIEW_END_MIN_FOLLOW_MS = 650L
+private const val PREVIEW_END_STABLE_PASSES = 3
+private const val PREVIEW_END_SETTLE_DELAY_MS = 60L
+private const val PREVIEW_END_VISUAL_TOLERANCE_PX = 1
 
 /**
  * Returns the block index whose source range contains [sourceOffset].
@@ -98,7 +101,6 @@ internal suspend fun LazyListState.scrollToSourceOffset(
 
 internal suspend fun LazyListState.animateScrollToPreviewTop() {
     if (awaitTotalItems() > 0) {
-        quickAnimateToItem(index = 0, scrollOffset = 0)
         scrollToItem(index = 0, scrollOffset = 0)
     }
 }
@@ -107,26 +109,17 @@ internal suspend fun LazyListState.animateScrollToPreviewBottom() {
     val totalItems = awaitTotalItems()
     if (totalItems <= 0) return
 
-    val lastIndex = totalItems - 1
-    quickAnimateToItem(index = lastIndex, scrollOffset = 0)
-
-    repeat(PREVIEW_BOTTOM_SETTLE_ATTEMPTS) { attempt ->
-        settleToPreviewBottom(lastIndex)
-        if (attempt < PREVIEW_BOTTOM_SETTLE_ATTEMPTS - 1) {
-            delay(PREVIEW_BOTTOM_SETTLE_DELAY_MS)
-            withFrameNanos { }
-        }
-    }
+    val endAnchorIndex = previewEndAnchorIndex(totalItems)
+    scrollToPreviewEnd(endAnchorIndex)
+    settlePreviewEnd(endAnchorIndex)
 }
 
 internal suspend fun ScrollState.animateQuickScrollToTop() {
-    animateScrollTo(0, animationSpec = tween(durationMillis = QUICK_SCROLL_DURATION_MS))
-    scrollTo(0)
+    quickScrollTo(0)
 }
 
 internal suspend fun ScrollState.animateQuickScrollToBottom() {
-    animateScrollTo(maxValue, animationSpec = tween(durationMillis = QUICK_SCROLL_DURATION_MS))
-    scrollTo(maxValue)
+    quickScrollTo(maxValue)
 }
 
 internal fun previewItemScrollOffsetForSourceOffset(
@@ -142,30 +135,64 @@ internal fun previewItemScrollOffsetForSourceOffset(
     return (targetY - viewportHeight.coerceAtLeast(1) * viewportFraction).roundToInt()
 }
 
-internal fun previewBottomScrollOffset(itemHeight: Int, viewportHeight: Int): Int =
-    (itemHeight - viewportHeight.coerceAtLeast(1)).coerceAtLeast(0)
+internal fun previewEndAnchorIndex(totalItems: Int): Int =
+    (totalItems - 1).coerceAtLeast(0)
 
-private suspend fun LazyListState.quickAnimateToItem(index: Int, scrollOffset: Int) {
-    val firstVisibleIndex = firstVisibleItemIndex
-    if (abs(firstVisibleIndex - index) > QUICK_SCROLL_ANIMATED_ITEM_DISTANCE) {
-        val stagingIndex = if (index > firstVisibleIndex) {
-            (index - QUICK_SCROLL_ANIMATED_ITEM_DISTANCE).coerceAtLeast(0)
-        } else {
-            (index + QUICK_SCROLL_ANIMATED_ITEM_DISTANCE)
-        }
-        scrollToItem(stagingIndex)
+private suspend fun ScrollState.quickScrollTo(target: Int) {
+    val safeTarget = target.coerceIn(0, maxValue)
+    val distance = abs(value - safeTarget)
+    if (distance <= QUICK_SCROLL_NEARBY_DISTANCE_PX) {
+        animateScrollTo(
+            value = safeTarget,
+            animationSpec = tween(durationMillis = QUICK_SCROLL_DURATION_MS)
+        )
+    } else {
+        scrollTo(safeTarget)
     }
-    animateScrollToItem(index, scrollOffset)
+    scrollTo(safeTarget)
 }
 
-private suspend fun LazyListState.settleToPreviewBottom(lastIndex: Int) {
-    val itemInfo = awaitVisibleItemInfo(lastIndex) ?: return
+private suspend fun LazyListState.settlePreviewEnd(endAnchorIndex: Int) {
+    val startedAtNanos = System.nanoTime()
+    var previousSnapshot: PreviewEndSnapshot? = null
+    var stablePasses = 0
+
+    // Images can reserve their final aspect ratio after the initial jump. Keep
+    // asking for the same final anchor until the visible layout proves the end
+    // sentinel is fully inside the viewport for a few consecutive passes.
+    withTimeoutOrNull(PREVIEW_END_FOLLOW_TIMEOUT_MS) {
+        while (true) {
+            if (!previewEndSnapshot().isAtVisualEnd) {
+                scrollToPreviewEnd(endAnchorIndex)
+            }
+            withFrameNanos { }
+
+            val snapshot = previewEndSnapshot()
+            stablePasses = if (snapshot == previousSnapshot && snapshot.isAtVisualEnd) {
+                stablePasses + 1
+            } else {
+                0
+            }
+            previousSnapshot = snapshot
+
+            val elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000L
+            if (
+                elapsedMs >= PREVIEW_END_MIN_FOLLOW_MS &&
+                stablePasses >= PREVIEW_END_STABLE_PASSES
+            ) {
+                return@withTimeoutOrNull
+            }
+            delay(PREVIEW_END_SETTLE_DELAY_MS)
+        }
+    }
+
+    scrollToPreviewEnd(endAnchorIndex)
+}
+
+private suspend fun LazyListState.scrollToPreviewEnd(endAnchorIndex: Int) {
     scrollToItem(
-        index = lastIndex,
-        scrollOffset = previewBottomScrollOffset(
-            itemHeight = itemInfo.size,
-            viewportHeight = layoutInfo.viewportHeight()
-        )
+        index = endAnchorIndex,
+        scrollOffset = 0
     )
 }
 
@@ -195,6 +222,37 @@ private suspend fun LazyListState.awaitVisibleItemInfo(itemIndex: Int): LazyList
         snapshotFlow { visibleItemInfo(itemIndex) }
             .first { it != null }
     }
+}
+
+private data class PreviewEndSnapshot(
+    val totalItems: Int,
+    val firstVisibleIndex: Int,
+    val firstVisibleItemScrollOffset: Int,
+    val lastVisibleIndex: Int,
+    val lastVisibleBottom: Int,
+    val viewportEndOffset: Int,
+    val canScrollForward: Boolean
+) {
+    val isAtVisualEnd: Boolean
+        get() = totalItems == 0 ||
+            (
+                lastVisibleIndex == totalItems - 1 &&
+                    lastVisibleBottom <= viewportEndOffset + PREVIEW_END_VISUAL_TOLERANCE_PX &&
+                    !canScrollForward
+                )
+}
+
+private fun LazyListState.previewEndSnapshot(): PreviewEndSnapshot {
+    val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
+    return PreviewEndSnapshot(
+        totalItems = layoutInfo.totalItemsCount,
+        firstVisibleIndex = firstVisibleItemIndex,
+        firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+        lastVisibleIndex = lastVisibleItem?.index ?: -1,
+        lastVisibleBottom = lastVisibleItem?.let { it.offset + it.size } ?: Int.MAX_VALUE,
+        viewportEndOffset = layoutInfo.viewportEndOffset,
+        canScrollForward = canScrollForward
+    )
 }
 
 private fun LazyListState.visibleItemInfo(itemIndex: Int): LazyListItemInfo? =

@@ -58,12 +58,62 @@ class EditorScrollMappingTest {
     }
 
     @Test
-    fun `preview bottom offset aligns tall last item with viewport bottom`() {
-        assertEquals(600, previewBottomScrollOffset(itemHeight = 1000, viewportHeight = 400))
+    fun `preview end anchor is the final lazy item`() {
+        assertEquals(4, previewEndAnchorIndex(totalItems = 5))
     }
 
     @Test
-    fun `preview bottom offset lets short last item clamp to list end`() {
-        assertEquals(0, previewBottomScrollOffset(itemHeight = 240, viewportHeight = 400))
+    fun `preview reading progress starts at zero before scrolling`() {
+        val progress = previewReadingProgress(
+            contentLength = 1_000,
+            sourceOffset = 120,
+            canScrollBackward = false,
+            canScrollForward = true
+        )
+
+        assertEquals(0f, progress, 0.0001f)
+    }
+
+    @Test
+    fun `preview reading progress moves within visible item`() {
+        val progress = previewReadingProgress(
+            contentLength = 1_000,
+            sourceOffset = 375,
+            canScrollBackward = true,
+            canScrollForward = true
+        )
+
+        assertEquals(0.375f, progress, 0.0001f)
+    }
+
+    @Test
+    fun `preview reading progress reaches one at list end`() {
+        val progress = previewReadingProgress(
+            contentLength = 1_000,
+            sourceOffset = 850,
+            canScrollBackward = true,
+            canScrollForward = false
+        )
+
+        assertEquals(1f, progress, 0.0001f)
+    }
+
+    @Test
+    fun `preview reading progress is complete when document does not scroll`() {
+        val progress = previewReadingProgress(
+            contentLength = 1_000,
+            sourceOffset = 0,
+            canScrollBackward = false,
+            canScrollForward = false
+        )
+
+        assertEquals(1f, progress, 0.0001f)
+    }
+
+    @Test
+    fun `preview reading progress is hidden when document does not scroll`() {
+        assertTrue(!previewReadingProgressVisible(canScrollBackward = false, canScrollForward = false))
+        assertTrue(previewReadingProgressVisible(canScrollBackward = false, canScrollForward = true))
+        assertTrue(previewReadingProgressVisible(canScrollBackward = true, canScrollForward = false))
     }
 }

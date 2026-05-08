@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.ui.component
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private data class MarkdownImageSize(
+    val width: Int,
+    val height: Int
+) {
+    val aspectRatio: Float = width.toFloat() / height.coerceAtLeast(1).toFloat()
+}
+
+private data class MarkdownImageLoadResult(
+    val bitmap: ImageBitmap,
+    val size: MarkdownImageSize
+)
+
 /**
  * Loads and renders a local image asynchronously.
  *
@@ -52,17 +65,28 @@ internal fun MarkdownImageBlock(
     }
 
     val file = remember(imageFileProvider, relativePath) { imageFileProvider(relativePath) }
+    val initialImageSize = remember(file.absolutePath, file.lastModified()) {
+        readMarkdownImageSize(file)
+    }
     var imageBitmap by remember(file.absolutePath) { mutableStateOf<ImageBitmap?>(null) }
+    var imageSize by remember(file.absolutePath) { mutableStateOf(initialImageSize) }
     var loadFailed by remember(file.absolutePath) { mutableStateOf(false) }
 
-    LaunchedEffect(file.absolutePath) {
+    LaunchedEffect(file.absolutePath, initialImageSize) {
         imageBitmap = null
+        imageSize = initialImageSize
         loadFailed = false
+
         val result = loadMarkdownBitmap(file)
-        if (result != null) imageBitmap = result else loadFailed = true
+        if (result != null) {
+            imageSize = result.size
+            imageBitmap = result.bitmap
+        } else {
+            loadFailed = true
+        }
     }
 
-    MarkdownImageContent(imageBitmap, loadFailed, altText)
+    MarkdownImageContent(imageBitmap, imageSize, loadFailed, altText)
 }
 
 @Composable
@@ -75,36 +99,51 @@ private fun MarkdownImagePlaceholder(altText: String) {
     )
 }
 
-private suspend fun loadMarkdownBitmap(file: File): ImageBitmap? {
+private fun readMarkdownImageSize(file: File): MarkdownImageSize? {
+    if (!file.exists()) return null
+
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, options)
+    return markdownImageSizeOrNull(options.outWidth, options.outHeight)
+}
+
+private suspend fun loadMarkdownBitmap(file: File): MarkdownImageLoadResult? {
     return withContext(Dispatchers.IO) {
-        if (file.exists()) BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() else null
+        if (!file.exists()) return@withContext null
+
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return@withContext null
+        MarkdownImageLoadResult(
+            bitmap = bitmap.asImageBitmap(),
+            size = MarkdownImageSize(width = bitmap.width, height = bitmap.height)
+        )
     }
 }
 
 @Composable
 private fun MarkdownImageContent(
     imageBitmap: ImageBitmap?,
+    imageSize: MarkdownImageSize?,
     loadFailed: Boolean,
     altText: String
 ) {
     when {
-        imageBitmap != null -> LoadedMarkdownImage(imageBitmap, altText)
+        imageBitmap != null -> LoadedMarkdownImage(imageBitmap, imageSize, altText)
         loadFailed -> MissingMarkdownImage()
-        else -> LoadingMarkdownImage()
+        else -> LoadingMarkdownImage(imageSize)
     }
 }
 
 @Composable
 private fun LoadedMarkdownImage(
-    imageBitmap: ImageBitmap?,
+    imageBitmap: ImageBitmap,
+    imageSize: MarkdownImageSize?,
     altText: String
 ) {
     Image(
-        bitmap             = imageBitmap!!,
+        bitmap             = imageBitmap,
         contentDescription = altText.ifEmpty { "Image in note" },
         modifier           = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .markdownImageFrame(imageSize ?: imageBitmap.intrinsicMarkdownSize())
             .clip(RoundedCornerShape(8.dp)),
         contentScale = ContentScale.FillWidth
     )
@@ -132,12 +171,10 @@ private fun MissingMarkdownImage() {
 }
 
 @Composable
-private fun LoadingMarkdownImage() {
+private fun LoadingMarkdownImage(imageSize: MarkdownImageSize?) {
     Box(
         modifier         = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .padding(vertical = 8.dp),
+            .markdownImageFrame(imageSize),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(
@@ -145,4 +182,20 @@ private fun LoadingMarkdownImage() {
             strokeWidth = 2.dp
         )
     }
+}
+
+private fun Modifier.markdownImageFrame(imageSize: MarkdownImageSize?): Modifier {
+    val base = fillMaxWidth().padding(vertical = 8.dp)
+    return if (imageSize != null) {
+        base.aspectRatio(imageSize.aspectRatio)
+    } else {
+        base.height(100.dp)
+    }
+}
+
+private fun ImageBitmap.intrinsicMarkdownSize(): MarkdownImageSize =
+    MarkdownImageSize(width = width, height = height)
+
+private fun markdownImageSizeOrNull(width: Int, height: Int): MarkdownImageSize? {
+    return if (width > 0 && height > 0) MarkdownImageSize(width, height) else null
 }
