@@ -24,9 +24,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,12 +39,18 @@ internal fun TagsScreenLayout(
     searchFocusRequester: FocusRequester,
     isSearchActive: Boolean,
     showSortMenu: Boolean,
+    floatingBottomPadding: Dp,
     actions: TagsActions
 ) {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState) { data ->
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(
+                    bottom = RadialMenuOverlayDefaults.snackbarBottomPadding(floatingBottomPadding)
+                )
+            ) { data ->
                 Snackbar(snackbarData = data)
             }
         },

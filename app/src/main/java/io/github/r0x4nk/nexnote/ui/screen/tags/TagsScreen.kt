@@ -1,9 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.tags
 
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -12,10 +10,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.r0x4nk.nexnote.domain.model.Note
-import io.github.r0x4nk.nexnote.ui.common.snackbarMessage
+import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
@@ -31,6 +31,7 @@ import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 @Composable
 fun TagsScreen(
     onNoteClick: (noteId: Long) -> Unit,
+    floatingBottomPadding: Dp = 0.dp,
     viewModel: TagsViewModel = viewModel(factory = TagsViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -50,7 +51,12 @@ fun TagsScreen(
     )
 
     RadialMenuEffect(items = emptyList())
-    TagsTrashEventsEffect(viewModel, snackbarHostState)
+    TrashSnackbarEffect(
+        trashEvents = viewModel.trashEvents,
+        snackbarHostState = snackbarHostState,
+        onUndoTrash = viewModel::undoPendingTrash,
+        onConfirmTrash = viewModel::confirmTrash
+    )
     TagsNoteActionMessagesEffect(viewModel, snackbarHostState)
 
     TagsScreenLayout(
@@ -60,6 +66,7 @@ fun TagsScreen(
         searchFocusRequester = searchFocusRequester,
         isSearchActive = isSearchActive,
         showSortMenu = showSortMenu,
+        floatingBottomPadding = floatingBottomPadding,
         actions = actions
     )
     TagsDialogHost(
@@ -73,27 +80,6 @@ fun TagsScreen(
         onDelete = viewModel::requestTrash,
         onDismiss = { activeActionsNote = null }
     )
-}
-
-@Composable
-private fun TagsTrashEventsEffect(
-    viewModel: TagsViewModel,
-    snackbarHostState: SnackbarHostState
-) {
-    LaunchedEffect(viewModel, snackbarHostState) {
-        viewModel.trashEvents.collect { event ->
-            val result = snackbarHostState.showSnackbar(
-                message = event.snackbarMessage(),
-                actionLabel = "Undo",
-                duration = SnackbarDuration.Short
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoPendingTrash(event.noteId)
-            } else {
-                viewModel.confirmTrash(event.noteId)
-            }
-        }
-    }
 }
 
 @Composable

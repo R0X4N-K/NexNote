@@ -24,6 +24,8 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 
+private const val TRASH_COLLAPSE_DELAY_MS = 280L
+
 /**
  * Card for a single note in list and grid views.
  *
@@ -61,7 +63,8 @@ fun NoteCard(
     )
 
     TrashAfterCollapseEffect(
-        collapsed = collapsedState.value,
+        collapsedState = collapsedState,
+        dismissState = dismissState,
         onTrash = onTrash
     )
 
@@ -122,16 +125,22 @@ private fun CollapseOnEndToStartSwipeEffect(
 
 @Composable
 private fun TrashAfterCollapseEffect(
-    collapsed: Boolean,
+    collapsedState: MutableState<Boolean>,
+    dismissState: SwipeToDismissBoxState,
     onTrash: () -> Unit
 ) {
     val currentOnTrash by rememberUpdatedState(onTrash)
 
-    LaunchedEffect(collapsed) {
-        if (collapsed) {
-            delay(280)
-            currentOnTrash()
-        }
+    LaunchedEffect(collapsedState.value) {
+        if (!collapsedState.value) return@LaunchedEffect
+
+        delay(TRASH_COLLAPSE_DELAY_MS)
+        currentOnTrash()
+
+        // Reset before Room can remove this keyed item from composition; otherwise
+        // a fast Undo can reuse the dismissed state and keep the restored card hidden.
+        dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+        collapsedState.value = false
     }
 }
 

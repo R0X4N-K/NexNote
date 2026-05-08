@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 
@@ -55,7 +56,7 @@ fun AgendaScreen(
     }
     var isCalendarVisible by remember { mutableStateOf(!uiState.isSearchActive) }
 
-    AgendaTrashEventsEffect(
+    TrashSnackbarEffect(
         trashEvents = viewModel.trashEvents,
         snackbarHostState = snackbarHostState,
         onUndoTrash = actions.onUndoTrash,

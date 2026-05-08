@@ -173,6 +173,27 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `requestTrash followed by undo restores note to active list`() = runViewModelTest {
+        fakeDao.emitAllNotes(
+            listOf(NoteEntity(id = 9L, title = "Recoverable note", lastModifiedDate = 100L))
+        )
+        advanceUntilIdle()
+
+        val note = viewModel.uiState.value.notes.single()
+        viewModel.requestTrash(note)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.notes.isEmpty())
+
+        viewModel.undoPendingTrash(note.id)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(9L),
+            viewModel.uiState.value.notes.map { it.id }
+        )
+    }
+
+    @Test
     fun `debounce does not emit immediately`() = runViewModelTest {
         fakeDao.emitAllNotes(listOf(
             NoteEntity(id = 1L, title = "Test", content = "content")
@@ -237,8 +258,22 @@ private class FakeNoteDao : NoteDao {
 
     override suspend fun insertNote(note: NoteEntity): Long = 0L
     override suspend fun updateNote(note: NoteEntity) = Unit
-    override suspend fun moveToTrash(id: Long, deletedDate: Long) { lastTrashedId = id }
-    override suspend fun restoreFromTrash(id: Long) { lastRestoredId = id }
+    override suspend fun moveToTrash(id: Long, deletedDate: Long) {
+        lastTrashedId = id
+        val trashedNote = _allNotes.value.find { it.id == id }
+            ?.copy(isDeleted = true, deletedDate = deletedDate)
+            ?: return
+        _allNotes.value = _allNotes.value.filterNot { it.id == id }
+        _deletedNotes.value = _deletedNotes.value + trashedNote
+    }
+    override suspend fun restoreFromTrash(id: Long) {
+        lastRestoredId = id
+        val restoredNote = _deletedNotes.value.find { it.id == id }
+            ?.copy(isDeleted = false, deletedDate = null)
+            ?: return
+        _deletedNotes.value = _deletedNotes.value.filterNot { it.id == id }
+        _allNotes.value = _allNotes.value + restoredNote
+    }
     override suspend fun deleteNotePermanently(id: Long): Int = 0
     override suspend fun emptyTrash(): Int = 0
     override suspend fun getDeletedImagePathsRaw(): List<String> = emptyList()

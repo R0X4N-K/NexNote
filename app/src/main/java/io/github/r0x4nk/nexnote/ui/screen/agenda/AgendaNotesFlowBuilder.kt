@@ -77,9 +77,22 @@ internal fun buildAgendaProcessedNotesFlow(
                     it.content.contains(query, ignoreCase = true)
             }
         }
-        when (order) {
-            SortOrder.MODIFIED_DESC -> searched.sortedByDescending { it.lastModifiedDate }
-            SortOrder.MODIFIED_ASC -> searched.sortedBy { it.lastModifiedDate }
-        }
+        searched.sortedByPinnedAndModifiedDate(order)
     }
+}
+
+private fun List<Note>.sortedByPinnedAndModifiedDate(order: SortOrder): List<Note> {
+    val comparator = when (order) {
+        SortOrder.MODIFIED_DESC ->
+            compareByDescending<Note> { it.isPinned }
+                .thenByDescending { it.lastModifiedDate }
+                .thenBy { it.id }
+
+        SortOrder.MODIFIED_ASC ->
+            compareByDescending<Note> { it.isPinned }
+                .thenBy { it.lastModifiedDate }
+                .thenBy { it.id }
+    }
+
+    return sortedWith(comparator)
 }

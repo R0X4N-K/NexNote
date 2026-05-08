@@ -268,6 +268,96 @@ class AgendaViewModelTest {
     }
 
     @Test
+    fun `notesForSelectedDate sorts pinned notes first in modified descending order`() = runViewModelTest {
+        val noteTs = DateUtils.toMillis(2025, Calendar.JUNE, 10)
+        fakeDao.addNote(
+            NoteEntity(id = 1L, title = "Unpinned newer", creationDate = noteTs, lastModifiedDate = 300L)
+        )
+        fakeDao.addNote(
+            NoteEntity(
+                id = 2L,
+                title = "Pinned older",
+                creationDate = noteTs,
+                lastModifiedDate = 100L,
+                isPinned = true
+            )
+        )
+        fakeDao.addNote(
+            NoteEntity(
+                id = 3L,
+                title = "Pinned newer",
+                creationDate = noteTs,
+                lastModifiedDate = 200L,
+                isPinned = true
+            )
+        )
+
+        viewModel.selectDate(2025, Calendar.JUNE, 10)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(3L, 2L, 1L),
+            viewModel.uiState.value.notesForSelectedDate.map { it.id }
+        )
+    }
+
+    @Test
+    fun `notesForSelectedDate keeps pinned notes first in modified ascending order`() = runViewModelTest {
+        val noteTs = DateUtils.toMillis(2025, Calendar.JUNE, 10)
+        fakeDao.addNote(
+            NoteEntity(id = 1L, title = "Unpinned older", creationDate = noteTs, lastModifiedDate = 100L)
+        )
+        fakeDao.addNote(
+            NoteEntity(
+                id = 2L,
+                title = "Pinned newer",
+                creationDate = noteTs,
+                lastModifiedDate = 300L,
+                isPinned = true
+            )
+        )
+        fakeDao.addNote(
+            NoteEntity(
+                id = 3L,
+                title = "Pinned older",
+                creationDate = noteTs,
+                lastModifiedDate = 200L,
+                isPinned = true
+            )
+        )
+
+        viewModel.selectDate(2025, Calendar.JUNE, 10)
+        viewModel.toggleSortOrder()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(3L, 2L, 1L),
+            viewModel.uiState.value.notesForSelectedDate.map { it.id }
+        )
+    }
+
+    @Test
+    fun `requestTrash followed by undo restores note to selected date`() = runViewModelTest {
+        val noteTs = DateUtils.toMillis(2025, Calendar.JUNE, 10)
+        fakeDao.addNote(NoteEntity(id = 30L, title = "Undo me", creationDate = noteTs))
+        viewModel.selectDate(2025, Calendar.JUNE, 10)
+        advanceUntilIdle()
+
+        val note = viewModel.uiState.value.notesForSelectedDate.single()
+        viewModel.requestTrash(note)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.notesForSelectedDate.isEmpty())
+
+        viewModel.undoPendingTrash(note.id)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(30L),
+            viewModel.uiState.value.notesForSelectedDate.map { it.id }
+        )
+    }
+
+    @Test
     fun `initial viewMode is LIST`() = runViewModelTest {
         advanceUntilIdle()
         assertEquals(NoteListViewMode.LIST, viewModel.uiState.value.viewMode)

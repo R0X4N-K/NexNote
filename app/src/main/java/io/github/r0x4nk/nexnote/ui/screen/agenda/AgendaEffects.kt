@@ -6,43 +6,14 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.lazy.LazyListState
-import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
-import io.github.r0x4nk.nexnote.ui.common.snackbarMessage
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
-import kotlinx.coroutines.flow.Flow
-
-@Composable
-internal fun AgendaTrashEventsEffect(
-    trashEvents: Flow<TrashedNoteEvent>,
-    snackbarHostState: SnackbarHostState,
-    onUndoTrash: (Long) -> Unit,
-    onConfirmTrash: (Long) -> Unit
-) {
-    LaunchedEffect(trashEvents, snackbarHostState, onUndoTrash, onConfirmTrash) {
-        trashEvents.collect { event ->
-            val result = snackbarHostState.showSnackbar(
-                message = event.snackbarMessage(),
-                actionLabel = "Undo",
-                duration = SnackbarDuration.Short
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                onUndoTrash(event.noteId)
-            } else {
-                onConfirmTrash(event.noteId)
-            }
-        }
-    }
-}
 
 @Composable
 internal fun AgendaCalendarVisibilityEffects(

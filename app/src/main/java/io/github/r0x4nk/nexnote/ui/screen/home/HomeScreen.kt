@@ -13,10 +13,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,12 +32,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
-import io.github.r0x4nk.nexnote.ui.common.snackbarMessage
 
 private const val EXIT_BACK_PRESS_WINDOW_MS = 2000L
 
@@ -64,7 +62,12 @@ fun HomeScreen(
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
 
-    TrashEventsEffect(viewModel, snackbarHostState)
+    TrashSnackbarEffect(
+        trashEvents = viewModel.trashEvents,
+        snackbarHostState = snackbarHostState,
+        onUndoTrash = viewModel::undoPendingTrash,
+        onConfirmTrash = viewModel::confirmTrash
+    )
     NoteActionMessagesEffect(viewModel, snackbarHostState)
     DoubleBackToExitHandler()
     HomeRadialMenu(onNewNote = onNewNote, onTemplateClick = viewModel::showTemplatePicker) {
@@ -132,27 +135,6 @@ private fun NoteActionMessagesEffect(
     LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.noteActionMessages.collect { message ->
             snackbarHostState.showSnackbar(message = message)
-        }
-    }
-}
-
-@Composable
-private fun TrashEventsEffect(
-    viewModel: HomeViewModel,
-    snackbarHostState: SnackbarHostState
-) {
-    LaunchedEffect(viewModel, snackbarHostState) {
-        viewModel.trashEvents.collect { event ->
-            val result = snackbarHostState.showSnackbar(
-                message = event.snackbarMessage(),
-                actionLabel = "Undo",
-                duration = SnackbarDuration.Short
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoPendingTrash(event.noteId)
-            } else {
-                viewModel.confirmTrash(event.noteId)
-            }
         }
     }
 }

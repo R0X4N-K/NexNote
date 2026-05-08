@@ -46,7 +46,7 @@ private fun NavGraphBuilder.bottomNavDestinations(
 ) {
     homeDestination(navController, floatingBottomPadding)
     agendaDestination(navController, floatingBottomPadding)
-    tagsDestination(navController)
+    tagsDestination(navController, floatingBottomPadding)
     templatesDestination(navController, floatingBottomPadding)
     settingsDestination()
 }
@@ -94,12 +94,16 @@ private fun NavGraphBuilder.agendaDestination(
     }
 }
 
-private fun NavGraphBuilder.tagsDestination(navController: NavHostController) {
+private fun NavGraphBuilder.tagsDestination(
+    navController: NavHostController,
+    floatingBottomPadding: Dp
+) {
     composable(Screen.Tags.route) {
         TagsScreen(
             onNoteClick = { noteId ->
                 navController.navigate(Screen.Editor.route(noteId = noteId))
-            }
+            },
+            floatingBottomPadding = floatingBottomPadding
         )
     }
 }

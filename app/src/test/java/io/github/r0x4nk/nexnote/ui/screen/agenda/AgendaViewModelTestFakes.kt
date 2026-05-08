@@ -47,11 +47,31 @@ class AgendaFakeNoteDao : NoteDao {
 
     override suspend fun insertNote(note: NoteEntity): Long = 0L
     override suspend fun updateNote(note: NoteEntity) = Unit
-    override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
-    override suspend fun restoreFromTrash(id: Long) = Unit
+    override suspend fun moveToTrash(id: Long, deletedDate: Long) {
+        notes.value = notes.value.map { note ->
+            if (note.id == id) {
+                note.copy(isDeleted = true, deletedDate = deletedDate)
+            } else {
+                note
+            }
+        }
+    }
+    override suspend fun restoreFromTrash(id: Long) {
+        notes.value = notes.value.map { note ->
+            if (note.id == id) {
+                note.copy(isDeleted = false, deletedDate = null)
+            } else {
+                note
+            }
+        }
+    }
     override suspend fun deleteNotePermanently(id: Long): Int = 0
     override suspend fun emptyTrash(): Int = 0
     override suspend fun getDeletedImagePathsRaw(): List<String> = emptyList()
-    override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
+    override suspend fun setPinned(id: Long, isPinned: Boolean) {
+        notes.value = notes.value.map { note ->
+            if (note.id == id) note.copy(isPinned = isPinned) else note
+        }
+    }
     override suspend fun setPreviewMode(id: Long, isPreviewMode: Boolean) = Unit
 }
