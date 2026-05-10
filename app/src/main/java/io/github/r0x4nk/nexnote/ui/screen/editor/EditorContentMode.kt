@@ -126,7 +126,7 @@ internal fun ColumnScope.EditorContentModeBox(
                 lazyListState = state.previewListState,
                 sourceRanges = state.currentSourceRanges,
                 contentLength = uiState.content.length,
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
     }
