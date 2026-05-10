@@ -2,6 +2,7 @@ package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.TextUnit
+import io.github.r0x4nk.nexnote.util.MarkdownColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -9,17 +10,28 @@ import org.junit.Test
 
 class NoteCardTextHighlightingTest {
 
+    /**
+     * Mirrors the bundle the production Composables build from the active
+     * Material theme, but with concrete values that are easy to assert against
+     * inside a unit test.
+     */
+    private val markdownColors = MarkdownColors(
+        linkColor = Color.Blue,
+        inlineCodeBackground = Color.LightGray,
+        inlineCodeForeground = Color.Black
+    )
+
     @Test
     fun `card markdown text renders inline and list syntax`() {
         val text = buildNoteCardDisplayText(
             sourceText = "**Bold** and [Docs](https://example.com)\n- [x] Done",
             ranges = emptyList(),
-            linkColor = Color.Blue,
+            colors = markdownColors,
             highlightColor = Color.Red,
             renderMarkdown = true
         )
 
-        assertEquals("Bold and Docs\n\u2611 Done", text.text)
+        assertEquals("Bold and Docs\n☑ Done", text.text)
     }
 
     @Test
@@ -27,7 +39,7 @@ class NoteCardTextHighlightingTest {
         val text = buildNoteCardDisplayText(
             sourceText = "![Diagram](images/diagram.png)",
             ranges = emptyList(),
-            linkColor = Color.Blue,
+            colors = markdownColors,
             highlightColor = Color.Red,
             renderMarkdown = true
         )
@@ -40,7 +52,7 @@ class NoteCardTextHighlightingTest {
         val text = buildNoteCardDisplayText(
             sourceText = "# Large heading",
             ranges = emptyList(),
-            linkColor = Color.Blue,
+            colors = markdownColors,
             highlightColor = Color.Red,
             renderMarkdown = true
         )
@@ -54,7 +66,7 @@ class NoteCardTextHighlightingTest {
         val text = buildNoteCardDisplayText(
             sourceText = "**Bold** text",
             ranges = listOf(2..5),
-            linkColor = Color.Blue,
+            colors = markdownColors,
             highlightColor = Color.Red,
             renderMarkdown = true
         )

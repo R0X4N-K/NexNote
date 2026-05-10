@@ -25,6 +25,7 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.buildNoteCardDisplayText
 import io.github.r0x4nk.nexnote.util.DateUtils
+import io.github.r0x4nk.nexnote.util.MarkdownColors
 
 private const val TRASH_NOTE_EXCERPT_MAX_LENGTH = 120
 
@@ -79,12 +80,21 @@ private fun TrashNoteCardContent(
 @Composable
 private fun rememberTrashNoteCardTextState(note: Note): TrashNoteCardTextState {
     val primaryColor = MaterialTheme.colorScheme.primary
-    return remember(note.title, note.content, note.isMarkdown, primaryColor) {
+    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
+    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
+    val markdownColors = remember(primaryColor, codeBackground, codeForeground) {
+        MarkdownColors(
+            linkColor            = primaryColor,
+            inlineCodeBackground = codeBackground,
+            inlineCodeForeground = codeForeground
+        )
+    }
+    return remember(note.title, note.content, note.isMarkdown, markdownColors) {
         TrashNoteCardTextState(
             title = buildNoteCardDisplayText(
                 sourceText = noteDisplayTitle(note),
                 ranges = emptyList(),
-                linkColor = primaryColor,
+                colors = markdownColors,
                 highlightColor = primaryColor,
                 renderMarkdown = note.isMarkdown
             ),
@@ -92,7 +102,7 @@ private fun rememberTrashNoteCardTextState(note: Note): TrashNoteCardTextState {
                 buildNoteCardDisplayText(
                     sourceText = note.content.take(TRASH_NOTE_EXCERPT_MAX_LENGTH),
                     ranges = emptyList(),
-                    linkColor = primaryColor,
+                    colors = markdownColors,
                     highlightColor = primaryColor,
                     renderMarkdown = note.isMarkdown
                 )

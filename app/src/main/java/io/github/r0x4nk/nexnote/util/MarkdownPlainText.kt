@@ -1,7 +1,5 @@
 package io.github.r0x4nk.nexnote.util
 
-import androidx.compose.ui.graphics.Color
-
 /**
  * Converts Markdown into readable text for clipboard/export surfaces that should
  * not expose Markdown delimiters.
@@ -11,7 +9,10 @@ object MarkdownPlainText {
     fun fromMarkdown(markdown: String): String {
         if (markdown.isEmpty()) return ""
 
-        return MarkdownParser.parseBlocks(markdown, Color.Unspecified)
+        // Color choices don't affect the plain-text projection, so we pass the
+        // neutral [MarkdownColors.Unspecified] bundle to satisfy the parser's
+        // signature without making the call site reach for a Composable scope.
+        return MarkdownParser.parseBlocks(markdown, MarkdownColors.Unspecified)
             .mapNotNull { block -> block.toPlainText().takeIf { it.isNotEmpty() } }
             .joinToString("\n")
     }

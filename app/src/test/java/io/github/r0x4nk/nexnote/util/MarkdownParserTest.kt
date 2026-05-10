@@ -9,15 +9,19 @@ import org.junit.Test
 
 class MarkdownParserTest {
 
-    private val linkColor = Color.Blue
-    private fun parseBlocks(text: String) = MarkdownParser.parseBlocks(text, linkColor)
+    private val colors = MarkdownColors(
+        linkColor = Color.Blue,
+        inlineCodeBackground = Color.LightGray,
+        inlineCodeForeground = Color.Black
+    )
+    private fun parseBlocks(text: String) = MarkdownParser.parseBlocks(text, colors)
 
     @Test
     fun parseBlocks_smallText_canBeReadFromCache() {
         val text = "Cacheable markdown"
         val blocks = parseBlocks(text)
 
-        assertEquals(blocks, MarkdownParser.getCached(text, linkColor))
+        assertEquals(blocks, MarkdownParser.getCached(text, colors))
     }
 
     @Test
@@ -28,7 +32,7 @@ class MarkdownParserTest {
 
         // Large texts bypass the bounded LRU cache but are still available via
         // the single-slot last-parse holder, ensuring warmup results are never lost.
-        assertEquals(blocks, MarkdownParser.getCached(text, linkColor))
+        assertEquals(blocks, MarkdownParser.getCached(text, colors))
     }
 
     @Test
@@ -91,6 +95,15 @@ class MarkdownParserTest {
         val blocks = parseBlocks("![alt](path/img.jpg)   ")
         assertEquals(1, blocks.size)
         assertTrue(blocks[0] is MarkdownBlock.ImageBlock)
+    }
+
+    @Test
+    fun parseBlocks_imageWithTitle_stripsTitleFromPath() {
+        val blocks = parseBlocks("""![alt](path/img.jpg "Title")""")
+        val block = blocks[0] as MarkdownBlock.ImageBlock
+
+        assertEquals("path/img.jpg", block.path)
+        assertEquals("alt", block.altText)
     }
 
     @Test

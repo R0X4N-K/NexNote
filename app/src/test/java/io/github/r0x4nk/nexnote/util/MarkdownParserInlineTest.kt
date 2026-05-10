@@ -14,7 +14,12 @@ import org.junit.Test
 class MarkdownParserInlineTest {
 
     private val linkColor = Color.Blue
-    private fun parse(text: String) = MarkdownParser.parse(text, linkColor)
+    private val colors = MarkdownColors(
+        linkColor = linkColor,
+        inlineCodeBackground = Color.LightGray,
+        inlineCodeForeground = Color.Black
+    )
+    private fun parse(text: String) = MarkdownParser.parse(text, colors)
 
     @Test
     fun plainText_noMarkdown_returnsSameText() {
@@ -77,6 +82,15 @@ class MarkdownParserInlineTest {
     }
 
     @Test
+    fun boldItalic_tripleUnderscore_producesBoldItalicSpan() {
+        val result = parse("___bold italic___")
+        assertEquals("bold italic", result.text)
+        val span = result.spanStyles.firstOrNull()
+        assertEquals(FontWeight.Bold, span?.item?.fontWeight)
+        assertEquals(FontStyle.Italic, span?.item?.fontStyle)
+    }
+
+    @Test
     fun bold_unclosed_emitsLiteralAsterisk() {
         val result = parse("**not closed")
         assertTrue(result.text.startsWith("*"))
@@ -87,6 +101,31 @@ class MarkdownParserInlineTest {
         val result = parse("*italic text*")
         assertEquals("italic text", result.text)
         assertEquals(FontStyle.Italic, result.spanStyles.firstOrNull()?.item?.fontStyle)
+    }
+
+    @Test
+    fun italic_placeholderInsertedByToolbar_producesItalicSpan() {
+        // Mirror the exact byte sequence the toolbar emits when the user clicks
+        // the italic button without an active selection. Catches regressions
+        // where the italic span fails to render the placeholder text.
+        val result = parse("*text*")
+        assertEquals("text", result.text)
+        val italicSpan = result.spanStyles.firstOrNull { it.item.fontStyle == FontStyle.Italic }
+        assertNotNull("Toolbar-inserted italic must produce an Italic span", italicSpan)
+        assertEquals(0, italicSpan?.start)
+        assertEquals(4, italicSpan?.end)
+    }
+
+    @Test
+    fun inlineCode_placeholderInsertedByToolbar_producesMonospaceSpan() {
+        // Mirror the toolbar's inline-code button output. Confirms that the
+        // resulting span carries both monospace font *and* the configured
+        // background, which is what the user actually sees in the preview.
+        val result = parse("`code`")
+        assertEquals("code", result.text)
+        val span = result.spanStyles.firstOrNull()?.item
+        assertEquals(FontFamily.Monospace, span?.fontFamily)
+        assertEquals(Color.LightGray, span?.background)
     }
 
     @Test
@@ -106,6 +145,13 @@ class MarkdownParserInlineTest {
         val span = result.spanStyles.firstOrNull()
         assertEquals(TextDecoration.Underline, span?.item?.textDecoration)
         assertEquals(linkColor, span?.item?.color)
+    }
+
+    @Test
+    fun link_withTitle_stripsTitleFromUrlAnnotation() {
+        val result = parse("""[text](https://example.com "Title")""")
+
+        assertEquals("https://example.com", result.getStringAnnotations("URL", 0, result.text.length).first().item)
     }
 
     @Test
@@ -162,6 +208,18 @@ class MarkdownParserInlineTest {
     }
 
     @Test
+    fun inlineCode_usesConfiguredBackgroundAndForeground() {
+        // Regression guard: the inline-code background was previously hard-coded
+        // to a translucent black that disappeared on dark themes. The parser must
+        // honor the [MarkdownColors] bundle so the surrounding Composable can
+        // pick a theme-aware pair that stays legible.
+        val result = parse("`code`")
+        val span = result.spanStyles.firstOrNull()?.item
+        assertEquals(Color.LightGray, span?.background)
+        assertEquals(Color.Black, span?.color)
+    }
+
+    @Test
     fun inlineCode_unclosed_emitsLiteralBacktick() {
         val result = parse("`not closed")
         assertTrue(result.text.startsWith("`"))
@@ -176,6 +234,12 @@ class MarkdownParserInlineTest {
     @Test
     fun bulletList_asterisk_producesBulletPrefix() {
         val result = parse("* list item")
+        assertEquals("• list item", result.text)
+    }
+
+    @Test
+    fun bulletList_plus_producesBulletPrefix() {
+        val result = parse("+ list item")
         assertEquals("• list item", result.text)
     }
 
@@ -264,6 +328,18 @@ class MarkdownParserInlineTest {
     @Test
     fun brTag_uppercase_emitsNewline() {
         val result = parse("Line one<BR>Line two")
+        assertEquals("Line one\nLine two", result.text)
+    }
+
+    @Test
+    fun hardBreak_twoTrailingSpaces_trimsSpacesAndEmitsNewline() {
+        val result = parse("Line one  \nLine two")
+        assertEquals("Line one\nLine two", result.text)
+    }
+
+    @Test
+    fun hardBreak_trailingBackslash_emitsNewline() {
+        val result = parse("Line one\\\nLine two")
         assertEquals("Line one\nLine two", result.text)
     }
 

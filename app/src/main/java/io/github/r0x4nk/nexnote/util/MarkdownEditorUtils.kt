@@ -24,6 +24,7 @@ data class MarkdownInsertionResult(
  * - `* item`    → next line starts with `* `
  * - `1. item`   → next line starts with `2. `
  * - `- [ ] item`→ next line starts with `- [ ] `
+ * - `> quote`   → next line starts with `> `
  * - Indented variants of all the above (nesting preserved)
  *
  * ### Stop condition
@@ -107,8 +108,11 @@ internal fun markdownListContinuationForLine(line: String): String? {
 
     // Task list must be checked before the plain bullet so that `- [ ] text`
     // is not consumed by the simpler bullet pattern.
-    val taskMatch = Regex("""^[*\-]\s+\[[ xX]]\s*(.*)""").find(trimmed)
+    val taskMatch = Regex("""^[*\-+]\s+\[[ xX]]\s*(.*)""").find(trimmed)
     if (taskMatch != null) return "$indent- [ ] "
+
+    val quoteMatch = Regex("""^>\s+(.*)""").find(trimmed)
+    if (quoteMatch != null && quoteMatch.groupValues[1].isNotBlank()) return "$indent> "
 
     val orderedMatch = Regex("""^(\d+)\.\s+(.*)""").find(trimmed)
     if (orderedMatch != null) {
@@ -116,7 +120,7 @@ internal fun markdownListContinuationForLine(line: String): String? {
         return "$indent$nextNumber. "
     }
 
-    val bulletMatch = Regex("""^([*\-])\s+(.*)""").find(trimmed)
+    val bulletMatch = Regex("""^([*\-+])\s+(.*)""").find(trimmed)
     if (bulletMatch != null) return "$indent${bulletMatch.groupValues[1]} "
 
     return null

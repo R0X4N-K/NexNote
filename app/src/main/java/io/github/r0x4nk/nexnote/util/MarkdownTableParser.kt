@@ -1,16 +1,15 @@
 package io.github.r0x4nk.nexnote.util
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 
-internal fun parseTableRow(line: String, linkColor: Color): List<AnnotatedString> =
+internal fun parseTableRow(line: String, colors: MarkdownColors): List<AnnotatedString> =
     line.trim()
         .removePrefix("|")
         .removeSuffix("|")
         .split("|")
         .map { cell ->
-            buildAnnotatedString { appendInlineSpans(cell.trim(), linkColor) }
+            buildAnnotatedString { appendInlineSpans(cell.trim(), colors) }
         }
 
 internal fun parseSeparatorRow(line: String, columnCount: Int): List<ColumnAlignment> {

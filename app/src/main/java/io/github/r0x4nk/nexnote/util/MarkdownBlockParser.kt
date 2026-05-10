@@ -1,13 +1,12 @@
 package io.github.r0x4nk.nexnote.util
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 
-internal fun parseMarkdownBlocks(text: String, linkColor: Color): List<MarkdownBlock> =
-    MarkdownBlockParsingSession(linkColor).parse(text)
+internal fun parseMarkdownBlocks(text: String, colors: MarkdownColors): List<MarkdownBlock> =
+    MarkdownBlockParsingSession(colors).parse(text)
 
 private class MarkdownBlockParsingSession(
-    private val linkColor: Color
+    private val colors: MarkdownColors
 ) {
     private val blocks = mutableListOf<MarkdownBlock>()
     private val textLines = mutableListOf<String>()
@@ -109,7 +108,7 @@ private class MarkdownBlockParsingSession(
         if (textLines.isEmpty()) return
 
         blocks += MarkdownBlock.TextBlock(
-            MarkdownParser.parse(textLines.joinToString("\n"), linkColor)
+            MarkdownParser.parse(textLines.joinToString("\n"), colors)
         )
         textLines.clear()
     }
@@ -118,7 +117,7 @@ private class MarkdownBlockParsingSession(
         if (blockquoteLines.isEmpty()) return
 
         blocks += MarkdownBlock.BlockquoteBlock(
-            MarkdownParser.parse(blockquoteLines.joinToString("\n"), linkColor)
+            MarkdownParser.parse(blockquoteLines.joinToString("\n"), colors)
         )
         blockquoteLines.clear()
     }
@@ -143,9 +142,9 @@ private class MarkdownBlockParsingSession(
         }
 
         flushText()
-        val headers = parseTableRow(tableLines[0], linkColor)
+        val headers = parseTableRow(tableLines[0], colors)
         val alignments = parseSeparatorRow(tableLines[1], headers.size)
-        val rows = tableLines.drop(2).map { parseTableRow(it, linkColor) }
+        val rows = tableLines.drop(2).map { parseTableRow(it, colors) }
         blocks += MarkdownBlock.TableBlock(headers, alignments, rows)
         tableLines.clear()
     }

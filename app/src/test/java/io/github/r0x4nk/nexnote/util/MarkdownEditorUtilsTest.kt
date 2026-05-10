@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.util
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -60,5 +62,24 @@ class MarkdownEditorUtilsTest {
 
         assertEquals("![image](images/photo.jpg)\n", result.text)
         assertEquals(result.text.length, result.cursorOffset)
+    }
+
+    @Test
+    fun `handleSmartEnter continues blockquote`() {
+        val oldValue = TextFieldValue("> first")
+        val newValue = TextFieldValue("> first\n", TextRange("> first\n".length))
+
+        val result = handleSmartEnter(oldValue, newValue)
+
+        assertEquals("> first\n> ", result.text)
+        assertEquals(TextRange("> first\n> ".length), result.selection)
+    }
+
+    @Test
+    fun `handleSmartEnter stops empty blockquote`() {
+        val oldValue = TextFieldValue("> first\n> ")
+        val newValue = TextFieldValue("> first\n> \n", TextRange("> first\n> \n".length))
+
+        assertEquals(newValue, handleSmartEnter(oldValue, newValue))
     }
 }

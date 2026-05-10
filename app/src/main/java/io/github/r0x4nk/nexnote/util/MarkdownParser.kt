@@ -1,6 +1,5 @@
 package io.github.r0x4nk.nexnote.util
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import java.util.LinkedHashMap
@@ -14,10 +13,15 @@ import java.util.LinkedHashMap
  *
  * Supported inline syntax includes bold, italic, strikethrough, inline code,
  * links, hard line breaks, and CommonMark escape sequences.
+ *
+ * Theming colors flow through every entry point as a single [MarkdownColors]
+ * bundle so that adding a new themable surface (highlight, mention, …) does
+ * not force every signature to grow another parameter, and so the parse cache
+ * has a single hashable key per `(content, theme)` pair.
  */
 object MarkdownParser {
 
-    private data class CacheKey(val content: String, val linkColorValue: ULong)
+    private data class CacheKey(val content: String, val colors: MarkdownColors)
 
     private const val MAX_BLOCK_CACHE_ENTRIES = 30
     private const val MAX_CACHEABLE_CONTENT_CHARS = 100_000
@@ -50,13 +54,13 @@ object MarkdownParser {
     private var lastParse: LastParseEntry? = null
 
     /**
-     * Returns the cached parse result for [text] + [linkColor], if present.
+     * Returns the cached parse result for [text] + [colors], if present.
      * Checks both the bounded LRU cache (for smaller notes) and the single-slot
      * last-parse holder (for any size), so a preceding [parseBlocks] warmup call
      * always provides an immediate hit.
      */
-    fun getCached(text: String, linkColor: Color): List<MarkdownBlock>? {
-        val key = CacheKey(text, linkColor.value)
+    fun getCached(text: String, colors: MarkdownColors): List<MarkdownBlock>? {
+        val key = CacheKey(text, colors)
 
         // Check single-slot last-parse first (works for any content size)
         lastParse?.let { entry ->
@@ -74,11 +78,11 @@ object MarkdownParser {
      * Image tags are left as-is in the output; use [parseBlocks] to extract
      * them as separate [MarkdownBlock.ImageBlock]s.
      */
-    fun parse(text: String, linkColor: Color): AnnotatedString =
+    fun parse(text: String, colors: MarkdownColors): AnnotatedString =
         buildAnnotatedString {
-            text.split("\n").forEachIndexed { index, line ->
+            text.withNormalizedHardBreaks().split("\n").forEachIndexed { index, line ->
                 if (index > 0) append("\n")
-                appendMarkdownLine(line, linkColor)
+                appendMarkdownLine(line, colors)
             }
         }
 
@@ -94,8 +98,8 @@ object MarkdownParser {
      * composition provides a synchronous hit via [getCached], even for very
      * large notes that would otherwise exceed the LRU cache size limit.
      */
-    fun parseBlocks(text: String, linkColor: Color): List<MarkdownBlock> {
-        val key = CacheKey(text, linkColor.value)
+    fun parseBlocks(text: String, colors: MarkdownColors): List<MarkdownBlock> {
+        val key = CacheKey(text, colors)
 
         // Check LRU cache first
         if (text.isCacheable()) {
@@ -105,7 +109,7 @@ object MarkdownParser {
             }
         }
 
-        val result = parseMarkdownBlocks(text, linkColor)
+        val result = parseMarkdownBlocks(text, colors)
 
         // Store in bounded LRU cache if within size limit
         if (text.isCacheable()) {
@@ -119,4 +123,8 @@ object MarkdownParser {
 
     private fun String.isCacheable(): Boolean =
         length <= MAX_CACHEABLE_CONTENT_CHARS
+
+    private fun String.withNormalizedHardBreaks(): String =
+        replace(Regex(""" {2,}\n"""), "\n")
+            .replace("\\\n", "\n")
 }

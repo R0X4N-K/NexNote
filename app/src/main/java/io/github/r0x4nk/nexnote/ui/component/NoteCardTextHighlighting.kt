@@ -9,6 +9,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
+import io.github.r0x4nk.nexnote.util.MarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownParser
 
 private const val NOTE_CARD_BLOCK_SEPARATOR = "\n"
@@ -18,12 +19,12 @@ private const val NOTE_CARD_IMAGE_PLACEHOLDER = "Image"
 internal fun buildNoteCardDisplayText(
     sourceText: String,
     ranges: List<IntRange>,
-    linkColor: Color,
+    colors: MarkdownColors,
     highlightColor: Color,
     renderMarkdown: Boolean
 ): AnnotatedString {
     val renderedText = if (renderMarkdown) {
-        renderCompactMarkdown(sourceText, linkColor)
+        renderCompactMarkdown(sourceText, colors)
     } else {
         AnnotatedString(sourceText)
     }
@@ -37,10 +38,10 @@ internal fun buildNoteCardDisplayText(
 
 private fun renderCompactMarkdown(
     sourceText: String,
-    linkColor: Color
+    colors: MarkdownColors
 ): AnnotatedString {
     val renderedText = buildAnnotatedString {
-        MarkdownParser.parseBlocks(sourceText, linkColor).forEach { block ->
+        MarkdownParser.parseBlocks(sourceText, colors).forEach { block ->
             appendCompactMarkdownBlock(block)
         }
     }

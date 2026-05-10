@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
+import io.github.r0x4nk.nexnote.util.MarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -81,10 +82,10 @@ internal class MarkdownPreviewContentState(
 
 @Composable
 private fun rememberMarkdownPreviewContentState(markdown: String): MarkdownPreviewContentState {
-    val linkColor = MaterialTheme.colorScheme.primary
+    val colors = rememberMarkdownColors()
     val highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
     val sourceRanges = remember(markdown) { buildMarkdownBlockSourceRanges(markdown) }
-    val blocks by rememberMarkdownBlocks(markdown = markdown, linkColor = linkColor)
+    val blocks by rememberMarkdownBlocks(markdown = markdown, colors = colors)
     return MarkdownPreviewContentState(
         blocks         = blocks,
         sourceRanges   = sourceRanges,
@@ -92,19 +93,42 @@ private fun rememberMarkdownPreviewContentState(markdown: String): MarkdownPrevi
     )
 }
 
+/**
+ * Derives the [MarkdownColors] bundle from the active Material theme.
+ *
+ * `surfaceContainerHigh` for the inline-code background and
+ * `onSurfaceVariant` for its foreground guarantee a legible contrast on both
+ * light and dark themes — the previous hard-coded translucent black washed out
+ * to invisibility on dark backgrounds, which is why inline-code spans looked
+ * indistinguishable from plain text when the user was in dark mode.
+ */
+@Composable
+private fun rememberMarkdownColors(): MarkdownColors {
+    val linkColor = MaterialTheme.colorScheme.primary
+    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
+    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
+    return remember(linkColor, codeBackground, codeForeground) {
+        MarkdownColors(
+            linkColor            = linkColor,
+            inlineCodeBackground = codeBackground,
+            inlineCodeForeground = codeForeground
+        )
+    }
+}
+
 @Composable
 private fun rememberMarkdownBlocks(
     markdown: String,
-    linkColor: Color
+    colors: MarkdownColors
 ): State<List<MarkdownBlock>> =
     produceState(
-        initialValue = remember(markdown, linkColor) {
-            MarkdownParser.getCached(markdown, linkColor) ?: emptyList()
+        initialValue = remember(markdown, colors) {
+            MarkdownParser.getCached(markdown, colors) ?: emptyList()
         },
         key1 = markdown,
-        key2 = linkColor
+        key2 = colors
     ) {
         value = withContext(Dispatchers.Default) {
-            MarkdownParser.parseBlocks(text = markdown, linkColor = linkColor)
+            MarkdownParser.parseBlocks(text = markdown, colors = colors)
         }
     }

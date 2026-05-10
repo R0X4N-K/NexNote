@@ -10,9 +10,9 @@ import androidx.compose.ui.unit.sp
 
 private const val NEST_INDENT_WIDTH = 2
 private const val RENDERED_NEST_INDENT = "    "
-private const val CHECKBOX_UNCHECKED_MARKER = "\u2610 "
-private const val CHECKBOX_CHECKED_MARKER = "\u2611 "
-private const val UNORDERED_LIST_MARKER = "\u2022 "
+private const val CHECKBOX_UNCHECKED_MARKER = "☐ "
+private const val CHECKBOX_CHECKED_MARKER = "☑ "
+private const val UNORDERED_LIST_MARKER = "• "
 
 private data class HeadingMarker(
     val prefix: String,
@@ -28,25 +28,25 @@ private val headingMarkers = listOf(
     HeadingMarker("# ", 28.sp)
 )
 
-internal fun AnnotatedString.Builder.appendMarkdownLine(line: String, linkColor: Color) {
+internal fun AnnotatedString.Builder.appendMarkdownLine(line: String, colors: MarkdownColors) {
     val heading = headingMarkers.firstOrNull { line.startsWith(it.prefix) }
     when {
-        heading != null -> appendHeading(line, heading, linkColor)
-        appendCheckboxLine(line, MarkdownPatterns.CHECKBOX_UNCHECKED, false, linkColor) -> Unit
-        appendCheckboxLine(line, MarkdownPatterns.CHECKBOX_CHECKED, true, linkColor) -> Unit
-        appendBulletLine(line, linkColor) -> Unit
-        appendOrderedListLine(line, linkColor) -> Unit
-        else -> appendInlineSpans(line, linkColor)
+        heading != null -> appendHeading(line, heading, colors)
+        appendCheckboxLine(line, MarkdownPatterns.CHECKBOX_UNCHECKED, false, colors) -> Unit
+        appendCheckboxLine(line, MarkdownPatterns.CHECKBOX_CHECKED, true, colors) -> Unit
+        appendBulletLine(line, colors) -> Unit
+        appendOrderedListLine(line, colors) -> Unit
+        else -> appendInlineSpans(line, colors)
     }
 }
 
 private fun AnnotatedString.Builder.appendHeading(
     line: String,
     heading: HeadingMarker,
-    linkColor: Color
+    colors: MarkdownColors
 ) {
     withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = heading.fontSize)) {
-        appendInlineSpans(line.removePrefix(heading.prefix), linkColor)
+        appendInlineSpans(line.removePrefix(heading.prefix), colors)
     }
 }
 
@@ -54,49 +54,49 @@ private fun AnnotatedString.Builder.appendCheckboxLine(
     line: String,
     pattern: Regex,
     checked: Boolean,
-    linkColor: Color
+    colors: MarkdownColors
 ): Boolean {
     val match = pattern.find(line) ?: return false
     appendNestedIndent(match.groupValues[1])
     append(if (checked) CHECKBOX_CHECKED_MARKER else CHECKBOX_UNCHECKED_MARKER)
-    appendCheckboxContent(line.substring(match.value.length), checked, linkColor)
+    appendCheckboxContent(line.substring(match.value.length), checked, colors)
     return true
 }
 
 private fun AnnotatedString.Builder.appendCheckboxContent(
     content: String,
     checked: Boolean,
-    linkColor: Color
+    colors: MarkdownColors
 ) {
     if (checked) {
         withStyle(SpanStyle(color = Color.Gray)) {
-            appendInlineSpans(content, linkColor)
+            appendInlineSpans(content, colors)
         }
     } else {
-        appendInlineSpans(content, linkColor)
+        appendInlineSpans(content, colors)
     }
 }
 
 private fun AnnotatedString.Builder.appendBulletLine(
     line: String,
-    linkColor: Color
+    colors: MarkdownColors
 ): Boolean {
     val match = MarkdownPatterns.BULLET_LINE.find(line) ?: return false
     appendNestedIndent(match.groupValues[1])
     append(UNORDERED_LIST_MARKER)
-    appendInlineSpans(line.substring(match.value.length), linkColor)
+    appendInlineSpans(line.substring(match.value.length), colors)
     return true
 }
 
 private fun AnnotatedString.Builder.appendOrderedListLine(
     line: String,
-    linkColor: Color
+    colors: MarkdownColors
 ): Boolean {
     val match = MarkdownPatterns.ORDERED_LIST.find(line) ?: return false
     val number = match.groupValues[2]
     appendNestedIndent(match.groupValues[1])
     append("$number. ")
-    appendInlineSpans(line.substring(match.value.length), linkColor)
+    appendInlineSpans(line.substring(match.value.length), colors)
     return true
 }
 

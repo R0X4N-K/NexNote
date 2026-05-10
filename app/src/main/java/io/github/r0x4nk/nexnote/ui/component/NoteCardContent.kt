@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
+import io.github.r0x4nk.nexnote.util.MarkdownColors
 
 private data class NoteCardVisuals(
     val primaryColor: Color,
@@ -94,17 +95,18 @@ private fun rememberNoteCardTextState(
     contentHighlightRanges: List<IntRange>,
     primaryColor: Color
 ): NoteCardTextState {
+    val markdownColors = rememberNoteCardMarkdownColors(primaryColor)
     val displayTitle = remember(note.title, note.content) {
         note.title.ifBlank {
             note.content.lines().firstOrNull { it.isNotBlank() }?.take(80) ?: "Untitled note"
         }
     }
     val effectiveRanges = if (note.title.isNotBlank()) titleHighlightRanges else emptyList()
-    val titleAnnotated = remember(displayTitle, effectiveRanges, primaryColor, note.isMarkdown) {
+    val titleAnnotated = remember(displayTitle, effectiveRanges, markdownColors, note.isMarkdown) {
         buildNoteCardDisplayText(
             sourceText = displayTitle,
             ranges = effectiveRanges,
-            linkColor = primaryColor,
+            colors = markdownColors,
             highlightColor = primaryColor,
             renderMarkdown = note.isMarkdown
         )
@@ -118,17 +120,36 @@ private fun rememberNoteCardTextState(
             if (safeStart < safeEnd) safeStart..<safeEnd else null
         }
     }
-    val contentAnnotated = remember(previewText, clampedContentRanges, primaryColor, note.isMarkdown) {
+    val contentAnnotated = remember(previewText, clampedContentRanges, markdownColors, note.isMarkdown) {
         buildNoteCardDisplayText(
             sourceText = previewText,
             ranges = clampedContentRanges,
-            linkColor = primaryColor,
+            colors = markdownColors,
             highlightColor = primaryColor,
             renderMarkdown = note.isMarkdown
         )
     }
 
     return NoteCardTextState(title = titleAnnotated, content = contentAnnotated)
+}
+
+/**
+ * Bundles the theme-aware colors used by inline Markdown rendering inside
+ * note cards. Uses the same `surfaceContainerHigh` / `onSurfaceVariant` pair
+ * as the full preview so that a note's compact card and its expanded preview
+ * stay visually consistent.
+ */
+@Composable
+private fun rememberNoteCardMarkdownColors(linkColor: Color): MarkdownColors {
+    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
+    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
+    return remember(linkColor, codeBackground, codeForeground) {
+        MarkdownColors(
+            linkColor            = linkColor,
+            inlineCodeBackground = codeBackground,
+            inlineCodeForeground = codeForeground
+        )
+    }
 }
 
 @Composable
