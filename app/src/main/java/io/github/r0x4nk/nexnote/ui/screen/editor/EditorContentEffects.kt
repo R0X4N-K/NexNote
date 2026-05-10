@@ -52,6 +52,10 @@ internal fun EditorContentSyncEffect(
         uiState.isTemplateMode,
         uiState.contentVersion
     ) {
+        if (uiState.shouldDeferInitialEditContentSync(state.syncedContentVersion)) {
+            delay(DIRECT_EDIT_TEXT_FIELD_SYNC_DELAY_MS)
+        }
+
         val cursorPos = if (uiState.contentVersion <= 1) {
             0
         } else {

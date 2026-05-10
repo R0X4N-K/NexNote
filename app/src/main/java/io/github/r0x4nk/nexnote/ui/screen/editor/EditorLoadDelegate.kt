@@ -52,6 +52,7 @@ internal class EditorLoadDelegate(
             content = note.content,
             showPreview = note.isPreviewMode,
             openedDirectlyInPreview = note.isPreviewMode,
+            openedDirectlyInEdit = !note.isPreviewMode,
             creationDate = note.creationDate,
             lastModifiedDate = note.lastModifiedDate,
             timezone = note.timezone,

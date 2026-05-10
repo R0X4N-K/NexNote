@@ -37,4 +37,84 @@ class EditorTextFieldSyncPolicyTest {
             EditorTextFieldSyncPolicy.canApplyRecomposedValue(currentValue, recomposedValue)
         )
     }
+
+    @Test
+    fun `shouldDeferInitialEditContentSync defers long unsynced existing edit note`() {
+        assertTrue(
+            EditorTextFieldSyncPolicy.shouldDeferInitialEditContentSync(
+                noteId = 42L,
+                isLoading = false,
+                isTemplateMode = false,
+                showPreview = false,
+                openedDirectlyInEdit = true,
+                contentVersion = 1,
+                syncedContentVersion = 0,
+                contentLength = DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS
+            )
+        )
+    }
+
+    @Test
+    fun `shouldDeferInitialEditContentSync does not defer preview note`() {
+        assertFalse(
+            EditorTextFieldSyncPolicy.shouldDeferInitialEditContentSync(
+                noteId = 42L,
+                isLoading = false,
+                isTemplateMode = false,
+                showPreview = true,
+                openedDirectlyInEdit = true,
+                contentVersion = 1,
+                syncedContentVersion = 0,
+                contentLength = DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS
+            )
+        )
+    }
+
+    @Test
+    fun `shouldDeferInitialEditContentSync does not defer already synced content`() {
+        assertFalse(
+            EditorTextFieldSyncPolicy.shouldDeferInitialEditContentSync(
+                noteId = 42L,
+                isLoading = false,
+                isTemplateMode = false,
+                showPreview = false,
+                openedDirectlyInEdit = true,
+                contentVersion = 1,
+                syncedContentVersion = 1,
+                contentLength = DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS
+            )
+        )
+    }
+
+    @Test
+    fun `shouldDeferInitialEditContentSync does not defer short content`() {
+        assertFalse(
+            EditorTextFieldSyncPolicy.shouldDeferInitialEditContentSync(
+                noteId = 42L,
+                isLoading = false,
+                isTemplateMode = false,
+                showPreview = false,
+                openedDirectlyInEdit = true,
+                contentVersion = 1,
+                syncedContentVersion = 0,
+                contentLength = DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS - 1
+            )
+        )
+    }
+
+    @Test
+    fun `shouldDeferInitialEditContentSync does not defer mode switches back to edit`() {
+        assertFalse(
+            EditorTextFieldSyncPolicy.shouldDeferInitialEditContentSync(
+                noteId = 42L,
+                isLoading = false,
+                isTemplateMode = false,
+                showPreview = false,
+                openedDirectlyInEdit = false,
+                contentVersion = 1,
+                syncedContentVersion = 0,
+                contentLength = DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS
+            )
+        )
+    }
 }

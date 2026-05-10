@@ -137,7 +137,9 @@ private fun editorContentTarget(
     state: EditorScreenState,
     previewWarmupKey: DirectPreviewWarmupKey?
 ): EditorContentTarget = when {
-    uiState.isLoading || state.isDirectPreviewWarmupPending(previewWarmupKey) -> {
+    uiState.isLoading ||
+        state.isDirectPreviewWarmupPending(previewWarmupKey) ||
+        uiState.shouldDeferInitialEditContentSync(state.syncedContentVersion) -> {
         EditorContentTarget.Loading
     }
     uiState.showPreview -> EditorContentTarget.Preview

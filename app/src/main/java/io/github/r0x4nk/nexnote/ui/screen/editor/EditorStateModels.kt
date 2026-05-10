@@ -20,6 +20,7 @@ data class EditorUiState(
     val content: String = "",
     val showPreview: Boolean = false,
     val openedDirectlyInPreview: Boolean = false,
+    val openedDirectlyInEdit: Boolean = false,
     val creationDate: Long = System.currentTimeMillis(),
     val lastModifiedDate: Long? = null,
     val timezone: String = TimeZone.getDefault().id,

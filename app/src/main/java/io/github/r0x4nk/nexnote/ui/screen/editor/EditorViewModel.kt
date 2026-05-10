@@ -299,7 +299,8 @@ class EditorViewModel(
         _uiState.update {
             it.copy(
                 showPreview = newValue,
-                openedDirectlyInPreview = false
+                openedDirectlyInPreview = false,
+                openedDirectlyInEdit = false
             )
         }
         if (!current.isTemplateMode && current.noteId != NO_ID) {
@@ -423,6 +424,7 @@ private fun EditorUiState.debugViewModelSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
         "loading=$isLoading dirty=$isDirty saving=$isSaving " +
         "preview=$showPreview openedDirectlyInPreview=$openedDirectlyInPreview " +
+        "openedDirectlyInEdit=$openedDirectlyInEdit " +
         "contentVersion=$contentVersion selection=$contentSelectionOffset " +
         "${NexNoteDebugLog.textSummary("title", title)} " +
         NexNoteDebugLog.textSummary("content", content)

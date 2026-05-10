@@ -19,4 +19,44 @@ internal object EditorTextFieldSyncPolicy {
     ): Boolean {
         return currentValue.text == recomposedValue.text
     }
+
+    /**
+     * Defers the first edit-mode hydration for long existing notes so the
+     * navigation enter animation can finish before BasicTextField measures the
+     * full document.
+     */
+    fun shouldDeferInitialEditContentSync(
+        noteId: Long,
+        isLoading: Boolean,
+        isTemplateMode: Boolean,
+        showPreview: Boolean,
+        openedDirectlyInEdit: Boolean,
+        contentVersion: Int,
+        syncedContentVersion: Int,
+        contentLength: Int
+    ): Boolean {
+        return noteId != EditorViewModel.NO_ID &&
+            !isLoading &&
+            !isTemplateMode &&
+            !showPreview &&
+            openedDirectlyInEdit &&
+            contentVersion == 1 &&
+            syncedContentVersion < contentVersion &&
+            contentLength >= DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS
+    }
+}
+
+internal fun EditorUiState.shouldDeferInitialEditContentSync(
+    syncedContentVersion: Int
+): Boolean {
+    return EditorTextFieldSyncPolicy.shouldDeferInitialEditContentSync(
+        noteId = noteId,
+        isLoading = isLoading,
+        isTemplateMode = isTemplateMode,
+        showPreview = showPreview,
+        openedDirectlyInEdit = openedDirectlyInEdit,
+        contentVersion = contentVersion,
+        syncedContentVersion = syncedContentVersion,
+        contentLength = content.length
+    )
 }
