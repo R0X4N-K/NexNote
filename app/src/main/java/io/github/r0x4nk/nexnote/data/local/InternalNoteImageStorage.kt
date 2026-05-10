@@ -6,11 +6,25 @@ import io.github.r0x4nk.nexnote.util.ImageFileManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 
+/**
+ * Persists note images in the app's internal storage directory.
+ *
+ * @param filesDir          root directory for internal file storage.
+ * @param currentTimeMillis clock function, injectable for deterministic tests.
+ * @param processImage      strategy that copies (and optionally transforms) an
+ *                          image stream into a destination file. Defaults to
+ *                          [NoteImageProcessor.processAndSave] which handles
+ *                          EXIF correction and downsampling. Tests may supply a
+ *                          raw-copy lambda to avoid Android framework dependencies.
+ */
 class InternalNoteImageStorage(
     private val filesDir: File,
-    private val currentTimeMillis: () -> Long = System::currentTimeMillis
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
+    private val processImage: (inputStreamProvider: () -> InputStream?, destination: File) -> Unit =
+        NoteImageProcessor::processAndSave
 ) : NoteImageStorage {
 
     override suspend fun copyImageToInternal(
@@ -22,12 +36,9 @@ class InternalNoteImageStorage(
         val destination = ImageFileManager.getImageFile(filesDir, relativePath)
 
         try {
-            NoteImageProcessor.processAndSave(
-                inputStreamProvider = openInputStream,
-                destination = destination
-            )
+            processImage(openInputStream, destination)
             if (destination.length() == 0L) {
-                throw IllegalStateException("Copied image is empty")
+                throw IOException("Copied image is empty")
             }
         } catch (error: Throwable) {
             destination.delete()

@@ -8,18 +8,31 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 
 class InternalNoteImageStorageTest {
 
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    /**
+     * Plain byte-copy processor that avoids Android framework classes
+     * ([android.graphics.BitmapFactory], [androidx.exifinterface.media.ExifInterface])
+     * which are unavailable in JVM unit tests.
+     */
+    private val rawCopyProcessor: ((() -> InputStream?), File) -> Unit = { provider, dest ->
+        val stream = provider() ?: throw IOException("Image input stream is unavailable")
+        stream.use { input -> dest.outputStream().use { output -> input.copyTo(output) } }
+    }
+
     @Test
     fun `copyImageToInternal writes stream to generated relative path`() = runTest {
         val storage = InternalNoteImageStorage(
             filesDir = tempFolder.root,
-            currentTimeMillis = { 123L }
+            currentTimeMillis = { 123L },
+            processImage = rawCopyProcessor
         )
 
         val relativePath = storage.copyImageToInternal(noteId = 42L) {
@@ -36,7 +49,8 @@ class InternalNoteImageStorageTest {
     fun `copyImageToInternal avoids overwriting an image created in the same millisecond`() = runTest {
         val storage = InternalNoteImageStorage(
             filesDir = tempFolder.root,
-            currentTimeMillis = { 123L }
+            currentTimeMillis = { 123L },
+            processImage = rawCopyProcessor
         )
         storage.getImageFile("images/note_42_img_123.jpg").parentFile?.mkdirs()
         storage.getImageFile("images/note_42_img_123.jpg").writeText("existing")
@@ -54,7 +68,8 @@ class InternalNoteImageStorageTest {
     fun `copyImageToInternal fails when stream is null`() = runTest {
         val storage = InternalNoteImageStorage(
             filesDir = tempFolder.root,
-            currentTimeMillis = { 456L }
+            currentTimeMillis = { 456L },
+            processImage = rawCopyProcessor
         )
 
         val result = runCatching {
@@ -69,7 +84,8 @@ class InternalNoteImageStorageTest {
     fun `copyImageToInternal removes empty destination on empty stream`() = runTest {
         val storage = InternalNoteImageStorage(
             filesDir = tempFolder.root,
-            currentTimeMillis = { 789L }
+            currentTimeMillis = { 789L },
+            processImage = rawCopyProcessor
         )
 
         val result = runCatching {
@@ -86,7 +102,8 @@ class InternalNoteImageStorageTest {
     fun `deleteImage removes only requested image`() = runTest {
         val storage = InternalNoteImageStorage(
             filesDir = tempFolder.root,
-            currentTimeMillis = { 1L }
+            currentTimeMillis = { 1L },
+            processImage = rawCopyProcessor
         )
         val keepPath = "images/note_1_img_100.jpg"
         val deletePath = "images/note_1_img_200.jpg"

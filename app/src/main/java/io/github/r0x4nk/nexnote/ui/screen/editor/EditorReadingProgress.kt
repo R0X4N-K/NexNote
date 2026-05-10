@@ -28,13 +28,20 @@ import io.github.r0x4nk.nexnote.ui.component.MarkdownSourceRange
 private const val READING_PROGRESS_ANIMATION_MS = 120
 private const val READING_PROGRESS_ANCHOR_FRACTION = 0.35f
 
+private val ScrollTrackWidth = 3.dp
+private val ScrollTrackTouchWidth = 12.dp
+private val ScrollTrackVerticalPadding = 8.dp
+private val ScrollTrackCornerRadius = 2.dp
+private val ScrollThumbMinHeight = 24.dp
+
 /**
- * Vertical scroll position indicator displayed on the right edge of the
+ * Vertical scroll-position indicator displayed on the right edge of the
  * preview. Draws a thin track with a rounded thumb whose vertical offset
  * reflects how far the user has scrolled through the markdown content.
  *
- * Preferred over a horizontal progress bar because it mirrors the natural
- * scroll direction and stays out of the reading area.
+ * The progress value drives the thumb position directly (no tweened
+ * animation) so the thumb follows the user's finger in real time instead
+ * of lagging behind and jumping when the scroll settles.
  */
 @Composable
 internal fun EditorPreviewReadingProgressBar(
@@ -55,8 +62,6 @@ internal fun EditorPreviewReadingProgressBar(
         modifier = modifier
     ) {
         VerticalScrollPositionTrack(
-            // Track the scroll position directly without tweened animation
-            // so the thumb follows the user's finger in real time.
             progress = state.progress,
             trackColor = trackColor,
             thumbColor = thumbColor,
@@ -69,15 +74,9 @@ internal fun EditorPreviewReadingProgressBar(
     }
 }
 
-private val ScrollTrackWidth = 3.dp
-private val ScrollTrackTouchWidth = 12.dp
-private val ScrollTrackVerticalPadding = 8.dp
-private val ScrollTrackCornerRadius = 2.dp
-private val ScrollThumbMinHeight = 24.dp
-
 /**
- * Custom-drawn vertical track with a rounded thumb. The [progress] value
- * (0 f..1 f) controls the thumb's vertical center position along the track.
+ * Custom-drawn vertical track with a rounded thumb. [progress] (0f..1f)
+ * controls the thumb's vertical position along the track.
  */
 @Composable
 private fun VerticalScrollPositionTrack(
@@ -90,11 +89,8 @@ private fun VerticalScrollPositionTrack(
         val trackWidthPx = ScrollTrackWidth.toPx()
         val cornerRadiusPx = ScrollTrackCornerRadius.toPx()
         val cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx)
-
-        // Center the track horizontally within the touch target area.
         val trackLeft = (size.width - trackWidthPx) / 2f
 
-        // Draw the background track.
         drawRoundRect(
             color = trackColor,
             topLeft = Offset(trackLeft, 0f),
@@ -102,17 +98,14 @@ private fun VerticalScrollPositionTrack(
             cornerRadius = cornerRadius
         )
 
-        // Compute the thumb height and position.
-        val thumbMinHeightPx = ScrollThumbMinHeight.toPx()
-        val thumbHeight = thumbMinHeightPx.coerceAtMost(size.height)
-        val maxThumbOffset = (size.height - thumbHeight).coerceAtLeast(0f)
+        val thumbHeightPx = ScrollThumbMinHeight.toPx().coerceAtMost(size.height)
+        val maxThumbOffset = (size.height - thumbHeightPx).coerceAtLeast(0f)
         val thumbTop = maxThumbOffset * progress.coerceIn(0f, 1f)
 
-        // Draw the thumb.
         drawRoundRect(
             color = thumbColor,
             topLeft = Offset(trackLeft, thumbTop),
-            size = Size(trackWidthPx, thumbHeight),
+            size = Size(trackWidthPx, thumbHeightPx),
             cornerRadius = cornerRadius
         )
     }
