@@ -1,11 +1,11 @@
 package io.github.r0x4nk.nexnote.data.local
 
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
+import io.github.r0x4nk.nexnote.util.NoteImageProcessor
 import io.github.r0x4nk.nexnote.util.ImageFileManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.IOException
 import java.io.InputStream
 
 class InternalNoteImageStorage(
@@ -20,15 +20,14 @@ class InternalNoteImageStorage(
         ImageFileManager.ensureImageDir(filesDir)
         val relativePath = buildUniqueRelativePath(noteId)
         val destination = ImageFileManager.getImageFile(filesDir, relativePath)
-        val input = openInputStream()
-            ?: throw IOException("Image input stream is unavailable")
 
         try {
-            input.use { source ->
-                destination.outputStream().use { output -> source.copyTo(output) }
-            }
+            NoteImageProcessor.processAndSave(
+                inputStreamProvider = openInputStream,
+                destination = destination
+            )
             if (destination.length() == 0L) {
-                throw IOException("Copied image is empty")
+                throw IllegalStateException("Copied image is empty")
             }
         } catch (error: Throwable) {
             destination.delete()

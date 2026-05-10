@@ -80,6 +80,9 @@ dependencies {
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 
+    // ExifInterface — EXIF orientation correction for imported images
+    implementation(libs.androidx.exifinterface)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 

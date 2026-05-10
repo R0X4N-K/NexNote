@@ -30,9 +30,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.util.ImageFileManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+
+// ── Data models ─────────────────────────────────────────────────────────
 
 private data class MarkdownImageSize(
     val width: Int,
@@ -45,6 +48,8 @@ private data class MarkdownImageLoadResult(
     val bitmap: ImageBitmap,
     val size: MarkdownImageSize
 )
+
+// ── Public composable ───────────────────────────────────────────────────
 
 /**
  * Loads and renders a local image asynchronously.
@@ -77,7 +82,7 @@ internal fun MarkdownImageBlock(
         imageSize = initialImageSize
         loadFailed = false
 
-        val result = loadMarkdownBitmap(file)
+        val result = loadMarkdownBitmap(file, initialImageSize)
         if (result != null) {
             imageSize = result.size
             imageBitmap = result.bitmap
@@ -89,34 +94,16 @@ internal fun MarkdownImageBlock(
     MarkdownImageContent(imageBitmap, imageSize, loadFailed, altText)
 }
 
+// ── Placeholder / error / loading states ────────────────────────────────
+
 @Composable
 private fun MarkdownImagePlaceholder(altText: String) {
     Text(
-        text     = "\uD83D\uDCF7 ${altText.ifEmpty { "Immagine" }}",
+        text     = "📷 ${altText.ifEmpty { "Immagine" }}",
         style    = MaterialTheme.typography.bodyMedium,
         color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
         modifier = Modifier.padding(vertical = 4.dp)
     )
-}
-
-private fun readMarkdownImageSize(file: File): MarkdownImageSize? {
-    if (!file.exists()) return null
-
-    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.absolutePath, options)
-    return markdownImageSizeOrNull(options.outWidth, options.outHeight)
-}
-
-private suspend fun loadMarkdownBitmap(file: File): MarkdownImageLoadResult? {
-    return withContext(Dispatchers.IO) {
-        if (!file.exists()) return@withContext null
-
-        val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return@withContext null
-        MarkdownImageLoadResult(
-            bitmap = bitmap.asImageBitmap(),
-            size = MarkdownImageSize(width = bitmap.width, height = bitmap.height)
-        )
-    }
 }
 
 @Composable
@@ -183,6 +170,54 @@ private fun LoadingMarkdownImage(imageSize: MarkdownImageSize?) {
         )
     }
 }
+
+// ── Bitmap loading ──────────────────────────────────────────────────────
+
+/**
+ * Reads the raw pixel dimensions without allocating a full bitmap.
+ * Called synchronously from `remember` to provide an immediate aspect ratio
+ * for the placeholder frame.
+ */
+private fun readMarkdownImageSize(file: File): MarkdownImageSize? {
+    if (!file.exists()) return null
+
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, options)
+    return markdownImageSizeOrNull(options.outWidth, options.outHeight)
+}
+
+/**
+ * Decodes the image bitmap with safe downsampling to prevent Canvas crashes
+ * on oversized images.
+ *
+ * Reuses [knownSize] (from the earlier [readMarkdownImageSize] call) to
+ * compute the [BitmapFactory.Options.inSampleSize] without a redundant
+ * bounds-only decode pass.
+ */
+private suspend fun loadMarkdownBitmap(
+    file: File,
+    knownSize: MarkdownImageSize?
+): MarkdownImageLoadResult? {
+    return withContext(Dispatchers.IO) {
+        if (!file.exists()) return@withContext null
+
+        val sampleSize = knownSize?.let { size ->
+            val longestSide = maxOf(size.width, size.height)
+            ImageFileManager.calculateSampleSize(longestSide)
+        } ?: 1
+
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
+            ?: return@withContext null
+
+        MarkdownImageLoadResult(
+            bitmap = bitmap.asImageBitmap(),
+            size = MarkdownImageSize(width = bitmap.width, height = bitmap.height)
+        )
+    }
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────
 
 private fun Modifier.markdownImageFrame(imageSize: MarkdownImageSize?): Modifier {
     val base = fillMaxWidth().padding(vertical = 8.dp)

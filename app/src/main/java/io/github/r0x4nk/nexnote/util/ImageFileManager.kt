@@ -14,6 +14,36 @@ object ImageFileManager {
     const val IMAGES_DIR = "images"
 
     /**
+     * Maximum pixel length for the longest side of a note image.
+     *
+     * Used both at import time (to downsample oversized camera photos) and at
+     * display time (as a safety net for images stored before downsampling was
+     * introduced). 2048 px keeps bitmaps under ~16 MB in ARGB_8888, well
+     * within Android's Canvas texture limit while remaining sharp on
+     * high-density screens.
+     */
+    const val MAX_IMAGE_DIMENSION_PX = 2048
+
+    /**
+     * Computes the largest power-of-two sample size that brings the
+     * [longestSide] at or below [maxDimension].
+     *
+     * This follows the standard approach for
+     * [android.graphics.BitmapFactory.Options.inSampleSize]: values are always
+     * powers of two, and the decoder rounds non-power-of-two values down
+     * anyway.
+     *
+     * @return 1 when no downsampling is needed.
+     */
+    fun calculateSampleSize(longestSide: Int, maxDimension: Int = MAX_IMAGE_DIMENSION_PX): Int {
+        var sampleSize = 1
+        while (longestSide / (sampleSize * 2) >= maxDimension) {
+            sampleSize *= 2
+        }
+        return sampleSize
+    }
+
+    /**
      * Builds a deterministic relative path for an image belonging to [noteId],
      * disambiguated by [timestamp] (typically [System.currentTimeMillis]).
      *
