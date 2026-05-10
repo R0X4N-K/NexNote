@@ -14,7 +14,7 @@ coroutinesTest = "1.10.1"
 # Nuove dipendenze aggiunte per il piano NexNote
 ksp = "2.2.10-2.0.2"
 room = "2.7.0"
-navigationCompose = "2.9.0"
+navigationCompose = "2.9.8"
 lifecycleViewmodelCompose = "2.8.7"
 lifecycleRuntimeCompose = "2.8.7"
 datastorePreferences = "1.1.4"
