@@ -154,6 +154,10 @@ private suspend fun editTagAutoHide(
         initialScroll = state.contentScrollState.value,
         initialMaxScroll = state.contentScrollState.maxValue
     )
+    // Suppresses the visible→hidden→visible bounce that the AnimatedVisibility
+    // resize would otherwise produce while the user keeps a single drag gesture
+    // active. See [TagBarVisibilityCooldown] for the full rationale.
+    val cooldown = TagBarVisibilityCooldown()
     snapshotFlow {
         TagBarScrollSnapshot(
             value = state.contentScrollState.value,
@@ -163,10 +167,12 @@ private suspend fun editTagAutoHide(
     }.collect { scroll ->
         if (!state.canAutoAdjustTags()) {
             controller.syncTo(scroll.value, scroll.maxValue)
+            cooldown.reset()
             return@collect
         }
         controller
             .onScrollChanged(scroll.value, scroll.maxValue, scroll.isInProgress)
+            ?.let(cooldown::accept)
             ?.let(state::applyTagBarVisibilityRequest)
     }
 }
@@ -191,6 +197,11 @@ private suspend fun previewTagAutoHide(
     var prevOffset = state.previewListState.firstVisibleItemScrollOffset
     var accumulatedDistance = 0
     var trackedDirection: TagBarVisibilityRequest? = null
+    // Same role as in edit mode: blocks the false reverse-direction emits that
+    // happen when the LazyColumn reflows after the bar starts animating —
+    // particularly noticeable when a trailing image at the end of the note
+    // lays out into its real aspect ratio mid-gesture.
+    val cooldown = TagBarVisibilityCooldown()
 
     snapshotFlow {
         PreviewScrollSnapshot(
@@ -204,6 +215,7 @@ private suspend fun previewTagAutoHide(
             prevOffset = snapshot.offset
             accumulatedDistance = 0
             trackedDirection = null
+            cooldown.reset()
             return@collect
         }
 
@@ -232,7 +244,7 @@ private suspend fun previewTagAutoHide(
         }
         if (accumulatedDistance >= threshold) {
             accumulatedDistance = 0
-            state.applyTagBarVisibilityRequest(direction)
+            cooldown.accept(direction)?.let(state::applyTagBarVisibilityRequest)
         }
     }
 }
