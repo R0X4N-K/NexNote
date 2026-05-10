@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -15,7 +16,10 @@ import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuScrollEffect
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,9 +54,15 @@ private fun EditorRadialMenuScrollBindings(
     state: EditorScreenState,
     scope: CoroutineScope
 ) {
+    val scrollRunner = remember(scope) { EditorScrollShortcutRunner(scope) }
+
+    DisposableEffect(scrollRunner) {
+        onDispose { scrollRunner.cancel() }
+    }
+
     RadialMenuScrollEffect(
         onScrollToTop = {
-            scope.launch {
+            scrollRunner.launch {
                 if (showPreview) {
                     state.previewListState.animateScrollToPreviewTop()
                 } else {
@@ -62,7 +72,7 @@ private fun EditorRadialMenuScrollBindings(
             }
         },
         onScrollToBottom = {
-            scope.launch {
+            scrollRunner.launch {
                 if (showPreview) {
                     state.previewListState.animateScrollToPreviewBottom()
                 } else {
@@ -72,6 +82,32 @@ private fun EditorRadialMenuScrollBindings(
             }
         }
     )
+}
+
+internal class EditorScrollShortcutRunner(
+    private val scope: CoroutineScope
+) {
+    private var activeJob: Job? = null
+
+    fun launch(block: suspend () -> Unit) {
+        val previousJob = activeJob
+        val nextJob = scope.launch(start = CoroutineStart.LAZY) {
+            previousJob?.cancelAndJoin()
+            block()
+        }
+        activeJob = nextJob
+        nextJob.invokeOnCompletion {
+            if (activeJob === nextJob) {
+                activeJob = null
+            }
+        }
+        nextJob.start()
+    }
+
+    fun cancel() {
+        activeJob?.cancel()
+        activeJob = null
+    }
 }
 
 private fun EditorScreenState.selectContentEdge(offset: Int) {
