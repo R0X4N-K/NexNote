@@ -75,6 +75,7 @@ fun EditorScreen(
         viewModel = viewModel
     )
     val insertAtCursor = rememberInsertAtCursor(state, viewModel)
+    val applyMarkdownEdit = rememberApplyMarkdownEdit(state, viewModel)
     val replaceNoteLinkAutocomplete = rememberReplaceNoteLinkAutocomplete(state, viewModel)
     val launchImagePickerAtCursor = rememberLaunchImagePickerAtCursor(context, state, viewModel)
     val openNoteLinkPicker: () -> Unit = {
@@ -255,6 +256,7 @@ fun EditorScreen(
             onInsertImage = launchImagePickerAfterCommit,
             onInsertNoteLink = openNoteLinkPicker,
             insertAtCursor = insertAtCursor,
+            applyMarkdownEdit = applyMarkdownEdit,
             onNoteLinkAutocompleteSelected = replaceNoteLinkAutocomplete,
             onPreviewNoteLinkClick = openNoteFromPreviewLink,
             onThemeToggle = { viewModel.toggleTheme(isDarkTheme) },

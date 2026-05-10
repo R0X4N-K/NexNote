@@ -63,6 +63,14 @@ internal class EditorScreenState(
      * menu is open so the user can pick "Web link" or "Note link" without flicker.
      */
     var showLinkTypeMenu by mutableStateOf(false)
+
+    /**
+     * Whether the keyboard toolbar's heading-level chooser dropdown is currently
+     * expanded. Hoisted for the same reason as [showLinkTypeMenu] — keeping the
+     * flag at the screen level prevents the IME-collapse cycle from tearing
+     * the menu down before the user can pick a level.
+     */
+    var showHeadingMenu by mutableStateOf(false)
     var tagsVisible by mutableStateOf(true)
     var tagsPinned by mutableStateOf(false)
     var tagBarHiddenByKeyboard by mutableStateOf(false)

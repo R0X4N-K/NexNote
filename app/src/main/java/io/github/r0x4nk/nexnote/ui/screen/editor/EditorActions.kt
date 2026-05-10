@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.util.MarkdownTextEdit
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 
 /**
@@ -118,6 +119,32 @@ internal fun rememberInsertAtCursor(
             )
             state.setContentFieldValue(TextFieldValue(newText, TextRange(nextCursor)))
             viewModel.onContentChange(newText, nextCursor)
+            state.markContentCommitted()
+        }
+    }
+}
+
+@Composable
+internal fun rememberApplyMarkdownEdit(
+    state: EditorScreenState,
+    viewModel: EditorViewModel
+): ((String, TextRange) -> MarkdownTextEdit) -> Unit {
+    return remember(state.contentFieldValueState, viewModel) {
+        { edit ->
+            val current = state.currentContentTextFieldValue()
+            val result = edit(current.text, current.selection)
+            val nextSelection = TextRange(
+                start = result.selection.start.coerceIn(0, result.text.length),
+                end = result.selection.end.coerceIn(0, result.text.length)
+            )
+            NexNoteDebugLog.editor(
+                event = "applyMarkdownEdit",
+                details = "selection=${current.selection.start}-${current.selection.end} " +
+                    "nextSelection=${nextSelection.start}-${nextSelection.end} " +
+                    NexNoteDebugLog.textSummary("newText", result.text)
+            )
+            state.setContentFieldValue(TextFieldValue(result.text, nextSelection))
+            viewModel.onContentChange(result.text, nextSelection.end)
             state.markContentCommitted()
         }
     }

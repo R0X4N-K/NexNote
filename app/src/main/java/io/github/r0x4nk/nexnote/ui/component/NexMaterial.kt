@@ -53,7 +53,7 @@ fun nexTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
 /**
  * Compact icon button used across the app in toolbars, top bars, and action rows.
  *
- * Uses a fixed 36dp touch target with a clipped circular background so the selection
+ * Uses a fixed 48dp touch target with a clipped circular background so the selection
  * indicator and ripple never overflow the parent container bounds. We override
  * [LocalMinimumInteractiveComponentSize] to prevent Material3 from expanding the
  * hit area beyond our explicit size, which previously caused visual clipping.
@@ -75,7 +75,7 @@ fun NexIconButton(
             onClick = onClick,
             enabled = enabled,
             modifier = modifier
-                .size(36.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(colors.container)
         ) {
@@ -83,7 +83,7 @@ fun NexIconButton(
                 imageVector = imageVector,
                 contentDescription = contentDescription,
                 tint = colors.content,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
     }

@@ -40,6 +40,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.util.MarkdownInlineToggle
+import io.github.r0x4nk.nexnote.util.MarkdownLineToggle
+import io.github.r0x4nk.nexnote.util.MarkdownTextEdit
 import java.io.File
 
 internal data class EditorScreenScaffoldContent(
@@ -63,6 +66,7 @@ internal data class EditorScreenActions(
     val onInsertImage: () -> Unit,
     val onInsertNoteLink: () -> Unit,
     val insertAtCursor: (String) -> Unit,
+    val applyMarkdownEdit: ((String, TextRange) -> MarkdownTextEdit) -> Unit,
     val onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     val onPreviewNoteLinkClick: (Long) -> Unit,
     val onThemeToggle: () -> Unit,
@@ -152,11 +156,12 @@ private fun EditorScreenBody(
     actions: EditorScreenActions,
     modifier: Modifier = Modifier
 ) {
-    // While the link-type chooser is open, Material3's focusable popup briefly
-    // hides the IME. We treat that flag as a soft "keyboard intent" so the toolbar
-    // stays mounted and the dropdown can complete its interaction without flicker.
-    val keepOpenForLinkMenu = content.state.showLinkTypeMenu
-    val toolbarVisible = (content.isKeyboardVisible || keepOpenForLinkMenu) &&
+    // While the link-type or heading-level chooser is open, Material3's focusable
+    // popup briefly hides the IME. We treat those flags as a soft "keyboard
+    // intent" so the toolbar stays mounted and the dropdown can complete its
+    // interaction without flicker.
+    val keepOpenForToolbarMenu = content.state.showLinkTypeMenu || content.state.showHeadingMenu
+    val toolbarVisible = (content.isKeyboardVisible || keepOpenForToolbarMenu) &&
         !content.uiState.showPreview &&
         !content.state.noteSearch.isActive &&
         !content.state.showNoteLinkPicker &&
@@ -226,15 +231,32 @@ private fun EditorScreenBody(
             noteBackground = content.noteBackground,
             linkMenuExpanded = content.state.showLinkTypeMenu,
             onLinkMenuExpandedChange = { expanded -> content.state.showLinkTypeMenu = expanded },
+            headingMenuExpanded = content.state.showHeadingMenu,
+            onHeadingMenuExpandedChange = { expanded -> content.state.showHeadingMenu = expanded },
             onUndo = actions.onUndo,
             onRedo = actions.onRedo,
             onInsertImage = actions.onInsertImage,
             onInsertChecklist = { actions.insertAtCursor(MARKDOWN_CHECKLIST_SNIPPET) },
+            onSetHeadingLevel = { level ->
+                content.state.showHeadingMenu = false
+                actions.applyMarkdownEdit { text, range ->
+                    MarkdownLineToggle.setHeading(text, range, level)
+                }
+            },
+            onToggleBold = { actions.applyMarkdownEdit(MarkdownInlineToggle::bold) },
+            onToggleItalic = { actions.applyMarkdownEdit(MarkdownInlineToggle::italic) },
+            onToggleStrikethrough = { actions.applyMarkdownEdit(MarkdownInlineToggle::strikethrough) },
+            onToggleInlineCode = { actions.applyMarkdownEdit(MarkdownInlineToggle::inlineCode) },
+            onInsertCodeBlock = { actions.applyMarkdownEdit(MarkdownLineToggle::codeBlock) },
+            onToggleQuote = { actions.applyMarkdownEdit(MarkdownLineToggle::quote) },
+            onToggleUnorderedList = { actions.applyMarkdownEdit(MarkdownLineToggle::unorderedList) },
+            onToggleOrderedList = { actions.applyMarkdownEdit(MarkdownLineToggle::orderedList) },
+            onInsertHorizontalRule = { actions.applyMarkdownEdit(MarkdownLineToggle::horizontalRule) },
             onInsertWebLink = {
                 // Close the chooser first so the toolbar can resume tracking the IME
                 // intent purely from the user's editing focus.
                 content.state.showLinkTypeMenu = false
-                actions.insertAtCursor(MARKDOWN_WEB_LINK_SNIPPET)
+                actions.applyMarkdownEdit(MarkdownInlineToggle::link)
             },
             onInsertNoteLink = {
                 content.state.showLinkTypeMenu = false
