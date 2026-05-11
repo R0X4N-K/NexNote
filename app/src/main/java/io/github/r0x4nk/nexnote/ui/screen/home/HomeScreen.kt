@@ -12,8 +12,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -37,7 +35,7 @@ import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
 private const val EXIT_BACK_PRESS_WINDOW_MS = 2000L
 
@@ -182,17 +180,22 @@ private fun SearchFocusEffect(
     }
 }
 
+/**
+ * Snackbar host for the Home screen.
+ *
+ * Delegates to [RadialMenuSnackbarHost] so that the snackbar sits at its
+ * natural bottom position and the radial FAB animates up out of its way —
+ * the Material 3 "lift the FAB" interaction. [floatingBottomPadding]
+ * carries the outer Scaffold's bottom-bar height so the snackbar still
+ * clears the global bottom navigation bar.
+ */
 @Composable
 private fun HomeSnackbarHost(
     snackbarHostState: SnackbarHostState,
     floatingBottomPadding: Dp
 ) {
-    SnackbarHost(
+    RadialMenuSnackbarHost(
         hostState = snackbarHostState,
-        modifier = Modifier.padding(
-            bottom = RadialMenuOverlayDefaults.snackbarBottomPadding(floatingBottomPadding)
-        )
-    ) { data ->
-        Snackbar(snackbarData = data)
-    }
+        bottomInset = floatingBottomPadding
+    )
 }

@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -28,7 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,15 +42,13 @@ internal fun TagsScreenLayout(
 ) {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        // Material 3 "lift the FAB" snackbar host — the radial FAB animates
+        // up while a snackbar is visible. See [RadialMenuSnackbarHost].
         snackbarHost = {
-            SnackbarHost(
+            RadialMenuSnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.padding(
-                    bottom = RadialMenuOverlayDefaults.snackbarBottomPadding(floatingBottomPadding)
-                )
-            ) { data ->
-                Snackbar(snackbarData = data)
-            }
+                bottomInset = floatingBottomPadding
+            )
         },
         topBar = {
             TagsTopBar(

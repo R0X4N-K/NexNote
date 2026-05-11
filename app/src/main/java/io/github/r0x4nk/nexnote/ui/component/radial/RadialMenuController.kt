@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -39,6 +40,21 @@ class RadialMenuController {
 
     /** Non-null only while the editor is active. Scrolls the note content to the bottom. */
     var scrollToBottomAction by mutableStateOf<(() -> Unit)?>(null)
+        internal set
+
+    /**
+     * Pixel height of a transient bottom-anchored UI element (e.g. a Material
+     * snackbar) that should push the FAB upward — matching the Material 3
+     * "snackbar lifts the FAB" interaction used by Gmail, Tasks, etc.
+     *
+     * Screens publish a height here via [RadialMenuSnackbarHost] whenever
+     * their snackbar measures itself. The [RadialMenuOverlay] folds this
+     * value into the FAB's bottom clearance, so the FAB rises through its
+     * existing spring animation rather than being overlapped by the snackbar.
+     *
+     * `0` means no obstruction (or the snackbar is fully dismissed).
+     */
+    var transientBottomObstructionPx by mutableIntStateOf(0)
         internal set
 }
 

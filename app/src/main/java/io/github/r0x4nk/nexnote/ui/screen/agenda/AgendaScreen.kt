@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,7 +34,6 @@ fun AgendaScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val noteCardStyle by viewModel.noteCardStyle.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val density = LocalDensity.current
     val listState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
@@ -47,13 +45,9 @@ fun AgendaScreen(
     )
 
     val isToolbarSticky by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > CONTROLS_ROW_INDEX }
+        derivedStateOf { listState.firstVisibleItemIndex >= CONTROLS_ROW_INDEX }
     }
 
-    var controlsRowHeightPx by remember { mutableStateOf(0) }
-    val controlsRowHeightDp = remember(controlsRowHeightPx) {
-        with(density) { controlsRowHeightPx.toDp() }
-    }
     var isCalendarVisible by remember { mutableStateOf(!uiState.isSearchActive) }
 
     TrashSnackbarEffect(
@@ -93,13 +87,9 @@ fun AgendaScreen(
             noteCardStyle = noteCardStyle,
             isCalendarVisible = isCalendarVisible,
             isToolbarSticky = isToolbarSticky,
-            controlsRowHeightDp = controlsRowHeightDp,
             floatingBottomPadding = floatingBottomPadding,
             searchFocusRequester = searchFocusRequester
         ),
-        onControlsRowHeightChanged = { height ->
-            if (height > 0) controlsRowHeightPx = height
-        },
         actions = actions
     )
 

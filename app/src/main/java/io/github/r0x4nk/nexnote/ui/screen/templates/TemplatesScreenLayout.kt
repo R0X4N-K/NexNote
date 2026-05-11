@@ -1,10 +1,8 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -15,7 +13,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import io.github.r0x4nk.nexnote.domain.model.Template
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
 internal data class TemplatesLayoutActions(
     val onNavigateToApplyTemplate: (Long) -> Unit,
@@ -63,12 +61,11 @@ private fun TemplatesScreenScaffold(
         topBar = {
             TemplatesTopBarSlot(uiState, searchFocusRequester, scrollBehavior, actions)
         },
+        // Material 3 "lift the FAB" snackbar host — see [RadialMenuSnackbarHost].
         snackbarHost = {
-            SnackbarHost(
+            RadialMenuSnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.padding(
-                    bottom = RadialMenuOverlayDefaults.snackbarBottomPadding(floatingBottomPadding)
-                )
+                bottomInset = floatingBottomPadding
             )
         }
     ) { padding ->

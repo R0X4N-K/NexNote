@@ -1,15 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.agenda
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,22 +13,17 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
 internal data class AgendaLayoutState(
     val uiState: AgendaUiState,
@@ -45,7 +32,6 @@ internal data class AgendaLayoutState(
     val noteCardStyle: NoteCardStyle,
     val isCalendarVisible: Boolean,
     val isToolbarSticky: Boolean,
-    val controlsRowHeightDp: Dp,
     val floatingBottomPadding: Dp,
     val searchFocusRequester: FocusRequester
 )
@@ -53,7 +39,6 @@ internal data class AgendaLayoutState(
 @Composable
 internal fun AgendaScreenLayout(
     layoutState: AgendaLayoutState,
-    onControlsRowHeightChanged: (Int) -> Unit,
     actions: AgendaActions
 ) {
     Scaffold(
@@ -72,25 +57,30 @@ internal fun AgendaScreenLayout(
         }
     ) { padding ->
         AgendaBody(
-            params = layoutState.toBodyParams(onControlsRowHeightChanged, actions),
+            params = layoutState.toBodyParams(actions),
             modifier = Modifier.padding(padding)
         )
     }
 }
 
+/**
+ * Snackbar host for the Agenda screen.
+ *
+ * See [RadialMenuSnackbarHost] for the Material 3 "lift the FAB" behaviour:
+ * the snackbar appears at its natural bottom position (above the outer
+ * Scaffold's bottom navigation, expressed by [floatingBottomPadding]), and
+ * publishes its measured height to the [io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuController]
+ * so the radial FAB animates upward while it is visible.
+ */
 @Composable
 private fun AgendaSnackbarHost(
     snackbarHostState: SnackbarHostState,
     floatingBottomPadding: Dp
 ) {
-    SnackbarHost(
+    RadialMenuSnackbarHost(
         hostState = snackbarHostState,
-        modifier = Modifier.padding(
-            bottom = RadialMenuOverlayDefaults.snackbarBottomPadding(floatingBottomPadding)
-        )
-    ) { data ->
-        Snackbar(snackbarData = data)
-    }
+        bottomInset = floatingBottomPadding
+    )
 }
 
 private data class AgendaBodyParams(
@@ -99,15 +89,12 @@ private data class AgendaBodyParams(
     val noteCardStyle: NoteCardStyle,
     val isCalendarVisible: Boolean,
     val isToolbarSticky: Boolean,
-    val controlsRowHeightDp: Dp,
     val floatingBottomPadding: Dp,
     val searchFocusRequester: FocusRequester,
-    val onControlsRowHeightChanged: (Int) -> Unit,
     val actions: AgendaActions
 )
 
 private fun AgendaLayoutState.toBodyParams(
-    onControlsRowHeightChanged: (Int) -> Unit,
     actions: AgendaActions
 ): AgendaBodyParams {
     return AgendaBodyParams(
@@ -116,14 +103,13 @@ private fun AgendaLayoutState.toBodyParams(
         noteCardStyle = noteCardStyle,
         isCalendarVisible = isCalendarVisible,
         isToolbarSticky = isToolbarSticky,
-        controlsRowHeightDp = controlsRowHeightDp,
         floatingBottomPadding = floatingBottomPadding,
         searchFocusRequester = searchFocusRequester,
-        onControlsRowHeightChanged = onControlsRowHeightChanged,
         actions = actions
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgendaBody(
     params: AgendaBodyParams,
@@ -133,17 +119,16 @@ private fun AgendaBody(
         modifier = modifier.fillMaxSize()
     ) {
         AgendaLazyColumn(params)
-        AgendaStickyControlsRow(params)
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgendaLazyColumn(params: AgendaBodyParams) {
     LazyColumn(
         state = params.listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = if (params.isToolbarSticky) params.controlsRowHeightDp else 0.dp,
             bottom = 16.dp
         )
     ) {
@@ -155,19 +140,27 @@ private fun AgendaLazyColumn(params: AgendaBodyParams) {
             isSearchEmpty = params.uiState.isSearchActive && params.uiState.searchQuery.isNotBlank(),
             actions = params.actions
         )
+        // Reserve enough room at the end of the list so the FAB never covers
+        // the last item — including the outer bottom-bar inset.
         item {
             Spacer(
                 Modifier.height(
-                    RadialMenuOverlayDefaults.snackbarBottomPadding(params.floatingBottomPadding)
+                    RadialMenuOverlayDefaults.fabBottomClearance(params.floatingBottomPadding)
                 )
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.agendaHeaderItems(params: AgendaBodyParams) {
     agendaCalendarItem(params)
-    item { AgendaInlineControlsRow(params) }
+    stickyHeader(
+        key = AGENDA_CONTROLS_STICKY_KEY,
+        contentType = AGENDA_CONTROLS_CONTENT_TYPE
+    ) {
+        AgendaStickyControlsRow(params)
+    }
     agendaTagFilterItem(params)
     agendaNotesHeaderItem(params)
 }
@@ -203,62 +196,23 @@ private fun LazyListScope.agendaNotesHeaderItem(params: AgendaBodyParams) {
 }
 
 @Composable
-private fun AgendaInlineControlsRow(params: AgendaBodyParams) {
-    val inactiveFocusRequester = remember { FocusRequester() }
-    AgendaControlsRow(
-        sortOrder = params.uiState.sortOrder,
-        viewMode = params.uiState.viewMode,
-        isSearchActive = params.uiState.isSearchActive,
-        searchQuery = params.uiState.searchQuery,
-        searchFocusRequester = if (params.isToolbarSticky) {
-            inactiveFocusRequester
-        } else {
-            params.searchFocusRequester
-        },
-        modifier = Modifier.onSizeChanged { size ->
-            params.onControlsRowHeightChanged(size.height)
-        },
-        actions = params.actions
-    )
-}
-
-@Composable
-private fun BoxScope.AgendaStickyControlsRow(params: AgendaBodyParams) {
-    AnimatedVisibility(
-        visible = params.isToolbarSticky,
-        enter = agendaStickyEnter(),
-        exit = agendaStickyExit(),
-        modifier = Modifier.align(Alignment.TopCenter)
+private fun AgendaStickyControlsRow(params: AgendaBodyParams) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = if (params.isToolbarSticky) 2.dp else 0.dp,
+        shadowElevation = if (params.isToolbarSticky) 4.dp else 0.dp
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(elevation = 4.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp
-        ) {
-            AgendaControlsRow(
-                sortOrder = params.uiState.sortOrder,
-                viewMode = params.uiState.viewMode,
-                isSearchActive = params.uiState.isSearchActive,
-                searchQuery = params.uiState.searchQuery,
-                searchFocusRequester = params.searchFocusRequester,
-                actions = params.actions
-            )
-        }
+        AgendaControlsRow(
+            sortOrder = params.uiState.sortOrder,
+            viewMode = params.uiState.viewMode,
+            isSearchActive = params.uiState.isSearchActive,
+            searchQuery = params.uiState.searchQuery,
+            searchFocusRequester = params.searchFocusRequester,
+            actions = params.actions
+        )
     }
 }
 
-private fun agendaStickyEnter(): EnterTransition {
-    return slideInVertically(
-        initialOffsetY = { fullHeight -> -fullHeight },
-        animationSpec = tween(durationMillis = 150)
-    ) + fadeIn(animationSpec = tween(durationMillis = 150))
-}
-
-private fun agendaStickyExit(): ExitTransition {
-    return slideOutVertically(
-        targetOffsetY = { fullHeight -> -fullHeight },
-        animationSpec = tween(durationMillis = 120)
-    ) + fadeOut(animationSpec = tween(durationMillis = 120))
-}
+private const val AGENDA_CONTROLS_STICKY_KEY = "agenda_controls"
+private const val AGENDA_CONTROLS_CONTENT_TYPE = "agenda_controls"

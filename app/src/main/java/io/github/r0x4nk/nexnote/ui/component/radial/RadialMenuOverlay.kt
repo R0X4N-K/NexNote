@@ -28,10 +28,27 @@ internal object RadialMenuOverlayDefaults {
     val fabSize = 56.dp
     val fabMargin = 24.dp
 
-    private val snackbarGap = 16.dp
+    /** Gap reserved above the FAB so adjacent UI never visually touches it. */
+    private val fabContentGap = 16.dp
 
-    fun snackbarBottomPadding(fabBottomOffset: Dp): Dp =
-        fabBottomOffset + fabMargin + fabSize + snackbarGap
+    /**
+     * Vertical space (in dp) that scrollable content must keep free at the
+     * bottom of the screen so the floating action button does not occlude the
+     * last items in the list. The value stacks the outer chrome (bottom
+     * navigation + system inset, expressed by [fabBottomOffset]) on top of the
+     * FAB's own footprint (margin + size + a small breathing gap).
+     *
+     * Use this as the trailing padding/spacer of a [androidx.compose.foundation.lazy.LazyColumn]
+     * or as the bottom inset of a [androidx.compose.foundation.layout.Box] whose
+     * content extends to the bottom edge.
+     *
+     * Note: this value is intentionally NOT used to position the Material
+     * snackbar anymore. With the Material 3 "lift the FAB on snackbar" pattern
+     * (see [RadialMenuController.transientBottomObstructionPx]) the snackbar
+     * sits at its natural bottom position and the FAB rises out of its way.
+     */
+    fun fabBottomClearance(fabBottomOffset: Dp): Dp =
+        fabBottomOffset + fabMargin + fabSize + fabContentGap
 }
 
 private val BUTTON_SIZE_DP         = RadialMenuOverlayDefaults.fabSize
@@ -69,13 +86,19 @@ private const val ARC_END_LEFT    =  75f
  *   - the system navigation bar,
  *   - [fabBottomOffset] — the app's own bottom chrome (bottom-tab bar).
  *
+ * On top of that bottom inset, any transient bottom-anchored UI (currently
+ * the Material snackbar — see [RadialMenuController.transientBottomObstructionPx])
+ * adds its height to the safe area, so the FAB lifts above a visible
+ * snackbar in the same Material 3 fashion as Gmail / Tasks.
+ *
  * Callers should pass `innerPadding.calculateBottomPadding()` from the outer
  * [androidx.compose.material3.Scaffold] so the FAB clears both the system nav
  * bar and any visible bottom navigation bar. When neither a keyboard nor a
  * bottom bar is present, the system nav bar alone is used.
  *
- * The FAB slides with the keyboard via a spring animation so its motion
- * matches the system keyboard curve.
+ * The FAB slides with the keyboard (and with snackbar appear/dismiss) via a
+ * single spring animation so its motion matches the system keyboard curve and
+ * snackbar transitions.
  *
  * **Visibility**
  *
@@ -123,20 +146,29 @@ fun RadialMenuOverlay(
             //  • fabBottomOffset — Scaffold's bottom bar (bottom tabs + nav bar)
             // Using max() prevents double-counting: when the bottom bar is
             // shown, fabBottomOffset already includes the system nav bar.
-            val imeBottomPx       = WindowInsets.ime.getBottom(density)
-            val navBarBottomPx    = WindowInsets.navigationBars.getBottom(density)
-            val fabBottomOffsetPx = with(density) { fabBottomOffset.toPx() }
-            val safeBottomPx      = maxOf(
+            //
+            // On top of whichever wins, we stack `transientBottomObstructionPx`
+            // (e.g. the live snackbar height) so the FAB rises above transient
+            // bottom-anchored UI — the Material 3 "lift the FAB" interaction.
+            // This addition is intentional (not max()): a snackbar is layered
+            // above the bottom inset, not overlapping it.
+            val imeBottomPx        = WindowInsets.ime.getBottom(density)
+            val navBarBottomPx     = WindowInsets.navigationBars.getBottom(density)
+            val fabBottomOffsetPx  = with(density) { fabBottomOffset.toPx() }
+            val transientInsetPx   = controller.transientBottomObstructionPx.toFloat()
+            val safeBottomPx       = maxOf(
                 imeBottomPx.toFloat(),
                 navBarBottomPx.toFloat(),
                 fabBottomOffsetPx
-            )
+            ) + transientInsetPx
 
-            // Animate safe-bottom so the FAB glides smoothly with the keyboard.
+            // Animate safe-bottom so the FAB glides smoothly with both the
+            // keyboard and the snackbar appear/dismiss cycle (both feed into
+            // `safeBottomPx`, so a single animation channel suffices).
             val animatedSafeBottomPx by animateFloatAsState(
                 targetValue   = safeBottomPx,
                 animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                label         = "fabKeyboardOffset"
+                label         = "fabBottomOffset"
             )
 
             val fabX = if (isLeftHanded) buttonMarginPx
