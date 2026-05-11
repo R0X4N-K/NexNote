@@ -19,10 +19,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,12 +47,44 @@ import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 private val EditorTopBarMinHeight = 44.dp
 private val EditorSearchFieldMinHeight = 36.dp
 
+/**
+ * Read-only snapshot of the editor controls that surface in the top bar.
+ *
+ * Bundling these flags into a single value class keeps [EditorTopBar]'s
+ * signature compact while making the state vs. behaviour split explicit at
+ * call sites. The class is intentionally [internal] so it cannot leak across
+ * module boundaries.
+ *
+ * @property isDarkTheme whether the editor is currently rendered with a dark
+ *   palette — drives the theme-toggle icon (sun/moon).
+ * @property hasCustomColor whether the note has a custom background colour —
+ *   used to render the palette icon in a selected state.
+ */
+internal data class EditorTopBarToolingState(
+    val isDarkTheme: Boolean,
+    val hasCustomColor: Boolean,
+)
+
+/**
+ * Action callbacks for the editor-level controls hosted by the top bar.
+ *
+ * Pairing this with [EditorTopBarToolingState] keeps the read and write
+ * surfaces aligned, mirroring the `*Content` / `*Actions` split already used
+ * by [EditorScreenScaffoldContent] / [EditorScreenActions] in this package.
+ */
+internal data class EditorTopBarToolingActions(
+    val onThemeToggle: () -> Unit,
+    val onToggleColorPicker: () -> Unit,
+)
+
 @Composable
 internal fun EditorTopBar(
     isSaving: Boolean,
     title: String,
     isTemplateMode: Boolean,
     containerColor: Color,
+    toolingState: EditorTopBarToolingState,
+    toolingActions: EditorTopBarToolingActions,
     searchState: NoteSearchState,
     searchFocusRequester: FocusRequester,
     onBack: () -> Unit,
@@ -101,6 +136,9 @@ internal fun EditorTopBar(
             }
             EditorTopBarActions(
                 isSaving = isSaving,
+                isTemplateMode = isTemplateMode,
+                toolingState = toolingState,
+                toolingActions = toolingActions,
                 searchState = searchState,
                 onSearchOpen = onSearchOpen,
                 onSearchClose = onSearchClose,
@@ -197,6 +235,9 @@ private fun EditorSearchField(
 @Composable
 private fun EditorTopBarActions(
     isSaving: Boolean,
+    isTemplateMode: Boolean,
+    toolingState: EditorTopBarToolingState,
+    toolingActions: EditorTopBarToolingActions,
     searchState: NoteSearchState,
     onSearchOpen: () -> Unit,
     onSearchClose: () -> Unit,
@@ -215,6 +256,9 @@ private fun EditorTopBarActions(
         )
     } else {
         EditorBrowsingActions(
+            isTemplateMode = isTemplateMode,
+            toolingState = toolingState,
+            toolingActions = toolingActions,
             onSearchOpen = onSearchOpen,
             onExport = onExport
         )
@@ -266,8 +310,27 @@ private fun EditorSearchActions(
     )
 }
 
+/**
+ * Trailing actions shown while the user is **not** searching.
+ *
+ * Order is intentional and was chosen so document-level actions flow into
+ * visual-styling controls and finish with the discovery-oriented search lens:
+ *  1. **Export** — document-level action, only when meaningful (a saved note,
+ *     not a template).
+ *  2. **Palette** — note background colour; hidden for templates because
+ *     templates don't carry per-note colours.
+ *  3. **Theme toggle** — global UI theme; placed after palette so the two
+ *     visual-styling controls cluster together.
+ *  4. **Search** — last, mirroring the affordance of "open a sub-tool".
+ *
+ * Editing-history controls live in the IME toolbar because they directly
+ * affect text entry and must remain reachable while formatting tools scroll.
+ */
 @Composable
 private fun EditorBrowsingActions(
+    isTemplateMode: Boolean,
+    toolingState: EditorTopBarToolingState,
+    toolingActions: EditorTopBarToolingActions,
     onSearchOpen: () -> Unit,
     onExport: (() -> Unit)?
 ) {
@@ -278,6 +341,19 @@ private fun EditorBrowsingActions(
             onClick = onExport
         )
     }
+    if (!isTemplateMode) {
+        NexIconButton(
+            imageVector = Icons.Default.Palette,
+            contentDescription = "Note background color",
+            onClick = toolingActions.onToggleColorPicker,
+            selected = toolingState.hasCustomColor
+        )
+    }
+    NexIconButton(
+        imageVector = if (toolingState.isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
+        contentDescription = if (toolingState.isDarkTheme) "Switch to light theme" else "Switch to dark theme",
+        onClick = toolingActions.onThemeToggle
+    )
     NexIconButton(
         imageVector = Icons.Default.Search,
         contentDescription = "Search in note",

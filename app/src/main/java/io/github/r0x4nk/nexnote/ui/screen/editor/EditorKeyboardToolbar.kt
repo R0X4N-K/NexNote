@@ -10,19 +10,20 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatItalic
@@ -32,10 +33,9 @@ import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
@@ -47,21 +47,53 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+
+/**
+ * Base container alpha for the IME toolbar.
+ *
+ * The toolbar stays slightly translucent for scroll context, but opaque enough
+ * to avoid noisy text popping through the controls.
+ */
+private const val EditorToolbarSurfaceAlpha = 0.94f
+
+/**
+ * Compact vertical padding keeps the rectangle visually attached to the IME
+ * instead of turning it into a floating panel.
+ */
+private val EditorToolbarVerticalPadding = 0.dp
+
+/**
+ * Horizontal content padding only affects the tool row; the container itself
+ * still spans the full screen width.
+ */
+private val EditorToolbarHorizontalPadding = 8.dp
+
+private val EditorToolbarHistoryGap = 4.dp
+
+private val EditorToolbarButtonSize = 44.dp
+
+private val EditorToolbarIconSize = 21.dp
+
+private val EditorToolbarHeadingTextSize = 17.sp
 
 /**
  * Compact editor actions anchored above the IME while editing.
+ *
+ * The toolbar keeps editing-history controls pinned to the left while
+ * Markdown formatting tools scroll independently on the right.
  *
  * The link-type and heading-level choosers are exposed via the
  * [linkMenuExpanded]/[onLinkMenuExpandedChange] and
  * [headingMenuExpanded]/[onHeadingMenuExpandedChange] pairs so the parent can
  * keep the toolbar mounted while either dropdown is open. This prevents the
- * dropdowns' focusable popups — which collapse the IME for a moment — from also
- * tearing the toolbar (and the menu itself) down before the user can pick an
- * option.
+ * dropdowns' focusable popups — which collapse the IME for a moment — from
+ * also tearing the toolbar (and the menu itself) down before the user can
+ * pick an option.
  *
  * The button order follows research-based priorities for mobile Markdown
  * note-taking: bold → heading → bullets → checkbox → link → italic → numbered
@@ -71,11 +103,8 @@ import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 internal fun EditorKeyboardToolbar(
     visible: Boolean,
     isTemplateMode: Boolean,
-    isDarkTheme: Boolean,
-    hasCustomColor: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
-    noteBackground: Color,
     linkMenuExpanded: Boolean,
     onLinkMenuExpandedChange: (Boolean) -> Unit,
     headingMenuExpanded: Boolean,
@@ -96,8 +125,6 @@ internal fun EditorKeyboardToolbar(
     onInsertHorizontalRule: () -> Unit,
     onInsertWebLink: () -> Unit,
     onInsertNoteLink: () -> Unit,
-    onThemeToggle: () -> Unit,
-    onToggleColorPicker: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -112,87 +139,151 @@ internal fun EditorKeyboardToolbar(
         ) + fadeOut(animationSpec = tween(durationMillis = 140)),
         modifier = modifier
     ) {
+        // A plain translucent surface keeps the toolbar calm and avoids extra
+        // decorative color around the outer edges.
         Surface(
-            modifier = Modifier
-                .background(noteBackground)
-                .padding(start = 6.dp, top = 0.dp, end = 6.dp, bottom = 1.dp),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-            tonalElevation = 1.dp
+            modifier = Modifier.fillMaxWidth(),
+            shape = RectangleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                alpha = EditorToolbarSurfaceAlpha
+            ),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
+                    .padding(
+                        horizontal = EditorToolbarHorizontalPadding,
+                        vertical = EditorToolbarVerticalPadding
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    EditorToolbarIcon(
-                        onClick = onUndo,
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Undo",
-                        enabled = canUndo
-                    )
-                    EditorToolbarIcon(
-                        onClick = onRedo,
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Redo",
-                        enabled = canRedo
-                    )
-                    // Order chosen from research: high-frequency actions first.
-                    EditorToolbarIcon(onToggleBold, Icons.Default.FormatBold, "Bold")
-                    EditorHeadingMenu(
-                        expanded = headingMenuExpanded,
-                        onExpandedChange = onHeadingMenuExpandedChange,
-                        onSelectLevel = onSetHeadingLevel
-                    )
-                    EditorToolbarIcon(
-                        onClick = onToggleUnorderedList,
-                        imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
-                        contentDescription = "Bulleted list"
-                    )
-                    EditorToolbarIcon(onInsertChecklist, Icons.Default.CheckBox, "Checklist")
-                    EditorLinkMenu(
-                        expanded = linkMenuExpanded,
-                        onExpandedChange = onLinkMenuExpandedChange,
-                        onInsertWebLink = onInsertWebLink,
-                        onInsertNoteLink = onInsertNoteLink
-                    )
-                    EditorToolbarIcon(onToggleItalic, Icons.Default.FormatItalic, "Italic")
-                    EditorToolbarIcon(
-                        onClick = onToggleOrderedList,
-                        imageVector = Icons.Default.FormatListNumbered,
-                        contentDescription = "Numbered list"
-                    )
-                    EditorToolbarIcon(onToggleInlineCode, Icons.Default.Code, "Inline code")
-                    EditorToolbarIcon(onInsertCodeBlock, Icons.Default.DataObject, "Code block")
-                    EditorToolbarIcon(onToggleQuote, Icons.Default.FormatQuote, "Quote")
-                    if (!isTemplateMode) {
-                        EditorToolbarIcon(onInsertImage, Icons.Default.Image, "Insert image")
-                    }
-                    EditorToolbarIcon(onInsertHorizontalRule, Icons.Default.HorizontalRule, "Horizontal rule")
-                    EditorToolbarIcon(onToggleStrikethrough, Icons.Default.FormatStrikethrough, "Strikethrough")
-                }
-                if (!isTemplateMode) {
-                    EditorToolbarIcon(
-                        onClick = onToggleColorPicker,
-                        imageVector = Icons.Default.Palette,
-                        contentDescription = "Note background color",
-                        selected = hasCustomColor
-                    )
-                }
-                EditorToolbarIcon(
-                    onClick = onThemeToggle,
-                    imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
-                    contentDescription = if (isDarkTheme) "Switch to light theme" else "Switch to dark theme"
+                EditorToolbarHistoryActions(
+                    canUndo = canUndo,
+                    canRedo = canRedo,
+                    onUndo = onUndo,
+                    onRedo = onRedo
+                )
+                Spacer(Modifier.width(EditorToolbarHistoryGap))
+                EditorToolbarScrollableActions(
+                    isTemplateMode = isTemplateMode,
+                    linkMenuExpanded = linkMenuExpanded,
+                    onLinkMenuExpandedChange = onLinkMenuExpandedChange,
+                    headingMenuExpanded = headingMenuExpanded,
+                    onHeadingMenuExpandedChange = onHeadingMenuExpandedChange,
+                    onInsertImage = onInsertImage,
+                    onInsertChecklist = onInsertChecklist,
+                    onSetHeadingLevel = onSetHeadingLevel,
+                    onToggleBold = onToggleBold,
+                    onToggleItalic = onToggleItalic,
+                    onToggleStrikethrough = onToggleStrikethrough,
+                    onToggleInlineCode = onToggleInlineCode,
+                    onInsertCodeBlock = onInsertCodeBlock,
+                    onToggleQuote = onToggleQuote,
+                    onToggleUnorderedList = onToggleUnorderedList,
+                    onToggleOrderedList = onToggleOrderedList,
+                    onInsertHorizontalRule = onInsertHorizontalRule,
+                    onInsertWebLink = onInsertWebLink,
+                    onInsertNoteLink = onInsertNoteLink,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
+    }
+}
+
+/**
+ * Fixed editing-history controls. Keeping this row outside the scrollable
+ * action strip lets undo and redo stay reachable while formatting tools move.
+ */
+@Composable
+private fun EditorToolbarHistoryActions(
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        EditorToolbarIcon(
+            onClick = onUndo,
+            imageVector = Icons.AutoMirrored.Filled.Undo,
+            contentDescription = "Undo",
+            enabled = canUndo
+        )
+        EditorToolbarIcon(
+            onClick = onRedo,
+            imageVector = Icons.AutoMirrored.Filled.Redo,
+            contentDescription = "Redo",
+            enabled = canRedo
+        )
+    }
+}
+
+/**
+ * Scrollable Markdown tool strip. History controls are deliberately kept out
+ * of this row so they remain pinned to the left edge.
+ */
+@Composable
+private fun EditorToolbarScrollableActions(
+    isTemplateMode: Boolean,
+    linkMenuExpanded: Boolean,
+    onLinkMenuExpandedChange: (Boolean) -> Unit,
+    headingMenuExpanded: Boolean,
+    onHeadingMenuExpandedChange: (Boolean) -> Unit,
+    onInsertImage: () -> Unit,
+    onInsertChecklist: () -> Unit,
+    onSetHeadingLevel: (Int) -> Unit,
+    onToggleBold: () -> Unit,
+    onToggleItalic: () -> Unit,
+    onToggleStrikethrough: () -> Unit,
+    onToggleInlineCode: () -> Unit,
+    onInsertCodeBlock: () -> Unit,
+    onToggleQuote: () -> Unit,
+    onToggleUnorderedList: () -> Unit,
+    onToggleOrderedList: () -> Unit,
+    onInsertHorizontalRule: () -> Unit,
+    onInsertWebLink: () -> Unit,
+    onInsertNoteLink: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Order chosen from research: high-frequency actions first.
+        EditorToolbarIcon(onToggleBold, Icons.Default.FormatBold, "Bold")
+        EditorHeadingMenu(
+            expanded = headingMenuExpanded,
+            onExpandedChange = onHeadingMenuExpandedChange,
+            onSelectLevel = onSetHeadingLevel
+        )
+        EditorToolbarIcon(
+            onClick = onToggleUnorderedList,
+            imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
+            contentDescription = "Bulleted list"
+        )
+        EditorToolbarIcon(onInsertChecklist, Icons.Default.CheckBox, "Checklist")
+        EditorLinkMenu(
+            expanded = linkMenuExpanded,
+            onExpandedChange = onLinkMenuExpandedChange,
+            onInsertWebLink = onInsertWebLink,
+            onInsertNoteLink = onInsertNoteLink
+        )
+        EditorToolbarIcon(onToggleItalic, Icons.Default.FormatItalic, "Italic")
+        EditorToolbarIcon(
+            onClick = onToggleOrderedList,
+            imageVector = Icons.Default.FormatListNumbered,
+            contentDescription = "Numbered list"
+        )
+        EditorToolbarIcon(onToggleInlineCode, Icons.Default.Code, "Inline code")
+        EditorToolbarIcon(onInsertCodeBlock, Icons.Default.DataObject, "Code block")
+        EditorToolbarIcon(onToggleQuote, Icons.Default.FormatQuote, "Quote")
+        if (!isTemplateMode) {
+            EditorToolbarIcon(onInsertImage, Icons.Default.Image, "Insert image")
+        }
+        EditorToolbarIcon(onInsertHorizontalRule, Icons.Default.HorizontalRule, "Horizontal rule")
+        EditorToolbarIcon(onToggleStrikethrough, Icons.Default.FormatStrikethrough, "Strikethrough")
     }
 }
 
@@ -311,19 +402,19 @@ private fun HeadingTriggerButton(
         IconButton(
             onClick = onClick,
             modifier = Modifier
-                .size(48.dp)
+                .size(EditorToolbarButtonSize)
                 .clip(CircleShape)
                 .background(containerColor)
         ) {
             Box(
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(EditorToolbarIconSize),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "H",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        fontSize = EditorToolbarHeadingTextSize,
                         color = contentColor
                     )
                 )
@@ -335,16 +426,34 @@ private fun HeadingTriggerButton(
 @Composable
 private fun EditorToolbarIcon(
     onClick: () -> Unit,
-    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    imageVector: ImageVector,
     contentDescription: String,
     enabled: Boolean = true,
     selected: Boolean = false
 ) {
-    NexIconButton(
-        imageVector = imageVector,
-        contentDescription = contentDescription,
-        onClick = onClick,
-        enabled = enabled,
-        selected = selected
-    )
+    val colorScheme = MaterialTheme.colorScheme
+    val containerColor = if (selected) colorScheme.primaryContainer else Color.Transparent
+    val contentColor = when {
+        !enabled -> colorScheme.onSurface.copy(alpha = 0.24f)
+        selected -> colorScheme.onPrimaryContainer
+        else -> colorScheme.onSurfaceVariant
+    }
+
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier
+                .size(EditorToolbarButtonSize)
+                .clip(CircleShape)
+                .background(containerColor)
+        ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = contentDescription,
+                tint = contentColor,
+                modifier = Modifier.size(EditorToolbarIconSize)
+            )
+        }
+    }
 }

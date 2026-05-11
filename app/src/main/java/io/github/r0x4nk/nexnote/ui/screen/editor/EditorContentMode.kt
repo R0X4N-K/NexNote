@@ -121,13 +121,22 @@ internal fun ColumnScope.EditorContentModeBox(
             onTargetSelected = onNoteLinkAutocompleteSelected,
             onVisibilityChange = { state.isNoteLinkAutocompleteVisible = it }
         )
-        if (contentTarget == EditorContentTarget.Preview) {
-            EditorPreviewReadingProgressBar(
-                lazyListState = state.previewListState,
-                sourceRanges = state.currentSourceRanges,
-                contentLength = uiState.content.length,
-                modifier = Modifier.align(Alignment.CenterEnd)
-            )
+        when (contentTarget) {
+            EditorContentTarget.Preview -> {
+                EditorPreviewReadingProgressBar(
+                    lazyListState = state.previewListState,
+                    sourceRanges = state.currentSourceRanges,
+                    contentLength = uiState.content.length,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
+            }
+            EditorContentTarget.Edit -> {
+                EditorEditReadingProgressBar(
+                    scrollState = state.contentScrollState,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
+            }
+            EditorContentTarget.Loading -> Unit
         }
     }
 }

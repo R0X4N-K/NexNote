@@ -3,7 +3,6 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -27,16 +26,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Tag
@@ -122,11 +115,23 @@ private fun EditorScreenTopBar(
     content: EditorScreenScaffoldContent,
     actions: EditorScreenActions
 ) {
+    // Visual-styling controls live in the top bar so they stay reachable in
+    // preview mode, while editing-history and Markdown tools stay near the IME.
+    val toolingState = EditorTopBarToolingState(
+        isDarkTheme = content.isDarkTheme,
+        hasCustomColor = content.uiState.backgroundColor != null,
+    )
+    val toolingActions = EditorTopBarToolingActions(
+        onThemeToggle = actions.onThemeToggle,
+        onToggleColorPicker = actions.onToggleColorPicker,
+    )
     EditorTopBar(
         isSaving = content.uiState.isSaving,
         title = content.uiState.title,
         isTemplateMode = content.uiState.isTemplateMode,
         containerColor = content.noteBackground,
+        toolingState = toolingState,
+        toolingActions = toolingActions,
         searchState = content.state.noteSearch,
         searchFocusRequester = content.state.searchFocusRequester,
         onBack = actions.onBack,
@@ -166,14 +171,6 @@ private fun EditorScreenBody(
         !content.state.noteSearch.isActive &&
         !content.state.showNoteLinkPicker &&
         !content.uiState.isLoading
-    var toolbarHeightPx by remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-    val toolbarHeightDp = with(density) { toolbarHeightPx.toDp() }
-    val animatedToolbarPadding by animateDpAsState(
-        targetValue = if (toolbarVisible) toolbarHeightDp else 0.dp,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-        label = "toolbarPadding"
-    )
 
     Box(
         modifier = modifier
@@ -185,7 +182,6 @@ private fun EditorScreenBody(
                 .fillMaxSize()
                 .navigationBarsPadding()
                 .imePadding()
-                .padding(bottom = animatedToolbarPadding)
         ) {
             // Metadata is placed above mode tabs to keep the editor chrome compact.
             EditorMetadataArea(content.uiState, actions.onCreationDateTap)
@@ -224,11 +220,8 @@ private fun EditorScreenBody(
         EditorKeyboardToolbar(
             visible = toolbarVisible,
             isTemplateMode = content.uiState.isTemplateMode,
-            isDarkTheme = content.isDarkTheme,
-            hasCustomColor = content.uiState.backgroundColor != null,
             canUndo = content.undoRedoState.canUndo,
             canRedo = content.undoRedoState.canRedo,
-            noteBackground = content.noteBackground,
             linkMenuExpanded = content.state.showLinkTypeMenu,
             onLinkMenuExpandedChange = { expanded -> content.state.showLinkTypeMenu = expanded },
             headingMenuExpanded = content.state.showHeadingMenu,
@@ -262,14 +255,10 @@ private fun EditorScreenBody(
                 content.state.showLinkTypeMenu = false
                 actions.onInsertNoteLink()
             },
-            onThemeToggle = actions.onThemeToggle,
-            onToggleColorPicker = actions.onToggleColorPicker,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .imePadding()
-                .navigationBarsPadding()
                 .fillMaxWidth()
-                .onSizeChanged { toolbarHeightPx = it.height }
         )
     }
 }

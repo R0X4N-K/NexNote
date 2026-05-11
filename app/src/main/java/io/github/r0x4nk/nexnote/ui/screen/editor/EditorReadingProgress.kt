@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,40 @@ internal fun EditorPreviewReadingProgressBar(
 ) {
     val state by rememberPreviewReadingProgress(lazyListState, sourceRanges, contentLength)
 
+    EditorScrollPositionBar(
+        state = state,
+        progressDescription = "Reading progress",
+        modifier = modifier
+    )
+}
+
+/**
+ * Vertical scroll-position indicator for edit mode.
+ *
+ * Edit mode is backed by a state-based [androidx.compose.foundation.text.BasicTextField],
+ * so the thumb is driven by the field's pixel [ScrollState] instead of markdown
+ * source ranges.
+ */
+@Composable
+internal fun EditorEditReadingProgressBar(
+    scrollState: ScrollState,
+    modifier: Modifier = Modifier
+) {
+    val state by rememberEditScrollProgress(scrollState)
+
+    EditorScrollPositionBar(
+        state = state,
+        progressDescription = "Editor scroll progress",
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun EditorScrollPositionBar(
+    state: ScrollProgressState,
+    progressDescription: String,
+    modifier: Modifier = Modifier
+) {
     val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
 
@@ -69,7 +104,7 @@ internal fun EditorPreviewReadingProgressBar(
                 .fillMaxHeight()
                 .width(ScrollTrackTouchWidth)
                 .padding(vertical = ScrollTrackVerticalPadding)
-                .semantics { contentDescription = "Reading progress" }
+                .semantics { contentDescription = progressDescription }
         )
     }
 }
@@ -116,7 +151,7 @@ private fun rememberPreviewReadingProgress(
     lazyListState: LazyListState,
     sourceRanges: List<MarkdownSourceRange>,
     contentLength: Int
-): State<PreviewReadingProgressState> {
+): State<ScrollProgressState> {
     return remember(lazyListState, sourceRanges, contentLength) {
         derivedStateOf {
             val layoutInfo = lazyListState.layoutInfo
@@ -131,7 +166,7 @@ private fun rememberPreviewReadingProgress(
             }
             val canScrollBackward = lazyListState.canScrollBackward
             val canScrollForward = lazyListState.canScrollForward
-            PreviewReadingProgressState(
+            ScrollProgressState(
                 progress = previewReadingProgress(
                     contentLength = contentLength,
                     sourceOffset = sourceOffset,
@@ -147,7 +182,26 @@ private fun rememberPreviewReadingProgress(
     }
 }
 
-private data class PreviewReadingProgressState(
+@Composable
+private fun rememberEditScrollProgress(
+    scrollState: ScrollState
+): State<ScrollProgressState> {
+    return remember(scrollState) {
+        derivedStateOf {
+            ScrollProgressState(
+                progress = editScrollProgress(
+                    scrollOffset = scrollState.value,
+                    maxScrollOffset = scrollState.maxValue
+                ),
+                isVisible = editScrollProgressVisible(
+                    maxScrollOffset = scrollState.maxValue
+                )
+            )
+        }
+    }
+}
+
+private data class ScrollProgressState(
     val progress: Float,
     val isVisible: Boolean
 )
@@ -170,3 +224,15 @@ internal fun previewReadingProgressVisible(
     canScrollBackward: Boolean,
     canScrollForward: Boolean
 ): Boolean = canScrollBackward || canScrollForward
+
+internal fun editScrollProgress(
+    scrollOffset: Int,
+    maxScrollOffset: Int
+): Float {
+    if (maxScrollOffset <= 0) return 1f
+
+    return (scrollOffset.toFloat() / maxScrollOffset.toFloat()).coerceIn(0f, 1f)
+}
+
+internal fun editScrollProgressVisible(maxScrollOffset: Int): Boolean =
+    maxScrollOffset > 0

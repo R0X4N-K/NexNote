@@ -116,4 +116,35 @@ class EditorScrollMappingTest {
         assertTrue(previewReadingProgressVisible(canScrollBackward = false, canScrollForward = true))
         assertTrue(previewReadingProgressVisible(canScrollBackward = true, canScrollForward = false))
     }
+
+    @Test
+    fun `edit scroll progress tracks the text field pixel offset`() {
+        val progress = editScrollProgress(
+            scrollOffset = 250,
+            maxScrollOffset = 1_000
+        )
+
+        assertEquals(0.25f, progress, 0.0001f)
+    }
+
+    @Test
+    fun `edit scroll progress clamps out of range offsets`() {
+        assertEquals(
+            0f,
+            editScrollProgress(scrollOffset = -20, maxScrollOffset = 1_000),
+            0.0001f
+        )
+        assertEquals(
+            1f,
+            editScrollProgress(scrollOffset = 1_200, maxScrollOffset = 1_000),
+            0.0001f
+        )
+    }
+
+    @Test
+    fun `edit scroll progress is hidden when text does not scroll`() {
+        assertEquals(1f, editScrollProgress(scrollOffset = 0, maxScrollOffset = 0), 0.0001f)
+        assertTrue(!editScrollProgressVisible(maxScrollOffset = 0))
+        assertTrue(editScrollProgressVisible(maxScrollOffset = 1))
+    }
 }
