@@ -12,7 +12,6 @@ import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import androidx.core.content.FileProvider
 import io.github.r0x4nk.nexnote.domain.model.Note
-import io.github.r0x4nk.nexnote.util.DateUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -25,7 +24,10 @@ import java.util.Locale
  * All I/O operations are dispatched to [Dispatchers.IO] internally.
  * No business logic here — it only consumes the [Note] list already filtered by the ViewModel.
  */
-class ExportManager(private val context: Context) {
+class ExportManager(
+    private val context: Context,
+    private val imageFileProvider: (String) -> File
+) {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -102,43 +104,19 @@ class ExportManager(private val context: Context) {
     // ── TXT writer ────────────────────────────────────────────────────────────
 
     private fun writeTxt(file: File, notes: List<Note>) {
-        file.bufferedWriter(Charsets.UTF_8).use { w ->
-            notes.forEachIndexed { idx, note ->
-                if (idx > 0) {
-                    w.newLine(); w.appendLine("---"); w.newLine()
-                }
-                if (note.title.isNotBlank()) {
-                    w.appendLine(note.title); w.newLine()
-                }
-                w.appendLine(DateUtils.formatDateTime(note.creationDate))
-                w.newLine()
-                w.appendLine(note.content)
-            }
-        }
+        file.writeText(ExportNoteFormatter.toPlainText(notes), Charsets.UTF_8)
     }
 
     // ── Markdown writer ───────────────────────────────────────────────────────
 
     private fun writeMd(file: File, notes: List<Note>) {
-        file.bufferedWriter(Charsets.UTF_8).use { w ->
-            notes.forEachIndexed { idx, note ->
-                if (idx > 0) {
-                    w.newLine(); w.appendLine("---"); w.newLine()
-                }
-                if (note.title.isNotBlank()) {
-                    w.appendLine("# ${note.title}"); w.newLine()
-                }
-                w.appendLine("_${DateUtils.formatDateTime(note.creationDate)}_")
-                w.newLine()
-                w.appendLine(note.content)
-            }
-        }
+        file.writeText(ExportNoteFormatter.toMarkdown(notes), Charsets.UTF_8)
     }
 
     // ── PDF writer (line-by-line pagination) ─────────────────────────────────
 
     private fun writePdf(file: File, notes: List<Note>) {
-        PdfNoteExporter.write(file, notes)
+        PdfNoteExporter.write(file, notes, imageFileProvider)
     }
 
     // ── PrintDocumentAdapter ──────────────────────────────────────────────────

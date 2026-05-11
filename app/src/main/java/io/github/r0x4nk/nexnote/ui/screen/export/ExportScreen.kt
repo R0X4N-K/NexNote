@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.NexNoteApp
 
 @Composable
 fun ExportScreen(
@@ -20,9 +21,13 @@ fun ExportScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val app = context.applicationContext as NexNoteApp
     val coroutineScope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    val exportManager = remember(context) { ExportManager(context) }
+    val imageFileProvider = remember(app) { app.useCases.images.getNoteImageFile::invoke }
+    val exportManager = remember(context, imageFileProvider) {
+        ExportManager(context, imageFileProvider)
+    }
     val actions = rememberExportActions(
         uiState = uiState,
         viewModel = viewModel,
