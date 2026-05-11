@@ -52,15 +52,26 @@ class EditorViewModelImageAutosaveTest : EditorViewModelTestBase() {
     }
 
     @Test
-    fun `onImagePicked on empty new note asks for text first`() = runTest {
+    fun `onImagePicked on empty new note creates the note and inserts the image`() = runTest {
+        // Regression guard: previously a brand-new note with no title or body
+        // could not accept an image — the editor refused to persist an "empty"
+        // note, so it never obtained a real id and the user got a misleading
+        // "Add some text before inserting an image" error. The new contract is
+        // that picking an image IS a content-bearing gesture: the note is
+        // eagerly persisted via [EditorSaveDelegate.ensurePersisted] and the
+        // image is attached normally.
         val imageStorage = FakeEditorNoteImageStorage()
         val vm = viewModel(imageStorage = imageStorage)
 
         vm.onImagePicked(openImageInputStream = { ByteArrayInputStream(byteArrayOf(1)) })
         advanceUntilIdle()
 
-        assertTrue(imageStorage.copiedNoteIds.isEmpty())
-        assertEquals("Add some text before inserting an image", vm.uiState.value.errorMessage)
+        val state = vm.uiState.value
+        assertNotEquals(EditorViewModel.NO_ID, state.noteId)
+        assertEquals(listOf(1L), imageStorage.copiedNoteIds)
+        assertEquals(listOf("images/note_1_img_100.jpg"), state.imagePaths)
+        assertTrue(state.content.contains("![image](images/note_1_img_100.jpg)"))
+        assertNull(state.errorMessage)
     }
 
     @Test

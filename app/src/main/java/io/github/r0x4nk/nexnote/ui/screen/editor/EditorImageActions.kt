@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-private const val ADD_TEXT_BEFORE_IMAGE_ERROR = "Add some text before inserting an image"
 private const val IMAGE_INSERT_ERROR = "Could not insert image"
 private const val MARKDOWN_IMAGE_ALT_TEXT = "image"
 
@@ -33,15 +32,26 @@ internal class EditorImageActions(
         }
     }
 
+    /**
+     * Guarantees the note has a database id before the image file is copied
+     * to internal storage.
+     *
+     * Image storage namespaces files under the owning note id, so a brand-new
+     * note must be persisted first — even when the user has not typed a title
+     * or body. We delegate to [EditorSaveDelegate.ensurePersisted], which
+     * intentionally bypasses the autosave "non-empty" guard for this exact
+     * case. The image insertion itself is the user's first content gesture
+     * and must not be blocked by it.
+     *
+     * Returns `false` only when the underlying save genuinely failed, in
+     * which case [EditorSaveDelegate] has already published a user-facing
+     * error message.
+     */
     private suspend fun ensureNoteExistsBeforeImageInsert(): Boolean {
         if (uiState.value.noteId != EditorViewModel.NO_ID) return true
 
-        uiState.update { it.copy(isDirty = true) }
-        saveDelegate.performSave()
-        if (uiState.value.noteId != EditorViewModel.NO_ID) return true
-
-        uiState.update { it.copy(errorMessage = ADD_TEXT_BEFORE_IMAGE_ERROR) }
-        return false
+        val persisted = saveDelegate.ensurePersisted()
+        return persisted && uiState.value.noteId != EditorViewModel.NO_ID
     }
 
     private suspend fun insertImageIntoCurrentNote(

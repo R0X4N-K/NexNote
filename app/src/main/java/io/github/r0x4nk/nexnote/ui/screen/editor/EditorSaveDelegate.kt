@@ -51,6 +51,57 @@ internal class EditorSaveDelegate(
         performSave()
     }
 
+    /**
+     * Eagerly persists the current editor state so callers can obtain a real
+     * database id, even when the note has no textual content yet.
+     *
+     * Whereas [performSave] is conservative — it refuses to persist a brand-new
+     * note that has neither title, body text, nor images, so transient empty
+     * editors do not pollute the database — there are legitimate flows that
+     * MUST have a stable id before any user content exists. The canonical
+     * example is image insertion: the storage layer needs a [Note.id] to
+     * namespace the image file before it can be copied into internal storage.
+     *
+     * This method is intentionally narrow: it only forces creation of the row
+     * when one does not yet exist. If the note is already persisted, or the
+     * editor is in template mode, the call is a no-op and the regular autosave
+     * pipeline keeps owning subsequent writes.
+     *
+     * @return `true` when the editor state references a real, persisted row
+     *         after the call (either it already did, or one was just created),
+     *         `false` if the underlying save failed.
+     */
+    suspend fun ensurePersisted(): Boolean = saveMutex.withLock {
+        val snapshot = uiState.value
+        NexNoteDebugLog.persistence(
+            event = "ensurePersistedStart",
+            details = snapshot.debugSaveSummary()
+        )
+
+        // Already has an id (note) or is editing a template — nothing to do.
+        // Templates intentionally do not participate in the image flow.
+        if (snapshot.isTemplateMode || snapshot.noteId != EditorViewModel.NO_ID) {
+            return@withLock true
+        }
+
+        uiState.update { it.copy(isSaving = true, errorMessage = null, isDirty = true) }
+        return@withLock try {
+            saveAsNote(snapshot)
+            NexNoteDebugLog.persistence(
+                event = "ensurePersistedSuccess",
+                details = uiState.value.debugSaveSummary()
+            )
+            true
+        } catch (e: Exception) {
+            NexNoteDebugLog.persistence(
+                event = "ensurePersistedFailed",
+                details = "${NexNoteDebugLog.throwableSummary(e)} ${snapshot.debugSaveSummary()}"
+            )
+            uiState.update { it.copy(isSaving = false, errorMessage = "Save failed") }
+            false
+        }
+    }
+
     suspend fun performSave(): Boolean = saveMutex.withLock {
         val snapshot = uiState.value
         val shouldSaveSnapshot = shouldSave(snapshot)
@@ -198,8 +249,18 @@ internal class EditorSaveDelegate(
         return isExistingRecord || hasContent(state)
     }
 
+    /**
+     * A note is considered "non-empty" for persistence purposes if it carries
+     * any user-authored content. Images count: a note that only contains
+     * inserted pictures is still a meaningful artifact, and once it has been
+     * persisted via [ensurePersisted] subsequent autosaves must continue to
+     * flush changes (e.g. additional images, colour, pin state) instead of
+     * skipping the save because the textual fields are still blank.
+     */
     private fun hasContent(state: EditorUiState): Boolean {
-        return state.title.isNotBlank() || state.content.isNotBlank()
+        return state.title.isNotBlank() ||
+            state.content.isNotBlank() ||
+            state.imagePaths.isNotEmpty()
     }
 
     private fun buildNote(state: EditorUiState): Note = Note(
