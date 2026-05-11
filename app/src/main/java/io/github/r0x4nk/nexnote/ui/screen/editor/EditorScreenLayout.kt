@@ -255,6 +255,7 @@ private fun EditorScreenBody(
                 content.state.showLinkTypeMenu = false
                 actions.onInsertNoteLink()
             },
+            onHeightChanged = content.state::updateKeyboardToolbarHeight,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .imePadding()
@@ -322,6 +323,7 @@ private fun EditorTitleArea(
         onValueChange = onTitleChange,
         placeholder = if (uiState.isTemplateMode) "Template name" else "Title",
         onNext = { state.contentFocusRequester.requestFocus() },
+        readOnly = uiState.showPreview,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)

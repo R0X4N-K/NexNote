@@ -81,12 +81,16 @@ internal fun TitleField(
     onValueChange: (String) -> Unit,
     onNext: () -> Unit,
     placeholder: String = "Title",
+    readOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BasicTextField(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = { nextValue ->
+            if (!readOnly) onValueChange(nextValue)
+        },
         modifier = modifier,
+        readOnly = readOnly,
         singleLine = true,
         textStyle = MaterialTheme.typography.titleLarge.copy(
             color = MaterialTheme.colorScheme.onSurface

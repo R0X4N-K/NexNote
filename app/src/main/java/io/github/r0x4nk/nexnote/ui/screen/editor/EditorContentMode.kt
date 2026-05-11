@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -31,7 +32,6 @@ import java.io.File
 private val EditorContentHorizontalPadding = 8.dp
 private val EditorContentTopPadding = 8.dp
 private val EditorContentDefaultBottomPadding = 12.dp
-private val EditorContentToolbarBottomPadding = 0.dp
 
 private enum class EditorContentTarget {
     Loading,
@@ -185,6 +185,11 @@ private fun EditorContentField(
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit
 ) {
+    val density = LocalDensity.current
+    val toolbarBottomPadding = with(density) {
+        state.keyboardToolbarHeightPx.toDp()
+    }
+
     ContentField(
         textFieldState = state.contentTextFieldState,
         scrollState = state.contentScrollState,
@@ -200,18 +205,27 @@ private fun EditorContentField(
                 start = EditorContentHorizontalPadding,
                 top = EditorContentTopPadding,
                 end = EditorContentHorizontalPadding,
-                bottom = editorContentBottomPadding(keyboardToolbarVisible)
+                bottom = editorContentBottomPadding(
+                    keyboardToolbarVisible = keyboardToolbarVisible,
+                    keyboardToolbarHeight = toolbarBottomPadding
+                )
             )
             .focusRequester(state.contentFocusRequester)
     )
 }
 
-private fun editorContentBottomPadding(keyboardToolbarVisible: Boolean): Dp =
-    if (keyboardToolbarVisible) {
-        EditorContentToolbarBottomPadding
+private fun editorContentBottomPadding(
+    keyboardToolbarVisible: Boolean,
+    keyboardToolbarHeight: Dp
+): Dp {
+    if (!keyboardToolbarVisible) return EditorContentDefaultBottomPadding
+
+    return if (keyboardToolbarHeight > 0.dp) {
+        keyboardToolbarHeight
     } else {
-        EditorContentDefaultBottomPadding
+        EditorKeyboardToolbarMinHeight
     }
+}
 
 private fun EditorScreenState.visibleContentHighlightRanges(): List<IntRange> {
     val searchRanges = searchContentHighlightRanges()

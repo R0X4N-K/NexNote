@@ -43,12 +43,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,7 +78,9 @@ private val EditorToolbarHorizontalPadding = 8.dp
 
 private val EditorToolbarHistoryGap = 4.dp
 
-private val EditorToolbarButtonSize = 44.dp
+internal val EditorKeyboardToolbarMinHeight = 44.dp
+
+private val EditorToolbarButtonSize = EditorKeyboardToolbarMinHeight
 
 private val EditorToolbarIconSize = 21.dp
 
@@ -125,8 +130,11 @@ internal fun EditorKeyboardToolbar(
     onInsertHorizontalRule: () -> Unit,
     onInsertWebLink: () -> Unit,
     onInsertNoteLink: () -> Unit,
+    onHeightChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val onHeightChangedState = rememberUpdatedState(onHeightChanged)
+
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(
@@ -139,10 +147,16 @@ internal fun EditorKeyboardToolbar(
         ) + fadeOut(animationSpec = tween(durationMillis = 140)),
         modifier = modifier
     ) {
+        DisposableEffect(Unit) {
+            onDispose { onHeightChangedState.value(0) }
+        }
+
         // A plain translucent surface keeps the toolbar calm and avoids extra
         // decorative color around the outer edges.
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { size -> onHeightChangedState.value(size.height) },
             shape = RectangleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                 alpha = EditorToolbarSurfaceAlpha

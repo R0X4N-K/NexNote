@@ -174,7 +174,7 @@ private suspend fun restoreEditScroll(
     viewportFraction: Float,
     density: Density
 ) {
-    val viewportHeight = state.contentViewportHeightPx.coerceAtLeast(1)
+    val viewportHeight = state.unobscuredContentViewportHeightPx
     val anchorY = editAnchorY(state, anchorOffset, density)
     val targetScroll = if (anchorY != null) {
         (anchorY - viewportHeight * viewportFraction)

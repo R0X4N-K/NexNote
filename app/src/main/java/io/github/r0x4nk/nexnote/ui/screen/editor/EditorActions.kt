@@ -39,7 +39,7 @@ internal fun rememberTogglePreviewPreservingScroll(
     val contentRef = rememberUpdatedState(content)
     val contentVersionRef = rememberUpdatedState(contentVersion)
     val textLayoutResultRef = rememberUpdatedState(state.textLayoutResult)
-    val contentViewportHeightPxRef = rememberUpdatedState(state.contentViewportHeightPx)
+    val contentViewportHeightPxRef = rememberUpdatedState(state.unobscuredContentViewportHeightPx)
 
     return remember(state, density, viewModel) {
         {

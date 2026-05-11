@@ -94,7 +94,7 @@ private suspend fun scrollEditToSearchMatch(
     state.selectNoteSearchRange(match)
 
     val targetY = editModeNoteSearchTargetY(match, state, density) ?: return
-    val viewportHeight = state.contentViewportHeightPx.coerceAtLeast(1)
+    val viewportHeight = state.unobscuredContentViewportHeightPx
     val targetScroll = (targetY - viewportHeight * CONTENT_SCROLL_ANCHOR_FRACTION)
         .toInt()
         .coerceIn(0, state.contentScrollState.maxValue)
