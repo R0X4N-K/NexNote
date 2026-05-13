@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 class TemplateRepositoryTest {
 
     private lateinit var db: NexNoteDatabase
-    private lateinit var repository: TemplateRepository
+    private lateinit var repository: TemplateRepositoryImpl
 
     @Before
     fun setUp() {
@@ -25,7 +25,7 @@ class TemplateRepositoryTest {
         db = Room.inMemoryDatabaseBuilder(context, NexNoteDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = TemplateRepository(db.templateDao())
+        repository = TemplateRepositoryImpl(db.templateDao())
     }
 
     @After

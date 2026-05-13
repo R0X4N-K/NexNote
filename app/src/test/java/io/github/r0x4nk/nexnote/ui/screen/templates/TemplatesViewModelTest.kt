@@ -2,7 +2,7 @@ package io.github.r0x4nk.nexnote.ui.screen.templates
 
 import io.github.r0x4nk.nexnote.data.db.TemplateDao
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
-import io.github.r0x4nk.nexnote.data.repository.TemplateRepository
+import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
@@ -36,7 +36,7 @@ class TemplatesViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao = FakeTemplateDao()
-        val repository = TemplateRepository(fakeDao)
+        val repository = TemplateRepositoryImpl(fakeDao)
         viewModel = TemplatesViewModel(
             observeTemplates = ObserveTemplatesUseCase(repository),
             deleteTemplate = DeleteTemplateUseCase(repository)

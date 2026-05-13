@@ -6,7 +6,7 @@ import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
-import io.github.r0x4nk.nexnote.data.repository.TemplateRepository
+import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
@@ -64,7 +64,7 @@ abstract class EditorViewModelTestBase {
         preferencesRepository: IUserPreferencesRepository = FakeEditorPreferencesRepository()
     ): EditorViewModel {
         val noteRepository = NoteRepositoryImpl(fakeNoteDao, imageStorage)
-        val templateRepository = TemplateRepository(fakeTemplateDao)
+        val templateRepository = TemplateRepositoryImpl(fakeTemplateDao)
         return EditorViewModel(
             copyNoteImageToInternal = CopyNoteImageToInternalUseCase(imageStorage),
             deleteNoteImage = DeleteNoteImageUseCase(imageStorage),

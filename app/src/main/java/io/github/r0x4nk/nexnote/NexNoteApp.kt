@@ -6,11 +6,12 @@ import io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage
 import io.github.r0x4nk.nexnote.data.preferences.UserPreferencesRepository
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TagRepositoryImpl
-import io.github.r0x4nk.nexnote.data.repository.TemplateRepository
+import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.di.AppUseCases
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
+import io.github.r0x4nk.nexnote.domain.repository.TemplateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,8 +44,12 @@ class NexNoteApp : Application() {
         )
     }
 
+    private val templateRepositoryImpl: TemplateRepositoryImpl by lazy {
+        TemplateRepositoryImpl(database.templateDao())
+    }
+
     val templateRepository: TemplateRepository by lazy {
-        TemplateRepository(database.templateDao())
+        templateRepositoryImpl
     }
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
@@ -76,7 +81,7 @@ class NexNoteApp : Application() {
     override fun onCreate() {
         super.onCreate()
         appScope.launch {
-            templateRepository.initializePredefinedTemplates()
+            templateRepositoryImpl.initializePredefinedTemplates()
         }
     }
 }

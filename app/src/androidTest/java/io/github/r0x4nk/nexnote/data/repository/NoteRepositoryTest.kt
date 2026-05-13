@@ -18,7 +18,7 @@ import androidx.room.Room
 class NoteRepositoryTest {
 
     private lateinit var db: NexNoteDatabase
-    private lateinit var repository: NoteRepository
+    private lateinit var repository: NoteRepositoryImpl
     private lateinit var imageStorage: NoOpNoteImageStorage
 
     @Before
@@ -28,7 +28,7 @@ class NoteRepositoryTest {
             .allowMainThreadQueries()
             .build()
         imageStorage = NoOpNoteImageStorage()
-        repository = NoteRepository(db.noteDao(), imageStorage)
+        repository = NoteRepositoryImpl(db.noteDao(), imageStorage)
     }
 
     @After

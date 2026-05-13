@@ -4,12 +4,19 @@ import io.github.r0x4nk.nexnote.data.db.TemplateDao
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.domain.model.PredefinedTemplates
 import io.github.r0x4nk.nexnote.domain.model.Template
+import io.github.r0x4nk.nexnote.domain.repository.TemplateRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class TemplateRepository(
+/**
+ * Room-backed implementation of the domain [TemplateRepository] contract.
+ *
+ * The `Impl` suffix keeps the data-layer implementation distinct from the
+ * domain interface, matching the note and tag repositories.
+ */
+class TemplateRepositoryImpl(
     private val dao: TemplateDao
-) : io.github.r0x4nk.nexnote.domain.repository.TemplateRepository {
+) : TemplateRepository {
 
     /** Flow of all templates: predefined first, then custom templates alphabetically. */
     override val allTemplates: Flow<List<Template>> =
