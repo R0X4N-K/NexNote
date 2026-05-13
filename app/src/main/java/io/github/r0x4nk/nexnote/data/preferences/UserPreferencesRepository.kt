@@ -20,6 +20,17 @@ import java.io.IOException
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
+private val Flow<Preferences>.safe: Flow<Preferences>
+    get() = catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+
+private inline fun <reified E : Enum<E>> Flow<Preferences>.observeEnum(
+    key: Preferences.Key<String>,
+    default: E
+): Flow<E> = safe.map { prefs ->
+    val name = prefs[key] ?: default.name
+    enumValues<E>().firstOrNull { it.name == name } ?: default
+}
+
 class UserPreferencesRepository(private val context: Context) : IUserPreferencesRepository {
 
     companion object {
@@ -32,41 +43,25 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         // EDITOR_BACKGROUND_KEY removed — per-note color replaced the global background setting.
     }
 
-    override val themeMode: Flow<ThemeMode> = context.dataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
-        .map { prefs ->
-            val name = prefs[THEME_MODE_KEY] ?: ThemeMode.SYSTEM.name
-            ThemeMode.entries.firstOrNull { it.name == name } ?: ThemeMode.SYSTEM
-        }
+    override val themeMode: Flow<ThemeMode> =
+        context.dataStore.data.observeEnum(THEME_MODE_KEY, ThemeMode.SYSTEM)
 
-    override val fontScale: Flow<FontScale> = context.dataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
-        .map { prefs ->
-            val name = prefs[FONT_SCALE_KEY] ?: FontScale.NORMAL.name
-            FontScale.entries.firstOrNull { it.name == name } ?: FontScale.NORMAL
-        }
+    override val fontScale: Flow<FontScale> =
+        context.dataStore.data.observeEnum(FONT_SCALE_KEY, FontScale.NORMAL)
 
     override val timezoneId: Flow<String> = context.dataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .safe
         .map { prefs -> prefs[TIMEZONE_KEY] ?: "" }
 
     override val isLeftHanded: Flow<Boolean> = context.dataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .safe
         .map { prefs -> prefs[LEFT_HANDED_KEY] ?: false }
 
-    override val accentColor: Flow<AccentColor> = context.dataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
-        .map { prefs ->
-            val name = prefs[ACCENT_COLOR_KEY] ?: AccentColor.VIOLET.name
-            AccentColor.entries.firstOrNull { it.name == name } ?: AccentColor.VIOLET
-        }
+    override val accentColor: Flow<AccentColor> =
+        context.dataStore.data.observeEnum(ACCENT_COLOR_KEY, AccentColor.VIOLET)
 
-    override val noteCardStyle: Flow<NoteCardStyle> = context.dataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
-        .map { prefs ->
-            val name = prefs[NOTE_CARD_STYLE_KEY] ?: NoteCardStyle.TITLE_AND_PREVIEW.name
-            NoteCardStyle.entries.firstOrNull { it.name == name } ?: NoteCardStyle.TITLE_AND_PREVIEW
-        }
+    override val noteCardStyle: Flow<NoteCardStyle> =
+        context.dataStore.data.observeEnum(NOTE_CARD_STYLE_KEY, NoteCardStyle.TITLE_AND_PREVIEW)
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { prefs -> prefs[THEME_MODE_KEY] = mode.name }

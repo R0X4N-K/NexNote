@@ -14,21 +14,17 @@ internal class EditorLoadDelegate(
     private val scheduleAutosave: () -> Unit,
     private val resetContentHistory: (content: String, selectionOffset: Int?) -> Unit
 ) {
-    suspend fun loadInitial(
-        noteId: Long,
-        templateId: Long,
-        editTemplateId: Long
-    ) {
+    suspend fun loadInitial(mode: EditorMode) {
         NexNoteDebugLog.viewModel(
             event = "loadInitial",
-            details = "routeNoteId=$noteId routeTemplateId=$templateId " +
-                "routeEditTemplateId=$editTemplateId"
+            details = mode.debugRouteSummary()
         )
-        when {
-            editTemplateId != EditorViewModel.NO_ID -> loadTemplateForEdit(editTemplateId)
-            noteId != EditorViewModel.NO_ID -> loadNote(noteId)
-            templateId != EditorViewModel.NO_ID -> loadTemplate(templateId)
-            else -> finishEmptyEditorLoad()
+        when (mode) {
+            is EditorMode.EditTemplate -> loadTemplateForEdit(mode.templateId)
+            is EditorMode.ExistingNote -> loadNote(mode.noteId)
+            is EditorMode.NewFromTemplate -> loadTemplate(mode.templateId)
+            EditorMode.NewNote -> finishEmptyEditorLoad()
+            EditorMode.NewTemplate -> startNewTemplate()
         }
     }
 
@@ -101,17 +97,17 @@ internal class EditorLoadDelegate(
         scheduleAutosave()
     }
 
+    private fun startNewTemplate() {
+        NexNoteDebugLog.viewModel(event = "startNewTemplate")
+        uiState.update { it.copy(isTemplateMode = true, isLoading = false) }
+        resetContentHistory("", null)
+    }
+
     private suspend fun loadTemplateForEdit(editTemplateId: Long) {
         NexNoteDebugLog.viewModel(
             event = "loadTemplateForEditStart",
             details = "editTemplateId=$editTemplateId"
         )
-        if (editTemplateId == EditorViewModel.NEW_TEMPLATE_ID) {
-            uiState.update { it.copy(isTemplateMode = true, isLoading = false) }
-            resetContentHistory("", null)
-            return
-        }
-
         val template = getTemplateById(editTemplateId)
         if (template == null) {
             NexNoteDebugLog.viewModel(

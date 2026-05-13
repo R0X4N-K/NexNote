@@ -40,6 +40,14 @@ private data class NoteCardTextState(
     val content: AnnotatedString
 )
 
+/**
+ * Renders the visual body of [NoteCard] after swipe and collapse handling.
+ *
+ * The public card owns gestures and dismissal; this component owns the stable
+ * card surface, note colors, markdown-aware compact text, search highlights,
+ * and pin affordance. Keeping that split lets the note body be tested and
+ * evolved without coupling it to Material swipe state.
+ */
 @Composable
 internal fun NoteCardContent(
     note: Note,

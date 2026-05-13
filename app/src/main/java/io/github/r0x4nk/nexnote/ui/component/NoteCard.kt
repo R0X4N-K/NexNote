@@ -21,10 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.ui.common.EditorMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-
-private const val TRASH_COLLAPSE_DELAY_MS = 280L
 
 /**
  * Card for a single note in list and grid views.
@@ -134,7 +133,7 @@ private fun TrashAfterCollapseEffect(
     LaunchedEffect(collapsedState.value) {
         if (!collapsedState.value) return@LaunchedEffect
 
-        delay(TRASH_COLLAPSE_DELAY_MS)
+        delay(EditorMotion.NOTE_CARD_TRASH_DELAY_MS)
         currentOnTrash()
 
         // Reset before Room can remove this keyed item from composition; otherwise
@@ -153,8 +152,8 @@ private fun DismissibleNoteCard(
 ) {
     AnimatedVisibility(
         visible = !collapsed,
-        exit = shrinkVertically(animationSpec = tween(durationMillis = 250)) +
-            fadeOut(animationSpec = tween(durationMillis = 200)),
+        exit = shrinkVertically(animationSpec = tween(durationMillis = EditorMotion.NOTE_CARD_EXIT_SHRINK_MS)) +
+            fadeOut(animationSpec = tween(durationMillis = EditorMotion.NOTE_CARD_EXIT_FADE_MS)),
         modifier = modifier
     ) {
         SwipeToDismissBox(

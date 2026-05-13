@@ -9,29 +9,23 @@ import java.util.TimeZone
 object DateUtils {
 
     /** Formats a timestamp as "dd/MM/yyyy" using the given timezone (device default if null). */
-    fun formatDate(timestamp: Long, timezone: String? = null): String {
-        val tz = if (timezone != null) TimeZone.getTimeZone(timezone)
-        else TimeZone.getDefault()
-        return SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            .apply { this.timeZone = tz }
-            .format(Date(timestamp))
-    }
+    fun formatDate(timestamp: Long, timezone: String? = null): String =
+        format(timestamp, pattern = "dd/MM/yyyy", timezone = timezone)
 
     /** Formats a timestamp as "dd/MM/yyyy HH:mm". */
-    fun formatDateTime(timestamp: Long, timezone: String? = null): String {
-        val tz = if (timezone != null) TimeZone.getTimeZone(timezone)
-        else TimeZone.getDefault()
-        return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-            .apply { this.timeZone = tz }
-            .format(Date(timestamp))
-    }
+    fun formatDateTime(timestamp: Long, timezone: String? = null): String =
+        format(timestamp, pattern = "dd/MM/yyyy HH:mm", timezone = timezone)
 
     /** Formats a timestamp as "dd/MM/yyyy HH:mm zzz" (with abbreviated timezone). */
-    fun formatDateWithTimezone(timestamp: Long, timezone: String): String {
-        return SimpleDateFormat("dd/MM/yyyy HH:mm zzz", Locale.getDefault())
-            .apply { this.timeZone = TimeZone.getTimeZone(timezone) }
+    fun formatDateWithTimezone(timestamp: Long, timezone: String): String =
+        format(timestamp, pattern = "dd/MM/yyyy HH:mm zzz", timezone = timezone)
+
+    private fun format(timestamp: Long, pattern: String, timezone: String?): String =
+        SimpleDateFormat(pattern, Locale.getDefault())
+            .apply {
+                timeZone = timezone?.let(TimeZone::getTimeZone) ?: TimeZone.getDefault()
+            }
             .format(Date(timestamp))
-    }
 
     /**
      * Formats a timestamp as a human-readable relative string.

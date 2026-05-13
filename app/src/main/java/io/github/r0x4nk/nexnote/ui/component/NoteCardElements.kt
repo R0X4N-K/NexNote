@@ -25,6 +25,12 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.util.DateUtils
 
+/**
+ * Header row for a note card: title text plus the pin toggle.
+ *
+ * The title is already markdown/search-highlight aware when it reaches this
+ * function, so the row only handles layout, truncation, and the pinned control.
+ */
 @Composable
 internal fun NoteCardTitleRow(
     title: AnnotatedString,
@@ -44,6 +50,12 @@ internal fun NoteCardTitleRow(
     }
 }
 
+/**
+ * Two-line preview text shown by the default note card style.
+ *
+ * It receives an [AnnotatedString] so compact markdown styling and search
+ * highlights survive the card-level truncation.
+ */
 @Composable
 internal fun NoteCardPreview(content: AnnotatedString) {
     Text(
@@ -55,6 +67,12 @@ internal fun NoteCardPreview(content: AnnotatedString) {
     )
 }
 
+/**
+ * Footer metadata for a note card.
+ *
+ * Displays the relative modification time and a compact Markdown marker when
+ * the source note should render with markdown semantics.
+ */
 @Composable
 internal fun NoteCardFooter(
     note: Note,
@@ -83,6 +101,12 @@ internal fun NoteCardFooter(
     }
 }
 
+/**
+ * Decides whether the card can show body preview text for the current style.
+ *
+ * Empty-title notes promote their first content line into the title slot, so
+ * showing the same content again as a preview would be redundant.
+ */
 internal fun showsContentPreview(note: Note, noteCardStyle: NoteCardStyle): Boolean =
     noteCardStyle == NoteCardStyle.TITLE_AND_PREVIEW &&
         note.title.isNotBlank() &&

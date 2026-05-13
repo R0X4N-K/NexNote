@@ -2,37 +2,40 @@ package io.github.r0x4nk.nexnote.ui.screen.templates
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.component.NexSectionLabel
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 
 @Composable
 internal fun TemplatesCollection(
     uiState: TemplatesUiState,
     padding: PaddingValues,
+    floatingBottomPadding: Dp,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
     onDelete: (Template) -> Unit
 ) {
     val contentModifier = Modifier.fillMaxSize().padding(padding)
+    val bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
 
     if (uiState.viewMode == NoteListViewMode.GRID) {
         TemplatesGrid(
             predefined = uiState.predefined,
             custom = uiState.custom,
+            bottomContentPadding = bottomContentPadding,
             onApply = onApply,
             onEdit = onEdit,
             onDelete = onDelete,
@@ -42,6 +45,7 @@ internal fun TemplatesCollection(
         TemplatesList(
             predefined = uiState.predefined,
             custom = uiState.custom,
+            bottomContentPadding = bottomContentPadding,
             onApply = onApply,
             onEdit = onEdit,
             onDelete = onDelete,
@@ -54,6 +58,7 @@ internal fun TemplatesCollection(
 private fun TemplatesList(
     predefined: List<Template>,
     custom: List<Template>,
+    bottomContentPadding: Dp,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
     onDelete: (Template) -> Unit,
@@ -61,7 +66,12 @@ private fun TemplatesList(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 8.dp,
+            end = 16.dp,
+            bottom = bottomContentPadding
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (predefined.isNotEmpty()) {
@@ -87,8 +97,6 @@ private fun TemplatesList(
                 )
             }
         }
-
-        item { Spacer(Modifier.height(80.dp)) }
     }
 }
 
@@ -96,20 +104,26 @@ private fun TemplatesList(
 private fun TemplatesGrid(
     predefined: List<Template>,
     custom: List<Template>,
+    bottomContentPadding: Dp,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
     onDelete: (Template) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(2),
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            top = 8.dp,
+            end = 12.dp,
+            bottom = bottomContentPadding
+        ),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalItemSpacing = 8.dp
     ) {
         if (predefined.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(span = StaggeredGridItemSpan.FullLine) {
                 SectionHeader("Predefined")
             }
             items(predefined, key = { it.id }) { template ->
@@ -123,7 +137,7 @@ private fun TemplatesGrid(
         }
 
         if (custom.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(span = StaggeredGridItemSpan.FullLine) {
                 SectionHeader("My templates")
             }
             items(custom, key = { it.id }) { template ->
@@ -134,10 +148,6 @@ private fun TemplatesGrid(
                     onDelete = { onDelete(template) }
                 )
             }
-        }
-
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Spacer(Modifier.height(80.dp))
         }
     }
 }

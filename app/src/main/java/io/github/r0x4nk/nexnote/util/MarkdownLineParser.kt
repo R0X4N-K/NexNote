@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
@@ -69,7 +70,12 @@ private fun AnnotatedString.Builder.appendCheckboxContent(
     colors: MarkdownColors
 ) {
     if (checked) {
-        withStyle(SpanStyle(color = Color.Gray)) {
+        withStyle(
+            SpanStyle(
+                color = Color.Gray,
+                textDecoration = TextDecoration.LineThrough
+            )
+        ) {
             appendInlineSpans(content, colors)
         }
     } else {

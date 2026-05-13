@@ -72,6 +72,7 @@ private fun TemplatesScreenScaffold(
         TemplatesScreenContent(
             uiState = uiState,
             padding = padding,
+            floatingBottomPadding = floatingBottomPadding,
             actions = actions
         )
     }
@@ -100,6 +101,7 @@ private fun TemplatesTopBarSlot(
 private fun TemplatesScreenContent(
     uiState: TemplatesUiState,
     padding: PaddingValues,
+    floatingBottomPadding: Dp,
     actions: TemplatesLayoutActions
 ) {
     when {
@@ -118,6 +120,7 @@ private fun TemplatesScreenContent(
             TemplatesCollection(
                 uiState = uiState,
                 padding = padding,
+                floatingBottomPadding = floatingBottomPadding,
                 onApply = actions.onNavigateToApplyTemplate,
                 onEdit = actions.onNavigateToEditTemplate,
                 onDelete = actions.onRequestDelete

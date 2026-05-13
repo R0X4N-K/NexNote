@@ -281,6 +281,15 @@ class MarkdownParserInlineTest {
     }
 
     @Test
+    fun checkboxChecked_textIsStruckThrough() {
+        val result = parse("- [x] completed")
+        val strikeSpan = result.spanStyles.firstOrNull {
+            it.item.textDecoration == TextDecoration.LineThrough
+        }
+        assertNotNull("Checked checkbox text must be struck through", strikeSpan)
+    }
+
+    @Test
     fun escape_asterisk_emitsLiteralAsterisk() {
         val result = parse("""\*not italic\*""")
         assertEquals("*not italic*", result.text)

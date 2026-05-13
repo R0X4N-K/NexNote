@@ -31,7 +31,6 @@ internal const val DIRECT_PREVIEW_FIRST_COMPOSITION_DELAY_MS = 220L
 // Keeps long edit-mode text field hydration out of the navigation enter animation.
 internal const val DIRECT_EDIT_TEXT_FIELD_SYNC_DELAY_MS = DIRECT_PREVIEW_FIRST_COMPOSITION_DELAY_MS
 internal const val DIRECT_EDIT_TEXT_FIELD_SYNC_DEFER_MIN_CHARS = 2_000
-internal const val MARKDOWN_CHECKLIST_SNIPPET = "\n- [ ] "
 internal const val MARKDOWN_WEB_LINK_SNIPPET = "\n[text](url)"
 internal const val EDITOR_MARKDOWN_ENABLED = true
 internal val SWIPE_DISTANCE_THRESHOLD_DP = 56

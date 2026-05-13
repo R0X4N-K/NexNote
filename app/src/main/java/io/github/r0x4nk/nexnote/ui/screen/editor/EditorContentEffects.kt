@@ -252,23 +252,26 @@ internal fun EditorErrorSnackbarEffect(
  * Requests initial focus when the editor opens.
  *
  * - Template-creation flow: focus the title so the user can name the template.
+ * - Template-editing flow: focus the title because the template name is editable.
  * - Brand-new note: focus the content field so typing starts immediately.
  * - Existing note: keep the previous focus owner (no-op).
  */
 @Composable
 internal fun EditorInitialFocusEffect(
-    noteId: Long,
-    editTemplateId: Long,
+    mode: EditorMode,
     state: EditorScreenState
 ) {
-    LaunchedEffect(noteId, editTemplateId) {
-        when {
-            editTemplateId != EditorViewModel.NO_ID -> {
+    LaunchedEffect(mode) {
+        when (mode) {
+            is EditorMode.EditTemplate,
+            EditorMode.NewTemplate -> {
                 runCatching { state.titleFocusRequester.requestFocus() }
             }
-            noteId == EditorViewModel.NO_ID -> {
+            is EditorMode.NewFromTemplate,
+            EditorMode.NewNote -> {
                 runCatching { state.contentFocusRequester.requestFocus() }
             }
+            is EditorMode.ExistingNote -> Unit
         }
     }
 }

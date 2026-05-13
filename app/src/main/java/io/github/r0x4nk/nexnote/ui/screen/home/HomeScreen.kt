@@ -4,8 +4,8 @@ import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
@@ -56,7 +56,7 @@ fun HomeScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val searchFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
+    val gridState = rememberLazyStaggeredGridState()
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
 
@@ -101,6 +101,7 @@ fun HomeScreen(
             onTogglePin = viewModel::togglePin,
             onRequestTrash = viewModel::requestTrash,
             onRequestNoteActions = { note -> activeActionsNote = note },
+            floatingBottomPadding = floatingBottomPadding,
             modifier = Modifier.padding(innerPadding)
         )
     }

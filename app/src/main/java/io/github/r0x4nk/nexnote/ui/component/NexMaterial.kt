@@ -40,6 +40,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+/**
+ * Returns the app-wide Material 3 top app bar colors.
+ *
+ * Screens use this helper instead of calling [TopAppBarDefaults] directly so
+ * the scrolled container, icon colors, and title contrast stay consistent
+ * across every top bar.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun nexTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
@@ -127,6 +134,13 @@ private fun nexIconButtonColors(
     }
 }
 
+/**
+ * Search field styled for compact app chrome.
+ *
+ * The component wraps a [BasicTextField] so screens can opt into autofocus via
+ * [focusRequester], customize text style, and still keep the same rounded
+ * container, search icon, cursor color, and IME search handling everywhere.
+ */
 @Composable
 fun NexSearchField(
     value: String,
@@ -187,6 +201,12 @@ fun NexSearchField(
     }
 }
 
+/**
+ * Centered empty-state block for screens whose primary list has no content.
+ *
+ * Callers provide the icon and copy while this component owns the shared
+ * spacing, icon container, and subdued text styling used by list-like screens.
+ */
 @Composable
 fun NexEmptyState(
     icon: ImageVector,
@@ -234,6 +254,13 @@ fun NexEmptyState(
     }
 }
 
+/**
+ * Small section heading used to separate groups of settings or actions.
+ *
+ * It intentionally keeps the color tied to [MaterialTheme.colorScheme.primary]
+ * so repeated sections read as navigation landmarks without becoming large
+ * visual headers.
+ */
 @Composable
 fun NexSectionLabel(
     text: String,

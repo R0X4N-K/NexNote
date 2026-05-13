@@ -4,11 +4,13 @@ import android.app.Application
 import io.github.r0x4nk.nexnote.data.db.NexNoteDatabase
 import io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage
 import io.github.r0x4nk.nexnote.data.preferences.UserPreferencesRepository
-import io.github.r0x4nk.nexnote.data.repository.NoteRepository
-import io.github.r0x4nk.nexnote.data.repository.TagRepository
+import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
+import io.github.r0x4nk.nexnote.data.repository.TagRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TemplateRepository
 import io.github.r0x4nk.nexnote.di.AppUseCases
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
+import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
+import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,7 +36,7 @@ class NexNoteApp : Application() {
     }
 
     val noteRepository: NoteRepository by lazy {
-        NoteRepository(
+        NoteRepositoryImpl(
             dao = database.noteDao(),
             imageStorage = noteImageStorage,
             appScope = appScope
@@ -54,7 +56,7 @@ class NexNoteApp : Application() {
      * This keeps tag maintenance away from the full note persistence API.
      */
     val tagRepository: TagRepository by lazy {
-        TagRepository(
+        TagRepositoryImpl(
             database = database,
             tagDao = database.tagDao(),
             noteContentPatchDao = database.noteContentPatchDao()

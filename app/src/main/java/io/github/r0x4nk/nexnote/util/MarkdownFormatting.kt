@@ -139,27 +139,28 @@ object MarkdownLineToggle {
         toggleLinePrefix(text, selection, "> ", Regex("""^>\s?"""))
 
     fun unorderedList(text: String, selection: TextRange): MarkdownTextEdit =
-        toggleLinePrefix(text, selection, "- ", Regex("""^\s*[*+\-]\s+"""))
+        toggleListMarker(
+            text = text,
+            selection = selection,
+            targetMarker = { "- " },
+            targetPrefix = UNORDERED_LIST_ONLY
+        )
 
     fun orderedList(text: String, selection: TextRange): MarkdownTextEdit =
-        editSelectedLines(text, selection) { lines ->
-            val nonBlank = lines.filter { it.isNotBlank() }
-            val allOrdered = nonBlank.isNotEmpty() && nonBlank.all { ORDERED_LIST.containsMatchIn(it) }
-            // When the cursor is on a single empty line the user simply wants
-            // a numbered marker inserted so they can start typing the first
-            // item — without this the click would silently do nothing.
-            if (lines.size == 1 && lines.single().isBlank()) {
-                return@editSelectedLines listOf("1. ")
-            }
-            lines.mapIndexed { index, line ->
-                when {
-                    allOrdered -> ORDERED_LIST.replace(line, "")
-                    line.isBlank() -> line
-                    else -> "${index + 1}. $line"
-                }
-            }
-        }
+        toggleListMarker(
+            text = text,
+            selection = selection,
+            targetMarker = { index -> "${index + 1}. " },
+            targetPrefix = ORDERED_LIST
+        )
 
+    fun taskList(text: String, selection: TextRange): MarkdownTextEdit =
+        toggleListMarker(
+            text = text,
+            selection = selection,
+            targetMarker = { "- [ ] " },
+            targetPrefix = TASK_LIST
+        )
 
     fun codeBlock(text: String, selection: TextRange): MarkdownTextEdit {
         val safeSelection = selection.normalized().coerceIn(text.length)
@@ -213,6 +214,31 @@ object MarkdownLineToggle {
             }
         }
 
+    private fun toggleListMarker(
+        text: String,
+        selection: TextRange,
+        targetMarker: (itemIndex: Int) -> String,
+        targetPrefix: Regex
+    ): MarkdownTextEdit =
+        editSelectedLines(text, selection) { lines ->
+            if (lines.size == 1 && lines.single().isBlank()) {
+                return@editSelectedLines listOf(targetMarker(0))
+            }
+
+            val nonBlankLines = lines.filter { it.isNotBlank() }
+            val removeMarker = nonBlankLines.isNotEmpty() &&
+                nonBlankLines.all { targetPrefix.containsMatchIn(it) }
+            var itemIndex = 0
+
+            lines.map { line ->
+                when {
+                    line.isBlank() -> line
+                    removeMarker -> line.withoutListMarker()
+                    else -> line.withListMarker(targetMarker(itemIndex++))
+                }
+            }
+        }
+
     private fun editSelectedLines(
         text: String,
         selection: TextRange,
@@ -238,6 +264,9 @@ object MarkdownLineToggle {
 private val HEADING = Regex("""^(#{1,3})\s+(.*)$""")
 private val ANY_HEADING = Regex("""^#{1,6}\s+""")
 private val ORDERED_LIST = Regex("""^\s*\d+\.\s+""")
+private val TASK_LIST = Regex("""^\s*[*+\-]\s+\[[ xX]]\s+""")
+private val UNORDERED_LIST_ONLY = Regex("""^\s*[*+\-]\s+(?!\[[ xX]]\s+)""")
+private val ANY_LIST_MARKER = Regex("""^(\s*)(?:[*+\-]\s+\[[ xX]]\s+|[*+\-]\s+|\d+\.\s+)""")
 
 private fun TextRange.normalized(): TextRange =
     if (start <= end) this else TextRange(end, start)
@@ -247,6 +276,25 @@ private fun TextRange.coerceIn(textLength: Int): TextRange =
 
 private fun String.hasRange(start: Int, end: Int, value: String): Boolean =
     start >= 0 && end <= length && substring(start, end) == value
+
+private fun String.withListMarker(marker: String): String {
+    val existing = ANY_LIST_MARKER.find(this)
+    if (existing != null) {
+        val indent = existing.groupValues[1]
+        return indent + marker + substring(existing.value.length)
+    }
+
+    val indentLength = leadingWhitespaceLength()
+    return substring(0, indentLength) + marker + substring(indentLength)
+}
+
+private fun String.withoutListMarker(): String {
+    val existing = ANY_LIST_MARKER.find(this) ?: return this
+    return existing.groupValues[1] + substring(existing.value.length)
+}
+
+private fun String.leadingWhitespaceLength(): Int =
+    indexOfFirst { !it.isWhitespace() }.let { index -> if (index == -1) length else index }
 
 private fun String.lineStartFor(offset: Int): Int =
     if (offset <= 0) {

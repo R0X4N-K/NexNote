@@ -8,6 +8,7 @@ import io.github.r0x4nk.nexnote.data.db.TagWithCount
 import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
 import io.github.r0x4nk.nexnote.data.db.entity.TagEntity
 import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.TagParser
 import kotlinx.coroutines.flow.Flow
@@ -15,23 +16,23 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
- * Repository for the tag system.
+ * Room-backed implementation of the domain [TagRepository] contract.
  *
  * Role: data layer — bridges the DAO layer and the domain/ViewModel layer.
  *
  * [noteContentPatchDao] is injected alongside [tagDao] because tag deletion
  * must patch note content directly (stripping '#' prefixes) without going
- * through [NoteRepository], which would trigger a full note-save cycle and
+ * through [NoteRepositoryImpl], which would trigger a full note-save cycle and
  * re-index tags unnecessarily.
  *
  * All Flow-returning methods are observed reactively by the UI. Room re-emits
  * whenever the underlying `tags` or `note_tag_cross_ref` tables change.
  */
-class TagRepository(
+class TagRepositoryImpl(
     private val database: RoomDatabase,
     private val tagDao: TagDao,
     private val noteContentPatchDao: NoteContentPatchDao
-) : io.github.r0x4nk.nexnote.domain.repository.TagRepository {
+) : TagRepository {
 
     // ── Queries ───────────────────────────────────────────────────────────────
 

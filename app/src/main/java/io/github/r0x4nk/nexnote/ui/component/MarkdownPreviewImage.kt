@@ -52,11 +52,15 @@ private data class MarkdownImageLoadResult(
 // ── Public composable ───────────────────────────────────────────────────
 
 /**
- * Loads and renders a local image asynchronously.
+ * Loads and renders an image referenced by a markdown note.
  *
- * - `imageFileProvider == null` -> text placeholder
- * - File missing / decode error -> broken-image icon
- * - Otherwise -> full-width image with rounded corners
+ * The preview only receives the relative path stored in markdown. Callers
+ * provide [imageFileProvider] to resolve that path into the app's note image
+ * storage; when the provider is missing the component falls back to a text
+ * placeholder so read-only previews can still render outside the editor.
+ *
+ * The image frame uses a bounds-only decode first so loading, missing, and
+ * decoded states keep the same aspect ratio and do not jump during async load.
  */
 @Composable
 internal fun MarkdownImageBlock(

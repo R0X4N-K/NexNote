@@ -15,12 +15,10 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SearchNotesScoredUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
+import io.github.r0x4nk.nexnote.ui.common.NoteListActionsDelegate
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
-import io.github.r0x4nk.nexnote.ui.common.displayLabel
-import io.github.r0x4nk.nexnote.ui.common.toTrashedNoteEvent
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,16 +28,15 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 class HomeViewModel(
     private val searchNotesScored: SearchNotesScoredUseCase,
     private val observeAllNotesSortedAsc: ObserveAllNotesSortedAscUseCase,
     private val observeAllNotes: ObserveAllNotesUseCase,
-    private val moveNoteToTrash: MoveNoteToTrashUseCase,
-    private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
-    private val toggleNotePin: ToggleNotePinUseCase,
-    private val duplicateNoteUseCase: DuplicateNoteUseCase? = null,
+    moveNoteToTrash: MoveNoteToTrashUseCase,
+    restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
+    toggleNotePin: ToggleNotePinUseCase,
+    duplicateNoteUseCase: DuplicateNoteUseCase? = null,
     private val observeTemplates: ObserveTemplatesUseCase? = null,
     private val observeMostUsedTags: ObserveMostUsedTagsUseCase? = null,
     private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase? = null,
@@ -64,6 +61,19 @@ class HomeViewModel(
 
     private val _noteActionMessages = Channel<String>(Channel.BUFFERED)
     val noteActionMessages: Flow<String> = _noteActionMessages.receiveAsFlow()
+
+    private val noteListActions = NoteListActionsDelegate(
+        scope = viewModelScope,
+        moveNoteToTrash = moveNoteToTrash,
+        restoreNoteFromTrash = restoreNoteFromTrash,
+        toggleNotePin = toggleNotePin,
+        duplicateNoteUseCase = duplicateNoteUseCase,
+        sortOrder = _sortOrder,
+        viewMode = _viewMode,
+        selectedTagFilters = _selectedTagFilters,
+        trashEvents = _trashEvents,
+        noteActionMessages = _noteActionMessages
+    )
 
     /**
      * Templates are loaded once and kept hot for the duration of the ViewModel.
@@ -164,15 +174,11 @@ class HomeViewModel(
     }
 
     fun toggleSortOrder() {
-        _sortOrder.update { current ->
-            if (current == SortOrder.MODIFIED_DESC) SortOrder.MODIFIED_ASC else SortOrder.MODIFIED_DESC
-        }
+        noteListActions.toggleSortOrder()
     }
 
     fun toggleViewMode() {
-        _viewMode.update { current ->
-            if (current == NoteListViewMode.LIST) NoteListViewMode.GRID else NoteListViewMode.LIST
-        }
+        noteListActions.toggleViewMode()
     }
 
     fun showTemplatePicker() {
@@ -190,19 +196,17 @@ class HomeViewModel(
      * otherwise it is added. An empty filter set means "show all notes".
      */
     fun toggleTagFilter(tagName: String) {
-        _selectedTagFilters.update { current ->
-            if (tagName in current) current - tagName else current + tagName
-        }
+        noteListActions.toggleTagFilter(tagName)
     }
 
     /** Removes a single tag from the active filters. */
     fun removeTagFilter(tagName: String) {
-        _selectedTagFilters.update { it - tagName }
+        noteListActions.removeTagFilter(tagName)
     }
 
     /** Clears all active tag filters, restoring the full note list. */
     fun clearTagFilters() {
-        _selectedTagFilters.update { emptySet() }
+        noteListActions.clearTagFilters()
     }
 
     // ── Trash actions ─────────────────────────────────────────────────────────
@@ -224,11 +228,7 @@ class HomeViewModel(
      * emitted the updated list — no in-memory filter is needed.
      */
     fun requestTrash(note: Note) {
-        val event = note.toTrashedNoteEvent()
-        viewModelScope.launch {
-            moveNoteToTrash(note.id)
-            _trashEvents.trySend(event)
-        }
+        noteListActions.requestTrash(note)
     }
 
     /**
@@ -236,8 +236,8 @@ class HomeViewModel(
      * The note is already in the database trash (written in [requestTrash]);
      * nothing else needs to happen here.
      */
-    fun confirmTrash(@Suppress("UNUSED_PARAMETER") noteId: Long) {
-        // No-op: Room flow already reflects the correct state.
+    fun confirmTrash() {
+        noteListActions.confirmTrash()
     }
 
     /**
@@ -246,26 +246,15 @@ class HomeViewModel(
      * issue a matching [restoreFromTrash] call to bring the note back.
      */
     fun undoPendingTrash(noteId: Long) {
-        viewModelScope.launch { restoreNoteFromTrash(noteId) }
+        noteListActions.undoPendingTrash(noteId)
     }
 
     fun togglePin(note: Note) {
-        viewModelScope.launch { toggleNotePin(note) }
+        noteListActions.togglePin(note)
     }
 
     fun duplicateNote(note: Note) {
-        val duplicate = duplicateNoteUseCase ?: return
-        val noteLabel = note.displayLabel()
-        viewModelScope.launch {
-            try {
-                duplicate(note)
-                _noteActionMessages.trySend("Duplicated \"$noteLabel\"")
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                _noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
-            }
-        }
+        noteListActions.duplicateNote(note)
     }
 
     companion object {

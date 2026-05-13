@@ -1,7 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.trash
 
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
-import io.github.r0x4nk.nexnote.data.repository.NoteRepository
+import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.EmptyTrashUseCase
@@ -40,7 +40,7 @@ class TrashViewModelTest {
         events.clear()
         fakeDao = FakeNoteDao(events)
         fakeImageStorage = FakeNoteImageStorage(events)
-        val repository = NoteRepository(fakeDao, fakeImageStorage)
+        val repository = NoteRepositoryImpl(fakeDao, fakeImageStorage)
         viewModel = TrashViewModel(
             observeDeletedNotes = ObserveDeletedNotesUseCase(repository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),

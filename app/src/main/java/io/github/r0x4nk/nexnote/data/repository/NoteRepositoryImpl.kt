@@ -7,6 +7,7 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
+import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.util.DateUtils
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.SearchUtils
@@ -18,11 +19,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 
-class NoteRepository(
+/**
+ * Room-backed implementation of the domain [NoteRepository] contract.
+ *
+ * The `Impl` suffix keeps the data-layer class distinct from the domain
+ * interface at call sites while preserving the repository role and API shape.
+ */
+class NoteRepositoryImpl(
     private val dao: NoteDao,
     private val imageStorage: NoteImageStorage,
     appScope: CoroutineScope? = null
-) : io.github.r0x4nk.nexnote.domain.repository.NoteRepository {
+) : NoteRepository {
 
     private val creationDateSnapshots: Flow<List<Long>> =
         dao.getAllCreationDates()

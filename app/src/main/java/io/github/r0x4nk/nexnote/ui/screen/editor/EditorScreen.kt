@@ -23,19 +23,18 @@ import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.ui.component.buildMarkdownBlockSourceRanges
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
+import io.github.r0x4nk.nexnote.util.MarkdownLineToggle
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EditorScreen(
-    noteId: Long,
-    templateId: Long,
-    editTemplateId: Long,
+    mode: EditorMode,
     navController: NavController,
     onExport: (() -> Unit)? = null,
     viewModel: EditorViewModel = viewModel(
-        factory = EditorViewModel.factory(noteId, templateId, editTemplateId)
+        factory = EditorViewModel.factory(mode)
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -44,7 +43,7 @@ fun EditorScreen(
     val selectedTagsInEditor by viewModel.selectedTagsInEditor.collectAsStateWithLifecycle()
     val noteLinkTargets by viewModel.noteLinkTargets.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val state = rememberEditorScreenState(noteId, templateId, editTemplateId)
+    val state = rememberEditorScreenState(mode)
     val context = LocalContext.current
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
@@ -59,11 +58,10 @@ fun EditorScreen(
     val noteBackground = uiState.backgroundColor?.let { adaptNoteColor(it, isDarkTheme) }
         ?: androidx.compose.material3.MaterialTheme.colorScheme.surface
 
-    LaunchedEffect(noteId, templateId, editTemplateId) {
+    LaunchedEffect(mode) {
         NexNoteDebugLog.editor(
             event = "routeEntered",
-            details = "routeNoteId=$noteId routeTemplateId=$templateId " +
-                "routeEditTemplateId=$editTemplateId ${uiState.debugEditorSummary()}"
+            details = "${mode.debugRouteSummary()} ${uiState.debugEditorSummary()}"
         )
     }
 
@@ -149,13 +147,14 @@ fun EditorScreen(
         isTemplateMode = uiState.isTemplateMode,
         state = state,
         launchImagePickerAtCursor = launchImagePickerAfterCommit,
+        onInsertChecklist = { applyMarkdownEdit(MarkdownLineToggle::taskList) },
         onInsertNoteLink = openNoteLinkPicker,
         onToggleColorPicker = toggleColorPicker,
         insertAtCursor = insertAtCursor,
         scope = scope
     )
     EditorErrorSnackbarEffect(uiState, state, viewModel)
-    EditorInitialFocusEffect(noteId, editTemplateId, state)
+    EditorInitialFocusEffect(mode, state)
     EditorTagEffects(
         viewModel = viewModel,
         uiState = uiState,
@@ -206,7 +205,7 @@ fun EditorScreen(
             else -> {
                 scope.launch {
                     viewModel.flushPendingChanges()
-                    navController.navigate(Screen.Editor.route(noteId = targetNoteId))
+                    navController.navigate(Screen.Editor.existingNoteRoute(targetNoteId))
                 }
             }
         }
@@ -234,7 +233,7 @@ fun EditorScreen(
         content = EditorScreenScaffoldContent(
             uiState = uiState,
             undoRedoState = undoRedoState,
-            noteId = noteId,
+            noteId = mode.routeNoteId,
             tagsForCurrentNote = tagsForCurrentNote,
             selectedTagsInEditor = selectedTagsInEditor,
             noteBackground = noteBackground,

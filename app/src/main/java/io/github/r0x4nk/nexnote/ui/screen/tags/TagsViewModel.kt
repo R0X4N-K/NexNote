@@ -214,7 +214,7 @@ class TagsViewModel(
         }
     }
 
-    fun confirmTrash(@Suppress("UNUSED_PARAMETER") noteId: Long) {
+    fun confirmTrash() {
         // No-op: the note was already moved to trash.
     }
 

@@ -3,7 +3,7 @@ package io.github.r0x4nk.nexnote.ui.screen.home
 import io.github.r0x4nk.nexnote.data.db.NoteDao
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
-import io.github.r0x4nk.nexnote.data.repository.NoteRepository
+import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
@@ -46,7 +46,7 @@ class HomeViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao = FakeNoteDao()
-        val repository = NoteRepository(fakeDao, NoOpNoteImageStorage())
+        val repository = NoteRepositoryImpl(fakeDao, NoOpNoteImageStorage())
         viewModel = HomeViewModel(
             searchNotesScored = SearchNotesScoredUseCase(repository),
             observeAllNotesSortedAsc = ObserveAllNotesSortedAscUseCase(repository),

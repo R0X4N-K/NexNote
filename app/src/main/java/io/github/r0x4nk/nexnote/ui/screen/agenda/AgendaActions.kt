@@ -22,7 +22,7 @@ internal data class AgendaActions(
     val onRequestTrash: (Note) -> Unit,
     val onRequestNoteActions: (Note) -> Unit,
     val onUndoTrash: (Long) -> Unit,
-    val onConfirmTrash: (Long) -> Unit
+    val onConfirmTrash: () -> Unit
 )
 
 @Composable

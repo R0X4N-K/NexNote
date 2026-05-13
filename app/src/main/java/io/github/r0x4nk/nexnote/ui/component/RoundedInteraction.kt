@@ -25,6 +25,10 @@ internal fun Modifier.roundedClickableTarget(
     onClick = onClick
 )
 
+/**
+ * Combined-click variant of [roundedClickableTarget] for surfaces that support
+ * both tap and long-press gestures while keeping ripple clipping consistent.
+ */
 internal fun Modifier.roundedCombinedClickableTarget(
     shape: Shape,
     enabled: Boolean = true,

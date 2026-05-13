@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.r0x4nk.nexnote.ui.common.EditorMotion
 
 /**
  * Base container alpha for the IME toolbar.
@@ -139,12 +140,12 @@ internal fun EditorKeyboardToolbar(
         visible = visible,
         enter = slideInVertically(
             initialOffsetY = { it },
-            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
-        ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+            animationSpec = tween(durationMillis = EditorMotion.IME_TOOLBAR_ENTER_MS, easing = FastOutSlowInEasing)
+        ) + fadeIn(animationSpec = tween(durationMillis = EditorMotion.IME_TOOLBAR_ENTER_FADE_MS)),
         exit = slideOutVertically(
             targetOffsetY = { it },
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
-        ) + fadeOut(animationSpec = tween(durationMillis = 140)),
+            animationSpec = tween(durationMillis = EditorMotion.IME_TOOLBAR_EXIT_MS, easing = FastOutSlowInEasing)
+        ) + fadeOut(animationSpec = tween(durationMillis = EditorMotion.IME_TOOLBAR_EXIT_FADE_MS)),
         modifier = modifier
     ) {
         DisposableEffect(Unit) {

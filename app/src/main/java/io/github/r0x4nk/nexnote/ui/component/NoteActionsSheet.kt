@@ -48,12 +48,25 @@ private const val NOTE_CLIP_LABEL = "NexNote note"
 
 private enum class NoteActionsPage { Actions, Copy }
 
+/**
+ * Clipboard operations exposed to note-list surfaces that can copy a note.
+ *
+ * Keeping these lambdas in a small immutable holder lets callers remember the
+ * clipboard/snackbar wiring once and pass a stable object into [NoteActionsSheet].
+ */
 @Immutable
 internal data class NoteClipboardCallbacks(
     val onCopyPlainText: (Note) -> Unit,
     val onCopyMarkdown: (Note) -> Unit
 )
 
+/**
+ * Creates clipboard callbacks that copy a note and report the result via a snackbar.
+ *
+ * The implementation stays in the component layer because it depends on Compose
+ * clipboard locals and on [SnackbarHostState], while callers only need the
+ * stable [NoteClipboardCallbacks] contract.
+ */
 @Composable
 internal fun rememberNoteClipboardCallbacks(
     snackbarHostState: SnackbarHostState
@@ -100,6 +113,13 @@ private suspend fun copyTextToClipboard(
     )
 }
 
+/**
+ * Bottom sheet for secondary note actions in list and agenda surfaces.
+ *
+ * The sheet owns the two-step copy flow (actions page, then copy format page)
+ * and dismisses itself after mutating actions so list ViewModels only receive
+ * domain-level callbacks such as duplicate, delete, or copy.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun NoteActionsSheet(

@@ -1,7 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.agenda
 
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
-import io.github.r0x4nk.nexnote.data.repository.NoteRepository
+import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
@@ -41,7 +41,7 @@ class AgendaViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao = AgendaFakeNoteDao()
-        val repository = NoteRepository(fakeDao, NoOpNoteImageStorage())
+        val repository = NoteRepositoryImpl(fakeDao, NoOpNoteImageStorage())
         viewModel = AgendaViewModel(
             observeDistinctLocalDays = ObserveDistinctLocalDaysUseCase(repository),
             observeNotesByDateRange = ObserveNotesByDateRangeUseCase(repository),

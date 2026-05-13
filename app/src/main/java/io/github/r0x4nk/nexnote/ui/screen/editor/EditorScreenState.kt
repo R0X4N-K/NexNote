@@ -127,11 +127,7 @@ internal class EditorScreenState(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun rememberEditorScreenState(
-    noteId: Long,
-    templateId: Long,
-    editTemplateId: Long
-): EditorScreenState = key(noteId, templateId, editTemplateId) {
+internal fun rememberEditorScreenState(mode: EditorMode): EditorScreenState = key(mode) {
     val snackbarHostState = remember { SnackbarHostState() }
     val contentScrollState = rememberScrollState()
     val previewListState = rememberLazyListState()
@@ -152,7 +148,7 @@ internal fun rememberEditorScreenState(
             contentFocusRequester = contentFocusRequester,
             searchFocusRequester = searchFocusRequester,
             contentTextFieldState = contentTextFieldState,
-            initialContentAnimationsEnabled = noteId == EditorViewModel.NO_ID,
+            initialContentAnimationsEnabled = mode.initialContentAnimationsEnabled,
             contentFieldValueState = contentFieldValueState,
             pendingImageInsertionOffsetState = pendingImageInsertionOffsetState,
             pendingContentScrollAnchorState = pendingContentScrollAnchorState

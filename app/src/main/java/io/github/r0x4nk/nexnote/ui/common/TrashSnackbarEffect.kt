@@ -14,7 +14,7 @@ internal fun TrashSnackbarEffect(
     trashEvents: Flow<TrashedNoteEvent>,
     snackbarHostState: SnackbarHostState,
     onUndoTrash: (Long) -> Unit,
-    onConfirmTrash: (Long) -> Unit
+    onConfirmTrash: () -> Unit
 ) {
     val currentOnUndoTrash by rememberUpdatedState(onUndoTrash)
     val currentOnConfirmTrash by rememberUpdatedState(onConfirmTrash)
@@ -41,10 +41,10 @@ internal suspend fun handleTrashSnackbarEvent(
     event: TrashedNoteEvent,
     showSnackbar: suspend (TrashedNoteEvent) -> SnackbarResult,
     onUndoTrash: (Long) -> Unit,
-    onConfirmTrash: (Long) -> Unit
+    onConfirmTrash: () -> Unit
 ) {
     when (showSnackbar(event)) {
         SnackbarResult.ActionPerformed -> onUndoTrash(event.noteId)
-        SnackbarResult.Dismissed -> onConfirmTrash(event.noteId)
+        SnackbarResult.Dismissed -> onConfirmTrash()
     }
 }

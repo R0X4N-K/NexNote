@@ -3,17 +3,15 @@ package io.github.r0x4nk.nexnote.ui.screen.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -22,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
@@ -30,13 +29,14 @@ import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 
 @Composable
 internal fun HomeContent(
     uiState: HomeUiState,
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
-    gridState: LazyGridState,
+    gridState: LazyStaggeredGridState,
     onNoteClick: (Long) -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
@@ -44,6 +44,7 @@ internal fun HomeContent(
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    floatingBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
     if (uiState.isLoading) {
@@ -61,6 +62,7 @@ internal fun HomeContent(
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
             onRequestNoteActions = onRequestNoteActions,
+            floatingBottomPadding = floatingBottomPadding,
             modifier = modifier
         )
     }
@@ -81,7 +83,7 @@ private fun HomeLoadedContent(
     uiState: HomeUiState,
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
-    gridState: LazyGridState,
+    gridState: LazyStaggeredGridState,
     onNoteClick: (Long) -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
@@ -89,6 +91,7 @@ private fun HomeLoadedContent(
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    floatingBottomPadding: Dp,
     modifier: Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -101,7 +104,8 @@ private fun HomeLoadedContent(
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
-            onRequestNoteActions = onRequestNoteActions
+            onRequestNoteActions = onRequestNoteActions,
+            bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
         )
     }
 }
@@ -146,11 +150,12 @@ private fun HomeNotesBody(
     uiState: HomeUiState,
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
-    gridState: LazyGridState,
+    gridState: LazyStaggeredGridState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit
+    onRequestNoteActions: (Note) -> Unit,
+    bottomContentPadding: Dp
 ) {
     if (uiState.notes.isEmpty()) {
         EmptyState(
@@ -167,7 +172,8 @@ private fun HomeNotesBody(
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
-            onRequestNoteActions = onRequestNoteActions
+            onRequestNoteActions = onRequestNoteActions,
+            bottomContentPadding = bottomContentPadding
         )
     }
 }
@@ -177,11 +183,12 @@ private fun HomeNoteCollection(
     uiState: HomeUiState,
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
-    gridState: LazyGridState,
+    gridState: LazyStaggeredGridState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit
+    onRequestNoteActions: (Note) -> Unit,
+    bottomContentPadding: Dp
 ) {
     val displayItems = rememberDisplayItems(uiState)
 
@@ -193,7 +200,8 @@ private fun HomeNoteCollection(
             onNoteClick,
             onTogglePin,
             onRequestTrash,
-            onRequestNoteActions
+            onRequestNoteActions,
+            bottomContentPadding
         )
     } else {
         HomeNoteList(
@@ -203,7 +211,8 @@ private fun HomeNoteCollection(
             onNoteClick,
             onTogglePin,
             onRequestTrash,
-            onRequestNoteActions
+            onRequestNoteActions,
+            bottomContentPadding
         )
     }
 }
@@ -227,19 +236,25 @@ private fun rememberDisplayItems(uiState: HomeUiState): List<ScoredNote> =
 private fun HomeNoteGrid(
     displayItems: List<ScoredNote>,
     noteCardStyle: NoteCardStyle,
-    gridState: LazyGridState,
+    gridState: LazyStaggeredGridState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit
+    onRequestNoteActions: (Note) -> Unit,
+    bottomContentPadding: Dp
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(2),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            top = 8.dp,
+            end = 12.dp,
+            bottom = bottomContentPadding
+        ),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalItemSpacing = 8.dp
     ) {
         items(
             items = displayItems,
@@ -267,12 +282,18 @@ private fun HomeNoteList(
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit
+    onRequestNoteActions: (Note) -> Unit,
+    bottomContentPadding: Dp
 ) {
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 8.dp,
+            end = 16.dp,
+            bottom = bottomContentPadding
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(
@@ -290,7 +311,6 @@ private fun HomeNoteList(
                 Modifier.animateItem()
             )
         }
-        item { Spacer(Modifier.height(32.dp)) }
     }
 }
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.ui.common.EditorMotion
 import io.github.r0x4nk.nexnote.util.MarkdownInlineToggle
 import io.github.r0x4nk.nexnote.util.MarkdownLineToggle
 import io.github.r0x4nk.nexnote.util.MarkdownTextEdit
@@ -229,7 +230,7 @@ private fun EditorScreenBody(
             onUndo = actions.onUndo,
             onRedo = actions.onRedo,
             onInsertImage = actions.onInsertImage,
-            onInsertChecklist = { actions.insertAtCursor(MARKDOWN_CHECKLIST_SNIPPET) },
+            onInsertChecklist = { actions.applyMarkdownEdit(MarkdownLineToggle::taskList) },
             onSetHeadingLevel = { level ->
                 content.state.showHeadingMenu = false
                 actions.applyMarkdownEdit { text, range ->
@@ -381,19 +382,19 @@ private fun EditorMetadataArea(
 private fun editorExpandEnter(): EnterTransition {
     return expandVertically(
         expandFrom = Alignment.Top,
-        animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing)
+        animationSpec = tween(durationMillis = EditorMotion.PANEL_EXPAND_MS, easing = FastOutSlowInEasing)
     ) + slideInVertically(
-        animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = EditorMotion.PANEL_EXPAND_MS, easing = FastOutSlowInEasing),
         initialOffsetY = { -it / 3 }
-    ) + fadeIn(animationSpec = tween(durationMillis = 140))
+    ) + fadeIn(animationSpec = tween(durationMillis = EditorMotion.PANEL_EXPAND_FADE_MS))
 }
 
 private fun editorExpandExit(): ExitTransition {
     return shrinkVertically(
         shrinkTowards = Alignment.Top,
-        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+        animationSpec = tween(durationMillis = EditorMotion.PANEL_COLLAPSE_MS, easing = FastOutSlowInEasing)
     ) + slideOutVertically(
-        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = EditorMotion.PANEL_COLLAPSE_MS, easing = FastOutSlowInEasing),
         targetOffsetY = { -it / 3 }
-    ) + fadeOut(animationSpec = tween(durationMillis = 110))
+    ) + fadeOut(animationSpec = tween(durationMillis = EditorMotion.PANEL_COLLAPSE_FADE_MS))
 }

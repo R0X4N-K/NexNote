@@ -11,32 +11,32 @@ class TrashSnackbarEffectTest {
     @Test
     fun `action performed dispatches undo for the trashed note id`() = runTest {
         val undoIds = mutableListOf<Long>()
-        val confirmIds = mutableListOf<Long>()
+        var confirmCount = 0
 
         handleTrashSnackbarEvent(
             event = TrashedNoteEvent(noteId = 42L, noteLabel = "Recover me"),
             showSnackbar = { SnackbarResult.ActionPerformed },
             onUndoTrash = { undoIds += it },
-            onConfirmTrash = { confirmIds += it }
+            onConfirmTrash = { confirmCount++ }
         )
 
         assertEquals(listOf(42L), undoIds)
-        assertTrue(confirmIds.isEmpty())
+        assertEquals(0, confirmCount)
     }
 
     @Test
-    fun `dismissed snackbar confirms the trashed note id`() = runTest {
+    fun `dismissed snackbar confirms the trashed note without note id`() = runTest {
         val undoIds = mutableListOf<Long>()
-        val confirmIds = mutableListOf<Long>()
+        var confirmCount = 0
 
         handleTrashSnackbarEvent(
             event = TrashedNoteEvent(noteId = 7L, noteLabel = "Keep deleted"),
             showSnackbar = { SnackbarResult.Dismissed },
             onUndoTrash = { undoIds += it },
-            onConfirmTrash = { confirmIds += it }
+            onConfirmTrash = { confirmCount++ }
         )
 
         assertTrue(undoIds.isEmpty())
-        assertEquals(listOf(7L), confirmIds)
+        assertEquals(1, confirmCount)
     }
 }

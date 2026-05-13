@@ -50,18 +50,14 @@ class EditorViewModel(
     private val indexNoteTags: IndexNoteTagsUseCase? = null,
     observeThemeMode: ObserveThemeModeUseCase? = null,
     private val setThemeMode: SetThemeModeUseCase? = null,
-    private val initialNoteId: Long,
-    private val initialTemplateId: Long,
-    private val initialEditTemplateId: Long,
+    private val initialMode: EditorMode,
     undoHistoryDebounceMs: Long = DEFAULT_UNDO_HISTORY_DEBOUNCE_MS,
     undoHistoryMaxSnapshots: Int = DEFAULT_UNDO_HISTORY_MAX_SNAPSHOTS
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         EditorUiState(
-            isLoading = initialNoteId != NO_ID ||
-                initialTemplateId != NO_ID ||
-                initialEditTemplateId != NO_ID
+            isLoading = initialMode.startsWithLoading
         )
     )
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -131,11 +127,10 @@ class EditorViewModel(
     init {
         NexNoteDebugLog.viewModel(
             event = "init",
-            details = "initialNoteId=$initialNoteId initialTemplateId=$initialTemplateId " +
-                "initialEditTemplateId=$initialEditTemplateId"
+            details = initialMode.debugRouteSummary()
         )
         viewModelScope.launch {
-            loadDelegate.loadInitial(initialNoteId, initialTemplateId, initialEditTemplateId)
+            loadDelegate.loadInitial(initialMode)
         }
     }
 
@@ -378,20 +373,18 @@ class EditorViewModel(
 
     companion object {
         /** Sentinel value: note/template not yet persisted in the database. */
-        const val NO_ID = 0L
+        const val NO_ID = EditorMode.NO_ID
 
         /**
          * editTemplateId sentinel: open the editor to create a brand-new
          * template (title = name, content = body, saved to templateRepository).
          */
-        const val NEW_TEMPLATE_ID = -1L
+        const val NEW_TEMPLATE_ID = EditorMode.NEW_TEMPLATE_ID
 
         private const val AUTOSAVE_DELAY_MS = 1_500L
 
         fun factory(
-            noteId: Long,
-            templateId: Long,
-            editTemplateId: Long = NO_ID
+            mode: EditorMode
         ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app =
@@ -411,9 +404,7 @@ class EditorViewModel(
                     indexNoteTags         = useCases.tags.indexNoteTags,
                     observeThemeMode      = useCases.preferences.observeThemeMode,
                     setThemeMode          = useCases.preferences.setThemeMode,
-                    initialNoteId         = noteId,
-                    initialTemplateId     = templateId,
-                    initialEditTemplateId = editTemplateId
+                    initialMode           = mode
                 )
             }
         }

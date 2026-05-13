@@ -16,13 +16,11 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
+import io.github.r0x4nk.nexnote.ui.common.NoteListActionsDelegate
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
-import io.github.r0x4nk.nexnote.ui.common.displayLabel
-import io.github.r0x4nk.nexnote.ui.common.toTrashedNoteEvent
 import io.github.r0x4nk.nexnote.util.DateUtils
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,17 +30,16 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 class AgendaViewModel(
     private val observeDistinctLocalDays: ObserveDistinctLocalDaysUseCase,
     private val observeNotesByDateRange: ObserveNotesByDateRangeUseCase,
-    private val moveNoteToTrash: MoveNoteToTrashUseCase,
-    private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
-    private val toggleNotePin: ToggleNotePinUseCase,
-    private val duplicateNoteUseCase: DuplicateNoteUseCase? = null,
+    moveNoteToTrash: MoveNoteToTrashUseCase,
+    restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
+    toggleNotePin: ToggleNotePinUseCase,
+    duplicateNoteUseCase: DuplicateNoteUseCase? = null,
     private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase? = null,
     observeNoteCardStyle: ObserveNoteCardStyleUseCase? = null
 ) : ViewModel() {
@@ -68,6 +65,19 @@ class AgendaViewModel(
 
     private val _noteActionMessages = Channel<String>(Channel.BUFFERED)
     val noteActionMessages: Flow<String> = _noteActionMessages.receiveAsFlow()
+
+    private val noteListActions = NoteListActionsDelegate(
+        scope = viewModelScope,
+        moveNoteToTrash = moveNoteToTrash,
+        restoreNoteFromTrash = restoreNoteFromTrash,
+        toggleNotePin = toggleNotePin,
+        duplicateNoteUseCase = duplicateNoteUseCase,
+        sortOrder = _sortOrder,
+        viewMode = _viewMode,
+        selectedTagFilters = _selectedTagFilters,
+        trashEvents = _trashEvents,
+        noteActionMessages = _noteActionMessages
+    )
 
     val noteCardStyle: StateFlow<NoteCardStyle> = (
         observeNoteCardStyle?.invoke() ?: flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
@@ -144,11 +154,7 @@ class AgendaViewModel(
      * the database write.
      */
     fun requestTrash(note: Note) {
-        val event = note.toTrashedNoteEvent()
-        viewModelScope.launch {
-            moveNoteToTrash(note.id)
-            _trashEvents.trySend(event)
-        }
+        noteListActions.requestTrash(note)
     }
 
     /**
@@ -156,8 +162,8 @@ class AgendaViewModel(
      * The note is already in the database trash (written in [requestTrash]);
      * nothing else needs to happen here.
      */
-    fun confirmTrash(@Suppress("UNUSED_PARAMETER") noteId: Long) {
-        // No-op: Room flow already reflects the correct state.
+    fun confirmTrash() {
+        noteListActions.confirmTrash()
     }
 
     /**
@@ -166,26 +172,15 @@ class AgendaViewModel(
      * issue a matching [restoreFromTrash] call to bring the note back.
      */
     fun undoPendingTrash(noteId: Long) {
-        viewModelScope.launch { restoreNoteFromTrash(noteId) }
+        noteListActions.undoPendingTrash(noteId)
     }
 
     fun togglePin(note: Note) {
-        viewModelScope.launch { toggleNotePin(note) }
+        noteListActions.togglePin(note)
     }
 
     fun duplicateNote(note: Note) {
-        val duplicate = duplicateNoteUseCase ?: return
-        val noteLabel = note.displayLabel()
-        viewModelScope.launch {
-            try {
-                duplicate(note)
-                _noteActionMessages.trySend("Duplicated \"$noteLabel\"")
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                _noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
-            }
-        }
+        noteListActions.duplicateNote(note)
     }
 
     // ── Search ────────────────────────────────────────────────────────────────
@@ -202,34 +197,28 @@ class AgendaViewModel(
     // ── Sort & view mode ──────────────────────────────────────────────────────
 
     fun toggleSortOrder() {
-        _sortOrder.update { current ->
-            if (current == SortOrder.MODIFIED_DESC) SortOrder.MODIFIED_ASC else SortOrder.MODIFIED_DESC
-        }
+        noteListActions.toggleSortOrder()
     }
 
     fun toggleViewMode() {
-        _viewMode.update { current ->
-            if (current == NoteListViewMode.LIST) NoteListViewMode.GRID else NoteListViewMode.LIST
-        }
+        noteListActions.toggleViewMode()
     }
 
     // ── Tag filter actions ────────────────────────────────────────────────────
 
     /** Toggles a tag filter; empty filter set = show all notes for the day. */
     fun toggleTagFilter(tagName: String) {
-        _selectedTagFilters.update { current ->
-            if (tagName in current) current - tagName else current + tagName
-        }
+        noteListActions.toggleTagFilter(tagName)
     }
 
     /** Removes a single tag from the active filters. */
     fun removeTagFilter(tagName: String) {
-        _selectedTagFilters.update { it - tagName }
+        noteListActions.removeTagFilter(tagName)
     }
 
     /** Clears all active tag filters. */
     fun clearTagFilters() {
-        _selectedTagFilters.update { emptySet() }
+        noteListActions.clearTagFilters()
     }
 
     // ── Month navigation ──────────────────────────────────────────────────────

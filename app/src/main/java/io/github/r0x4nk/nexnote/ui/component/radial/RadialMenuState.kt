@@ -8,6 +8,12 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
+ * Runtime geometry for the radial menu overlay.
+ *
+ * The state is deliberately small and immutable so [RadialMenuOverlay] can
+ * close or reopen the menu by replacing the whole value, while pure geometry
+ * helpers such as [itemOffset] remain easy to test.
+ *
  * @param arcStartDeg Starting angle of the item arc, measured clockwise from 12 o'clock
  *                    (0 = up, 90 = right, 180 = down, 270 = left).
  * @param arcEndDeg   Ending angle of the item arc (same convention).

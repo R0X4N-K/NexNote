@@ -6,7 +6,10 @@ package io.github.r0x4nk.nexnote.ui.navigation
  * Bottom nav: Home, Agenda, Templates, Settings
  * Back stack: Editor (new / existing / from template / template editing), Trash
  *
- * Editor uses optional query parameters:
+ * Editor routes serialize primitive query parameters for Navigation, then
+ * `AppNavGraph` maps them to `EditorMode` before entering the editor feature.
+ *
+ * Editor query parameters:
  *   noteId          = 0   → new note
  *   noteId          > 0   → open existing note
  *   templateId      > 0   → new note pre-filled from template
@@ -44,6 +47,16 @@ sealed class Screen(val route: String) {
             templateId: Long     = NO_ID,
             editTemplateId: Long = NO_ID
         ): String = "editor?noteId=$noteId&templateId=$templateId&editTemplateId=$editTemplateId"
+
+        fun newNoteRoute(): String = route()
+
+        fun existingNoteRoute(noteId: Long): String = route(noteId = noteId)
+
+        fun fromTemplateRoute(templateId: Long): String = route(templateId = templateId)
+
+        fun newTemplateRoute(): String = route(editTemplateId = NEW_TEMPLATE_ID)
+
+        fun editTemplateRoute(templateId: Long): String = route(editTemplateId = templateId)
     }
 
     companion object {

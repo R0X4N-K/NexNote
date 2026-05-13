@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.ui.common.EditorMotion
 import io.github.r0x4nk.nexnote.ui.component.MarkdownPreview
 import java.io.File
 
@@ -256,21 +257,28 @@ private fun editorContentTransition(
         contentTransform(EnterTransition.None, ExitTransition.None)
     }
     loadingTransition(initialState, targetState) -> {
-        contentTransform(fadeIn(tween(120)), fadeOut(tween(90)))
+        contentTransform(
+            fadeIn(tween(durationMillis = EditorMotion.CONTENT_LOADING_FADE_IN_MS)),
+            fadeOut(tween(durationMillis = EditorMotion.CONTENT_LOADING_FADE_OUT_MS))
+        )
     }
     !contentAnimationsEnabled -> {
         contentTransform(EnterTransition.None, ExitTransition.None)
     }
     targetState == EditorContentTarget.Preview -> {
         contentTransform(
-            enter = slideInHorizontally(tween(220)) { it } + fadeIn(tween(180)),
-            exit = slideOutHorizontally(tween(220)) { -it } + fadeOut(tween(160))
+            enter = slideInHorizontally(tween(durationMillis = EditorMotion.CONTENT_MODE_SLIDE_MS)) { it } +
+                fadeIn(tween(durationMillis = EditorMotion.CONTENT_MODE_FADE_IN_MS)),
+            exit = slideOutHorizontally(tween(durationMillis = EditorMotion.CONTENT_MODE_SLIDE_MS)) { -it } +
+                fadeOut(tween(durationMillis = EditorMotion.CONTENT_MODE_FADE_OUT_MS))
         )
     }
     else -> {
         contentTransform(
-            enter = slideInHorizontally(tween(220)) { -it } + fadeIn(tween(180)),
-            exit = slideOutHorizontally(tween(220)) { it } + fadeOut(tween(160))
+            enter = slideInHorizontally(tween(durationMillis = EditorMotion.CONTENT_MODE_SLIDE_MS)) { -it } +
+                fadeIn(tween(durationMillis = EditorMotion.CONTENT_MODE_FADE_IN_MS)),
+            exit = slideOutHorizontally(tween(durationMillis = EditorMotion.CONTENT_MODE_SLIDE_MS)) { it } +
+                fadeOut(tween(durationMillis = EditorMotion.CONTENT_MODE_FADE_OUT_MS))
         )
     }
 }

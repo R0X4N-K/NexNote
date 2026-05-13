@@ -1,14 +1,9 @@
 package io.github.r0x4nk.nexnote.ui.screen.agenda
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
@@ -16,6 +11,7 @@ import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.component.MasonryGrid
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import java.text.SimpleDateFormat
@@ -79,24 +76,21 @@ private fun AgendaNotesGrid(
     noteCardStyle: NoteCardStyle,
     actions: AgendaActions
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+    MasonryGrid(
+        columns = 2,
         modifier = Modifier
             .fillMaxWidth()
-            .height(agendaNotesGridHeight(notes.size))
             .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        userScrollEnabled = false
+        horizontalSpacing = 8.dp,
+        verticalSpacing = 8.dp
     ) {
-        items(notes, key = { it.id }) { note ->
-            AgendaGridNoteCard(note, noteCardStyle, actions)
+        notes.forEach { note ->
+            key(note.id) {
+                AgendaGridNoteCard(note, noteCardStyle, actions)
+            }
         }
     }
 }
-
-private fun agendaNotesGridHeight(itemCount: Int) =
-    110.dp * ((itemCount + 1) / 2) + 8.dp * maxOf(((itemCount + 1) / 2) - 1, 0)
 
 @Composable
 private fun AgendaGridNoteCard(

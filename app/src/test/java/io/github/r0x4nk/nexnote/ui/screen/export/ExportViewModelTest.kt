@@ -3,7 +3,7 @@ package io.github.r0x4nk.nexnote.ui.screen.export
 import io.github.r0x4nk.nexnote.data.db.NoteDao
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
-import io.github.r0x4nk.nexnote.data.repository.NoteRepository
+import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
@@ -33,13 +33,13 @@ class ExportViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeDao: FakeNoteDao
-    private lateinit var repository: NoteRepository
+    private lateinit var repository: NoteRepositoryImpl
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao    = FakeNoteDao()
-        repository = NoteRepository(fakeDao, NoOpNoteImageStorage())
+        repository = NoteRepositoryImpl(fakeDao, NoOpNoteImageStorage())
     }
 
     @After

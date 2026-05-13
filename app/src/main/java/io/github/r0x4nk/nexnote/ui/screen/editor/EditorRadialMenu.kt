@@ -29,6 +29,7 @@ internal fun EditorRadialMenuBindings(
     isTemplateMode: Boolean,
     state: EditorScreenState,
     launchImagePickerAtCursor: () -> Unit,
+    onInsertChecklist: () -> Unit,
     onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
     insertAtCursor: (String) -> Unit,
@@ -40,6 +41,7 @@ internal fun EditorRadialMenuBindings(
         items = rememberEditorRadialMenuItems(
             launchImagePickerAtCursor,
             isTemplateMode,
+            onInsertChecklist,
             onInsertNoteLink,
             onToggleColorPicker,
             insertAtCursor
@@ -125,12 +127,14 @@ private fun EditorScreenState.selectContentEdge(offset: Int) {
 private fun rememberEditorRadialMenuItems(
     launchImagePickerAtCursor: () -> Unit,
     isTemplateMode: Boolean,
+    onInsertChecklist: () -> Unit,
     onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
     insertAtCursor: (String) -> Unit
 ): List<RadialMenuItem> = remember(
     launchImagePickerAtCursor,
     isTemplateMode,
+    onInsertChecklist,
     onInsertNoteLink,
     onToggleColorPicker,
     insertAtCursor
@@ -150,7 +154,7 @@ private fun rememberEditorRadialMenuItems(
             RadialMenuItem(
                 icon = Icons.Default.CheckBox,
                 label = "",
-                action = { insertAtCursor(MARKDOWN_CHECKLIST_SNIPPET) },
+                action = onInsertChecklist,
                 contentDescription = "Insert checklist"
             )
         )

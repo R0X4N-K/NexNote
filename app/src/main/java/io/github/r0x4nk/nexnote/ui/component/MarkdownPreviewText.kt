@@ -39,6 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.r0x4nk.nexnote.util.NoteLinkMarkdown
 
+/**
+ * Text block renderer for markdown preview content.
+ *
+ * It preserves inline parser annotations, maps search highlights from markdown
+ * source offsets onto the rendered text, and routes URL/note-link taps through
+ * the same handler used by every text-like markdown block.
+ */
 @Composable
 internal fun MarkdownTextBlock(
     annotatedText: AnnotatedString,
@@ -76,6 +83,12 @@ internal fun MarkdownTextBlock(
     )
 }
 
+/**
+ * Blockquote renderer with a vertical accent bar and italicized content.
+ *
+ * The component shares highlight and link handling with normal text blocks so
+ * search navigation and note links behave identically inside quoted text.
+ */
 @Composable
 internal fun MarkdownBlockquote(
     content: AnnotatedString,
@@ -134,6 +147,13 @@ private fun rememberHighlightedPreviewText(
         )
     }
 
+/**
+ * Adds tap handling for links embedded in a rendered markdown [AnnotatedString].
+ *
+ * The parser emits note links with [NoteLinkMarkdown.ANNOTATION_TAG] and regular
+ * URLs with the standard `URL` tag. Centralizing the hit-test here keeps text,
+ * blockquotes, and table cells aligned on navigation behavior.
+ */
 internal fun Modifier.markdownAnnotationTapHandler(
     displayText: AnnotatedString,
     getLayoutResult: () -> TextLayoutResult?,
@@ -212,6 +232,12 @@ private fun blockquoteTextStyle(style: TextStyle): TextStyle =
         fontStyle = FontStyle.Italic
     )
 
+/**
+ * Horizontally scrollable code block for markdown preview.
+ *
+ * Code keeps a monospace face and its own rounded background so long lines can
+ * remain intact without forcing the full note preview wider than the viewport.
+ */
 @Composable
 internal fun MarkdownCodeBlock(code: String) {
     val bgColor = MaterialTheme.colorScheme.surfaceVariant

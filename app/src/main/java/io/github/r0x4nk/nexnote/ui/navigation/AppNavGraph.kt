@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.github.r0x4nk.nexnote.ui.screen.agenda.AgendaScreen
+import io.github.r0x4nk.nexnote.ui.screen.editor.EditorMode
 import io.github.r0x4nk.nexnote.ui.screen.editor.EditorScreen
 import io.github.r0x4nk.nexnote.ui.screen.export.ExportScreen
 import io.github.r0x4nk.nexnote.ui.screen.home.HomeScreen
@@ -64,13 +65,13 @@ private fun NavGraphBuilder.homeDestination(
     composable(Screen.Home.route) {
         HomeScreen(
             onNoteClick = { noteId ->
-                navController.navigate(Screen.Editor.route(noteId = noteId))
+                navController.navigate(Screen.Editor.existingNoteRoute(noteId))
             },
             onNewNote = {
-                navController.navigate(Screen.Editor.route())
+                navController.navigate(Screen.Editor.newNoteRoute())
             },
             onNewNoteFromTemplate = { templateId ->
-                navController.navigate(Screen.Editor.route(templateId = templateId))
+                navController.navigate(Screen.Editor.fromTemplateRoute(templateId))
             },
             onOpenTrash = {
                 navController.navigate(Screen.Trash.route)
@@ -87,7 +88,7 @@ private fun NavGraphBuilder.agendaDestination(
     composable(Screen.Agenda.route) {
         AgendaScreen(
             onNoteClick = { noteId ->
-                navController.navigate(Screen.Editor.route(noteId = noteId))
+                navController.navigate(Screen.Editor.existingNoteRoute(noteId))
             },
             floatingBottomPadding = floatingBottomPadding
         )
@@ -101,7 +102,7 @@ private fun NavGraphBuilder.tagsDestination(
     composable(Screen.Tags.route) {
         TagsScreen(
             onNoteClick = { noteId ->
-                navController.navigate(Screen.Editor.route(noteId = noteId))
+                navController.navigate(Screen.Editor.existingNoteRoute(noteId))
             },
             floatingBottomPadding = floatingBottomPadding
         )
@@ -115,10 +116,15 @@ private fun NavGraphBuilder.templatesDestination(
     composable(Screen.Templates.route) {
         TemplatesScreen(
             onNavigateToApplyTemplate = { templateId ->
-                navController.navigate(Screen.Editor.route(templateId = templateId))
+                navController.navigate(Screen.Editor.fromTemplateRoute(templateId))
             },
             onNavigateToEditTemplate = { editTemplateId ->
-                navController.navigate(Screen.Editor.route(editTemplateId = editTemplateId))
+                val route = if (editTemplateId == Screen.NEW_TEMPLATE_ID) {
+                    Screen.Editor.newTemplateRoute()
+                } else {
+                    Screen.Editor.editTemplateRoute(editTemplateId)
+                }
+                navController.navigate(route)
             },
             floatingBottomPadding = floatingBottomPadding
         )
@@ -180,23 +186,26 @@ private fun EditorDestination(
     args: EditorRouteArgs,
     navController: NavHostController
 ) {
+    val mode = args.toEditorMode()
     EditorScreen(
-        noteId         = args.noteId,
-        templateId     = args.templateId,
-        editTemplateId = args.editTemplateId,
-        navController  = navController,
-        onExport       = editorExportAction(args, navController)
+        mode          = mode,
+        navController = navController,
+        onExport      = editorExportAction(mode, navController)
     )
 }
 
 private fun editorExportAction(
-    args: EditorRouteArgs,
+    mode: EditorMode,
     navController: NavHostController
 ): (() -> Unit)? =
-    if (args.noteId != Screen.NO_ID && args.editTemplateId == Screen.NO_ID) {
-        { navController.navigate(Screen.Export.route(noteId = args.noteId)) }
-    } else {
-        null
+    when (mode) {
+        is EditorMode.ExistingNote -> {
+            { navController.navigate(Screen.Export.route(noteId = mode.noteId)) }
+        }
+        is EditorMode.EditTemplate,
+        is EditorMode.NewFromTemplate,
+        EditorMode.NewNote,
+        EditorMode.NewTemplate -> null
     }
 
 private fun exportArguments() = listOf(
@@ -234,4 +243,10 @@ private data class EditorRouteArgs(
     val noteId: Long,
     val templateId: Long,
     val editTemplateId: Long
-)
+) {
+    fun toEditorMode(): EditorMode = EditorMode.fromRoute(
+        noteId = noteId,
+        templateId = templateId,
+        editTemplateId = editTemplateId
+    )
+}

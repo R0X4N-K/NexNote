@@ -96,4 +96,32 @@ class MarkdownFormattingTest {
 
         assertEquals("a\nb", result.text)
     }
+
+    @Test
+    fun `unordered list replaces ordered marker at line start`() {
+        val result = MarkdownLineToggle.unorderedList("1. task", TextRange(4))
+
+        assertEquals("- task", result.text)
+    }
+
+    @Test
+    fun `ordered list replaces checklist marker at line start`() {
+        val result = MarkdownLineToggle.orderedList("- [x] done", TextRange(8))
+
+        assertEquals("1. done", result.text)
+    }
+
+    @Test
+    fun `task list inserts marker at current line start`() {
+        val result = MarkdownLineToggle.taskList("write docs", TextRange(5))
+
+        assertEquals("- [ ] write docs", result.text)
+    }
+
+    @Test
+    fun `task list replaces unordered marker at line start`() {
+        val result = MarkdownLineToggle.taskList("- write docs", TextRange(4))
+
+        assertEquals("- [ ] write docs", result.text)
+    }
 }

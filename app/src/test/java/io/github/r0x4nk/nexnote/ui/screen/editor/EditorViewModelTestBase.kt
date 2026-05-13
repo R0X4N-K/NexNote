@@ -5,7 +5,7 @@ import io.github.r0x4nk.nexnote.data.db.TemplateDao
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
-import io.github.r0x4nk.nexnote.data.repository.NoteRepository
+import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TemplateRepository
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
@@ -59,10 +59,11 @@ abstract class EditorViewModelTestBase {
         noteId: Long = 0L,
         templateId: Long = 0L,
         editTemplateId: Long = 0L,
+        mode: EditorMode = EditorMode.fromRoute(noteId, templateId, editTemplateId),
         imageStorage: NoteImageStorage = FakeEditorNoteImageStorage(),
         preferencesRepository: IUserPreferencesRepository = FakeEditorPreferencesRepository()
     ): EditorViewModel {
-        val noteRepository = NoteRepository(fakeNoteDao, imageStorage)
+        val noteRepository = NoteRepositoryImpl(fakeNoteDao, imageStorage)
         val templateRepository = TemplateRepository(fakeTemplateDao)
         return EditorViewModel(
             copyNoteImageToInternal = CopyNoteImageToInternalUseCase(imageStorage),
@@ -76,9 +77,7 @@ abstract class EditorViewModelTestBase {
             observeNoteLinkCandidates = ObserveNoteLinkCandidatesUseCase(noteRepository),
             observeThemeMode = ObserveThemeModeUseCase(preferencesRepository),
             setThemeMode = SetThemeModeUseCase(preferencesRepository),
-            initialNoteId = noteId,
-            initialTemplateId = templateId,
-            initialEditTemplateId = editTemplateId
+            initialMode = mode
         )
     }
 }
