@@ -4,6 +4,7 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import kotlinx.coroutines.flow.Flow
 
 interface IUserPreferencesRepository {
@@ -13,6 +14,10 @@ interface IUserPreferencesRepository {
     val isLeftHanded: Flow<Boolean>
     val accentColor: Flow<AccentColor>
     val noteCardStyle: Flow<NoteCardStyle>
+    val protectVaultRecentPreviews: Flow<Boolean>
+    val lockVaultOnBackground: Flow<Boolean>
+    val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout>
+    val unlockVaultWithAndroidCredential: Flow<Boolean>
 
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setFontScale(scale: FontScale)
@@ -20,4 +25,8 @@ interface IUserPreferencesRepository {
     suspend fun setLeftHanded(value: Boolean)
     suspend fun setAccentColor(color: AccentColor)
     suspend fun setNoteCardStyle(style: NoteCardStyle)
+    suspend fun setProtectVaultRecentPreviews(value: Boolean)
+    suspend fun setLockVaultOnBackground(value: Boolean)
+    suspend fun setVaultAutoLockTimeout(timeout: VaultAutoLockTimeout)
+    suspend fun setUnlockVaultWithAndroidCredential(value: Boolean)
 }

@@ -13,13 +13,13 @@ import androidx.room.PrimaryKey
  * [creationDate]: user-editable (for the agenda calendar).
  * [lastModifiedDate]: managed exclusively by the app, not user-editable.
  *
- * The composite index on (isDeleted, isPinned, lastModifiedDate) directly covers
+ * The composite index on (isDeleted, isInVault, isPinned, lastModifiedDate) directly covers
  * the ORDER BY clause of getAllNotes() and its ascending variant, so those queries
  * avoid a full table scan even with thousands of notes.
  */
 @Entity(
     tableName = "notes",
-    indices = [Index(value = ["isDeleted", "isPinned", "lastModifiedDate"])]
+    indices = [Index(value = ["isDeleted", "isInVault", "isPinned", "lastModifiedDate"])]
 )
 data class NoteEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -31,6 +31,9 @@ data class NoteEntity(
     val timezone: String = java.util.TimeZone.getDefault().id,
     val isDeleted: Boolean = false,
     val deletedDate: Long? = null,
+    // True when the note belongs to the encrypted Vault surface.
+    // Added in database version 7; normal-note queries must exclude it.
+    val isInVault: Boolean = false,
     val isPinned: Boolean = false,
     val imagePathsRaw: String = "",
     // Packed ARGB color (android.graphics.Color.toArgb()). NULL means "no custom color".

@@ -13,11 +13,12 @@ import kotlinx.coroutines.flow.Flow
  *
  * Role: data layer — Room DAO for `tags` and `note_tag_cross_ref` tables.
  *
- * Usage counts are computed dynamically via a LEFT JOIN with `note_tag_cross_ref`
- * and `notes` (filtered to active notes: isDeleted = 0). Storing a cached count in
- * the entity would require transactional updates on every note save, trash, restore,
- * and permanent delete — error-prone and prone to drift. Dynamic computation is
- * preferred here because tag queries are infrequent relative to note saves.
+ * Usage counts are computed dynamically via joins with `note_tag_cross_ref` and
+ * `notes` (filtered to active normal notes: isDeleted = 0 and isInVault = 0).
+ * Storing a cached count in the entity would require transactional updates on
+ * every note save, trash, restore, and permanent delete — error-prone and prone
+ * to drift. Dynamic computation is preferred here because tag queries are
+ * infrequent relative to note saves.
  *
  * All queries returning [Flow] are observed reactively by the UI layer. Room
  * re-emits automatically when any of the involved tables change.
@@ -30,10 +31,12 @@ interface TagDao {
     /** Tags sorted by active-note usage, most used first. */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r.noteId END) AS noteCount
+               COUNT(DISTINCT n.id) AS noteCount
         FROM tags t
-        LEFT JOIN note_tag_cross_ref r ON t.name = r.tagName
-        LEFT JOIN notes n ON r.noteId = n.id
+        INNER JOIN note_tag_cross_ref r ON t.name = r.tagName
+        INNER JOIN notes n ON r.noteId = n.id
+        WHERE n.isDeleted = 0
+          AND n.isInVault = 0
         GROUP BY t.name
         ORDER BY noteCount DESC, t.name ASC
     """)
@@ -42,10 +45,12 @@ interface TagDao {
     /** Tags sorted by active-note usage, least used first. */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r.noteId END) AS noteCount
+               COUNT(DISTINCT n.id) AS noteCount
         FROM tags t
-        LEFT JOIN note_tag_cross_ref r ON t.name = r.tagName
-        LEFT JOIN notes n ON r.noteId = n.id
+        INNER JOIN note_tag_cross_ref r ON t.name = r.tagName
+        INNER JOIN notes n ON r.noteId = n.id
+        WHERE n.isDeleted = 0
+          AND n.isInVault = 0
         GROUP BY t.name
         ORDER BY noteCount ASC, t.name ASC
     """)
@@ -54,10 +59,12 @@ interface TagDao {
     /** Tags sorted by last-updated date, most recently used first. */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r.noteId END) AS noteCount
+               COUNT(DISTINCT n.id) AS noteCount
         FROM tags t
-        LEFT JOIN note_tag_cross_ref r ON t.name = r.tagName
-        LEFT JOIN notes n ON r.noteId = n.id
+        INNER JOIN note_tag_cross_ref r ON t.name = r.tagName
+        INNER JOIN notes n ON r.noteId = n.id
+        WHERE n.isDeleted = 0
+          AND n.isInVault = 0
         GROUP BY t.name
         ORDER BY t.lastUpdatedDate DESC
     """)
@@ -66,10 +73,12 @@ interface TagDao {
     /** Tags sorted by last-updated date, oldest first. */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r.noteId END) AS noteCount
+               COUNT(DISTINCT n.id) AS noteCount
         FROM tags t
-        LEFT JOIN note_tag_cross_ref r ON t.name = r.tagName
-        LEFT JOIN notes n ON r.noteId = n.id
+        INNER JOIN note_tag_cross_ref r ON t.name = r.tagName
+        INNER JOIN notes n ON r.noteId = n.id
+        WHERE n.isDeleted = 0
+          AND n.isInVault = 0
         GROUP BY t.name
         ORDER BY t.lastUpdatedDate ASC
     """)
@@ -78,11 +87,13 @@ interface TagDao {
     /** Tags whose name contains [query], sorted by usage descending. */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r.noteId END) AS noteCount
+               COUNT(DISTINCT n.id) AS noteCount
         FROM tags t
-        LEFT JOIN note_tag_cross_ref r ON t.name = r.tagName
-        LEFT JOIN notes n ON r.noteId = n.id
+        INNER JOIN note_tag_cross_ref r ON t.name = r.tagName
+        INNER JOIN notes n ON r.noteId = n.id
         WHERE t.name LIKE '%' || :query || '%'
+          AND n.isDeleted = 0
+          AND n.isInVault = 0
         GROUP BY t.name
         ORDER BY noteCount DESC, t.name ASC
     """)
@@ -91,9 +102,10 @@ interface TagDao {
     /** Tags associated with a specific note (includes tags in trashed notes). */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r2.noteId END) AS noteCount
+               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 AND n.isInVault = 0 THEN r2.noteId END) AS noteCount
         FROM tags t
         INNER JOIN note_tag_cross_ref r ON t.name = r.tagName AND r.noteId = :noteId
+        INNER JOIN notes target ON target.id = r.noteId AND target.isInVault = 0
         LEFT JOIN note_tag_cross_ref r2 ON t.name = r2.tagName
         LEFT JOIN notes n ON r2.noteId = n.id
         GROUP BY t.name
@@ -104,10 +116,12 @@ interface TagDao {
     /** Top [limit] most-used tags; used by the AutoScrollingTagRow on Home/Agenda. */
     @Query("""
         SELECT t.name, t.createdDate, t.lastUpdatedDate,
-               COUNT(DISTINCT CASE WHEN n.isDeleted = 0 THEN r.noteId END) AS noteCount
+               COUNT(DISTINCT n.id) AS noteCount
         FROM tags t
-        LEFT JOIN note_tag_cross_ref r ON t.name = r.tagName
-        LEFT JOIN notes n ON r.noteId = n.id
+        INNER JOIN note_tag_cross_ref r ON t.name = r.tagName
+        INNER JOIN notes n ON r.noteId = n.id
+        WHERE n.isDeleted = 0
+          AND n.isInVault = 0
         GROUP BY t.name
         ORDER BY noteCount DESC, t.name ASC
         LIMIT :limit
@@ -121,10 +135,14 @@ interface TagDao {
      * This query is only called when [tagNames] is non-empty.
      */
     @Query("""
-        SELECT noteId FROM note_tag_cross_ref
-        WHERE tagName IN (:tagNames)
-        GROUP BY noteId
-        HAVING COUNT(DISTINCT tagName) = :tagCount
+        SELECT r.noteId
+        FROM note_tag_cross_ref r
+        INNER JOIN notes n ON r.noteId = n.id
+        WHERE r.tagName IN (:tagNames)
+          AND n.isDeleted = 0
+          AND n.isInVault = 0
+        GROUP BY r.noteId
+        HAVING COUNT(DISTINCT r.tagName) = :tagCount
     """)
     fun getNoteIdsWithAllTags(tagNames: List<String>, tagCount: Int): Flow<List<Long>>
 
@@ -174,9 +192,13 @@ interface TagDao {
     @Query("DELETE FROM note_tag_cross_ref WHERE noteId = :noteId")
     suspend fun deleteAllCrossRefsForNote(noteId: Long)
 
-    /** Removes all cross-refs for a tag; used during tag deletion. */
-    @Query("DELETE FROM note_tag_cross_ref WHERE tagName = :tagName")
-    suspend fun deleteAllCrossRefsForTag(tagName: String)
+    /** Removes cross-refs for a tag from normal notes; Vault refs are preserved. */
+    @Query("""
+        DELETE FROM note_tag_cross_ref
+        WHERE tagName = :tagName
+          AND noteId IN (SELECT id FROM notes WHERE isInVault = 0)
+    """)
+    suspend fun deleteNonVaultCrossRefsForTag(tagName: String)
 }
 
 /**

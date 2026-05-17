@@ -157,11 +157,11 @@ class TagRepositoryImpl(
      * tag semantics are removed. Notes are never deleted as a side effect.
      *
      * Steps:
-     * 1. Find all notes (active and trashed) that reference [tagName].
+     * 1. Find all normal notes (active and trashed) that reference [tagName].
      * 2. Replace `#tagName` with `tagName` in each note's content.
      * 3. Update the note row with the new content (and a fresh lastModifiedDate).
-     * 4. Remove all [NoteTagCrossRef] rows for this tag.
-     * 5. Remove the [TagEntity] row.
+     * 4. Remove normal-note [NoteTagCrossRef] rows for this tag.
+     * 5. Prune the [TagEntity] row only when no cross-refs remain.
      *
      * The '#' replacement uses a word-boundary regex to avoid partial matches:
      *   - `#todo` in `#todo list` becomes `todo list` ✅
@@ -190,8 +190,8 @@ class TagRepositoryImpl(
                 }
             }
 
-            tagDao.deleteAllCrossRefsForTag(tagName)
-            tagDao.deleteTagByName(tagName)
+            tagDao.deleteNonVaultCrossRefsForTag(tagName)
+            tagDao.pruneOrphanTags()
         }
     }
 

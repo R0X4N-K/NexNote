@@ -15,6 +15,7 @@ data class Note(
     val timezone: String = java.util.TimeZone.getDefault().id,
     val isDeleted: Boolean = false,
     val deletedDate: Long? = null,
+    val isInVault: Boolean = false,
     val isPinned: Boolean = false,
     val imagePaths: List<String> = emptyList(),
     // Packed ARGB color chosen by the user for this note. NULL = no custom color.

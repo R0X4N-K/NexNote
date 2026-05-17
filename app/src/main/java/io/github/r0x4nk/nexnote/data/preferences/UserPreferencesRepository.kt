@@ -12,6 +12,7 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -40,6 +41,14 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         val LEFT_HANDED_KEY      = booleanPreferencesKey("is_left_handed")
         val ACCENT_COLOR_KEY     = stringPreferencesKey("accent_color")
         val NOTE_CARD_STYLE_KEY  = stringPreferencesKey("note_card_style")
+        val VAULT_RECENT_PREVIEWS_PROTECTED_KEY =
+            booleanPreferencesKey("vault_recent_previews_protected")
+        val VAULT_LOCK_ON_BACKGROUND_KEY =
+            booleanPreferencesKey("vault_lock_on_background")
+        val VAULT_AUTO_LOCK_TIMEOUT_KEY =
+            stringPreferencesKey("vault_auto_lock_timeout")
+        val VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY =
+            booleanPreferencesKey("vault_android_credential_unlock_enabled")
         // EDITOR_BACKGROUND_KEY removed — per-note color replaced the global background setting.
     }
 
@@ -63,6 +72,24 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
     override val noteCardStyle: Flow<NoteCardStyle> =
         context.dataStore.data.observeEnum(NOTE_CARD_STYLE_KEY, NoteCardStyle.TITLE_AND_PREVIEW)
 
+    override val protectVaultRecentPreviews: Flow<Boolean> = context.dataStore.data
+        .safe
+        .map { prefs -> prefs[VAULT_RECENT_PREVIEWS_PROTECTED_KEY] ?: true }
+
+    override val lockVaultOnBackground: Flow<Boolean> = context.dataStore.data
+        .safe
+        .map { prefs -> prefs[VAULT_LOCK_ON_BACKGROUND_KEY] ?: true }
+
+    override val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout> =
+        context.dataStore.data.observeEnum(
+            VAULT_AUTO_LOCK_TIMEOUT_KEY,
+            VaultAutoLockTimeout.IMMEDIATELY
+        )
+
+    override val unlockVaultWithAndroidCredential: Flow<Boolean> = context.dataStore.data
+        .safe
+        .map { prefs -> prefs[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] ?: false }
+
     override suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { prefs -> prefs[THEME_MODE_KEY] = mode.name }
     }
@@ -85,6 +112,24 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
 
     override suspend fun setNoteCardStyle(style: NoteCardStyle) {
         context.dataStore.edit { prefs -> prefs[NOTE_CARD_STYLE_KEY] = style.name }
+    }
+
+    override suspend fun setProtectVaultRecentPreviews(value: Boolean) {
+        context.dataStore.edit { prefs -> prefs[VAULT_RECENT_PREVIEWS_PROTECTED_KEY] = value }
+    }
+
+    override suspend fun setLockVaultOnBackground(value: Boolean) {
+        context.dataStore.edit { prefs -> prefs[VAULT_LOCK_ON_BACKGROUND_KEY] = value }
+    }
+
+    override suspend fun setVaultAutoLockTimeout(timeout: VaultAutoLockTimeout) {
+        context.dataStore.edit { prefs -> prefs[VAULT_AUTO_LOCK_TIMEOUT_KEY] = timeout.name }
+    }
+
+    override suspend fun setUnlockVaultWithAndroidCredential(value: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] = value
+        }
     }
 
 }

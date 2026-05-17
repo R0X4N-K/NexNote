@@ -188,6 +188,7 @@ class NoteRepositoryImpl(
         timezone = timezone,
         isDeleted = isDeleted,
         deletedDate = deletedDate,
+        isInVault = isInVault,
         isPinned = isPinned,
         imagePaths = imagePaths(),
         backgroundColor = backgroundColor,
@@ -210,6 +211,7 @@ class NoteRepositoryImpl(
         timezone = timezone,
         isDeleted = isDeleted,
         deletedDate = deletedDate,
+        isInVault = isInVault,
         isPinned = isPinned,
         imagePathsRaw = imagePaths.filter { it.isNotBlank() }.joinToString("\n"),
         backgroundColor = backgroundColor,
@@ -250,6 +252,13 @@ class NoteRepositoryImpl(
                 append(" item").append(index)
                     .append(".id=").append(note.id)
                     .append(" item").append(index)
+                    .append(".vault=").append(note.isInVault)
+                if (note.isInVault) {
+                    append(" item").append(index)
+                        .append(".content=redacted")
+                    return@forEachIndexed
+                }
+                append(" item").append(index)
                     .append(".contentLen=").append(note.content.length)
                     .append(" item").append(index)
                     .append(".contentHash=").append(note.content.hashCode())

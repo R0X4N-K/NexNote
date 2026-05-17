@@ -18,3 +18,13 @@ enum class NoteCardStyle {
     /** Title plus last-modified date prominently displayed. */
     TITLE_DATE
 }
+
+/** Configurable timeout options for future Vault auto-lock behavior. */
+enum class VaultAutoLockTimeout(val durationMillis: Long?) {
+    IMMEDIATELY(0L),
+    AFTER_1_MINUTE(60_000L),
+    AFTER_5_MINUTES(5 * 60_000L),
+    AFTER_15_MINUTES(15 * 60_000L),
+    AFTER_30_MINUTES(30 * 60_000L),
+    NEVER(null)
+}

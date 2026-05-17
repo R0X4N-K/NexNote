@@ -13,8 +13,9 @@ import androidx.room.Index
  * - CASCADE DELETE on the note side ensures cross-refs are cleaned up automatically
  *   when a note is permanently deleted from the database.
  * - Soft-deleted (trashed) notes retain their cross-refs so that tag associations
- *   survive a restore. The usage-count queries JOIN with `notes WHERE isDeleted = 0`
- *   to exclude trashed notes from the displayed count.
+ *   survive a restore. The usage-count queries JOIN with active normal notes
+ *   (`isDeleted = 0` and `isInVault = 0`) so trashed and Vault notes do not
+ *   inflate global counts.
  * - No foreign key on [tagName]: the tag entity is managed separately by
  *   [TagRepository.deleteTag], which removes all cross-refs in the same operation.
  *   Avoiding the FK here also prevents cascades during tag cleanup from interfering

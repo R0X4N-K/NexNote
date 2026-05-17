@@ -59,8 +59,11 @@ object NexNoteDebugLog {
         )
     }
 
-    fun textSummary(label: String, text: String): String {
+    fun textSummary(label: String, text: String, redact: Boolean = false): String {
         if (!isEnabled) return ""
+        if (redact) {
+            return "$label.len=${text.length} $label.content=redacted"
+        }
         return "$label.len=${text.length} " +
             "$label.hash=${text.debugFingerprint()} " +
             "$label.sample=\"${text.debugSample()}\""
@@ -69,14 +72,21 @@ object NexNoteDebugLog {
     fun noteSummary(label: String, note: Note?): String {
         if (!isEnabled) return ""
         if (note == null) return "$label=null"
-        return "$label.id=${note.id} " +
-            "$label.titleLen=${note.title.length} " +
-            "$label.contentLen=${note.content.length} " +
-            "$label.contentHash=${note.content.debugFingerprint()} " +
-            "$label.markdown=${note.isMarkdown} " +
-            "$label.preview=${note.isPreviewMode} " +
-            "$label.modified=${note.lastModifiedDate} " +
-            "$label.contentSample=\"${note.content.debugSample()}\""
+        return buildString {
+            append("$label.id=${note.id} ")
+            append("$label.vault=${note.isInVault} ")
+            if (note.isInVault) {
+                append("$label.content=redacted")
+            } else {
+                append("$label.titleLen=${note.title.length} ")
+                append("$label.contentLen=${note.content.length} ")
+                append("$label.contentHash=${note.content.debugFingerprint()} ")
+                append("$label.markdown=${note.isMarkdown} ")
+                append("$label.preview=${note.isPreviewMode} ")
+                append("$label.modified=${note.lastModifiedDate} ")
+                append("$label.contentSample=\"${note.content.debugSample()}\"")
+            }
+        }
     }
 
     fun throwableSummary(error: Throwable): String {

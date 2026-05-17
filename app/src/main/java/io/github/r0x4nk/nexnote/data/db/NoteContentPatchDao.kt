@@ -18,11 +18,19 @@ interface NoteContentPatchDao {
         FROM notes n
         INNER JOIN note_tag_cross_ref r ON n.id = r.noteId
         WHERE r.tagName = :tagName
+          AND n.isInVault = 0
         """
     )
     suspend fun getPatchesForTag(tagName: String): List<NoteContentPatch>
 
-    @Query("UPDATE notes SET content = :content, lastModifiedDate = :lastModifiedDate WHERE id = :id")
+    @Query(
+        """
+        UPDATE notes
+        SET content = :content, lastModifiedDate = :lastModifiedDate
+        WHERE id = :id
+          AND isInVault = 0
+    """
+    )
     suspend fun updateContent(id: Long, content: String, lastModifiedDate: Long)
 }
 

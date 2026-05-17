@@ -13,7 +13,7 @@ import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 
 @Database(
     entities = [NoteEntity::class, TemplateEntity::class, TagEntity::class, NoteTagCrossRef::class],
-    version  = 6,
+    version  = 7,
     exportSchema = true
 )
 abstract class NexNoteDatabase : RoomDatabase() {
@@ -115,6 +115,22 @@ abstract class NexNoteDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the Vault membership flag. Existing notes remain normal notes.
+         * The sort index is rebuilt with isInVault in the filtered prefix so
+         * normal-note queries can exclude Vault rows efficiently.
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notes ADD COLUMN isInVault INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notes_isDeleted_isInVault_isPinned_lastModifiedDate " +
+                        "ON notes (isDeleted, isInVault, isPinned, lastModifiedDate)"
+                )
+                db.execSQL("DROP INDEX IF EXISTS index_notes_isDeleted_isPinned_lastModifiedDate")
+            }
+        }
+
         fun getDatabase(context: Context): NexNoteDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
@@ -131,7 +147,8 @@ abstract class NexNoteDatabase : RoomDatabase() {
                     MIGRATION_2_3,
                     MIGRATION_3_4,
                     MIGRATION_4_5,
-                    MIGRATION_5_6
+                    MIGRATION_5_6,
+                    MIGRATION_6_7
                 )
                 .build()
     }
