@@ -23,7 +23,6 @@ import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.ui.component.buildMarkdownBlockSourceRanges
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
-import io.github.r0x4nk.nexnote.util.MarkdownLineToggle
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import kotlinx.coroutines.launch
 
@@ -65,16 +64,22 @@ fun EditorScreen(
         )
     }
 
+    val redactEditorContent = uiState.redactContentForLogs
     val togglePreviewPreservingScroll = rememberTogglePreviewPreservingScroll(
         state = state,
         showPreview = uiState.showPreview,
         content = uiState.content,
         contentVersion = uiState.contentVersion,
+        redactContent = redactEditorContent,
         viewModel = viewModel
     )
-    val insertAtCursor = rememberInsertAtCursor(state, viewModel)
-    val applyMarkdownEdit = rememberApplyMarkdownEdit(state, viewModel)
-    val replaceNoteLinkAutocomplete = rememberReplaceNoteLinkAutocomplete(state, viewModel)
+    val insertAtCursor = rememberInsertAtCursor(state, redactEditorContent, viewModel)
+    val applyMarkdownEdit = rememberApplyMarkdownEdit(state, redactEditorContent, viewModel)
+    val replaceNoteLinkAutocomplete = rememberReplaceNoteLinkAutocomplete(
+        state,
+        redactEditorContent,
+        viewModel
+    )
     val launchImagePickerAtCursor = rememberLaunchImagePickerAtCursor(context, state, viewModel)
     val openNoteLinkPicker: () -> Unit = {
         state.openNoteLinkPickerDetachedFromEditor(focusManager)
@@ -85,19 +90,23 @@ fun EditorScreen(
         state.showNoteLinkPicker = false
         state.showColorPicker = !state.showColorPicker
     }
+    val toggleTheme: () -> Unit = {
+        viewModel.toggleTheme(isDarkTheme)
+    }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
     val commitActiveEditContent: () -> Unit = {
         if (!uiState.showPreview) {
             NexNoteDebugLog.editor(
                 event = "commitActiveEditContent",
-                details = "field=${state.currentContentTextFieldValue().debugTextFieldValueSummary()} " +
-                    "remembered=${state.contentFieldValue.debugTextFieldValueSummary()} " +
+                details = "field=${state.currentContentTextFieldValue().debugTextFieldValueSummary(redactEditorContent)} " +
+                    "remembered=${state.contentFieldValue.debugTextFieldValueSummary(redactEditorContent)} " +
                     "model=${uiState.debugEditorSummary()}"
             )
             state.commitContentTextFieldValue(
                 modelContent = uiState.content,
                 modelContentVersion = uiState.contentVersion,
-                onContentChange = viewModel::onContentChange
+                onContentChange = viewModel::onContentChange,
+                redactContent = redactEditorContent
             )
         } else {
             NexNoteDebugLog.editor(
@@ -117,6 +126,36 @@ fun EditorScreen(
         }
         state.showColorPicker = false
         viewModel.onTagChipClick(tagName)
+    }
+    val openSearch: () -> Unit = {
+        commitActiveEditContent()
+        state.highlightRange = null
+        state.pendingTagScroll = null
+        state.showColorPicker = false
+        state.noteSearch = state.noteSearch.open(state.contentFieldValue.text)
+    }
+    val openVaultAccess: () -> Unit = {
+        state.noteSearch = state.noteSearch.close()
+        if (!navController.popBackStack(Screen.Vault.route, inclusive = false)) {
+            navController.navigate(Screen.Vault.route()) {
+                launchSingleTop = true
+            }
+        }
+    }
+    val closeSearch: () -> Unit = {
+        state.noteSearch = state.noteSearch.close()
+        if (!uiState.showPreview) {
+            runCatching { state.contentFocusRequester.requestFocus() }
+        }
+    }
+    val updateSearchQuery: (String) -> Unit = { query ->
+        state.noteSearch = state.noteSearch.updateQuery(query, state.contentFieldValue.text)
+    }
+    val searchPrevious: () -> Unit = {
+        state.noteSearch = state.noteSearch.previous()
+    }
+    val searchNext: () -> Unit = {
+        state.noteSearch = state.noteSearch.next()
     }
 
     val shouldMaintainPreviewSourceRanges =
@@ -145,12 +184,11 @@ fun EditorScreen(
         isKeyboardVisible = isKeyboardVisible,
         showPreview = uiState.showPreview,
         isTemplateMode = uiState.isTemplateMode,
+        isDarkTheme = isDarkTheme,
         state = state,
-        launchImagePickerAtCursor = launchImagePickerAfterCommit,
-        onInsertChecklist = { applyMarkdownEdit(MarkdownLineToggle::taskList) },
-        onInsertNoteLink = openNoteLinkPicker,
         onToggleColorPicker = toggleColorPicker,
-        insertAtCursor = insertAtCursor,
+        onThemeToggle = toggleTheme,
+        onSearchOpen = openSearch,
         scope = scope
     )
     EditorErrorSnackbarEffect(uiState, state, viewModel)
@@ -169,28 +207,6 @@ fun EditorScreen(
         density = density
     )
 
-    val openSearch: () -> Unit = {
-        commitActiveEditContent()
-        state.highlightRange = null
-        state.pendingTagScroll = null
-        state.showColorPicker = false
-        state.noteSearch = state.noteSearch.open(state.contentFieldValue.text)
-    }
-    val closeSearch: () -> Unit = {
-        state.noteSearch = state.noteSearch.close()
-        if (!uiState.showPreview) {
-            runCatching { state.contentFocusRequester.requestFocus() }
-        }
-    }
-    val updateSearchQuery: (String) -> Unit = { query ->
-        state.noteSearch = state.noteSearch.updateQuery(query, state.contentFieldValue.text)
-    }
-    val searchPrevious: () -> Unit = {
-        state.noteSearch = state.noteSearch.previous()
-    }
-    val searchNext: () -> Unit = {
-        state.noteSearch = state.noteSearch.next()
-    }
     val insertNoteLinkAtCursor: (NoteLinkTarget) -> Unit = { target ->
         insertAtCursor(noteLinkMarkdownFor(target))
     }
@@ -258,7 +274,7 @@ fun EditorScreen(
             applyMarkdownEdit = applyMarkdownEdit,
             onNoteLinkAutocompleteSelected = replaceNoteLinkAutocomplete,
             onPreviewNoteLinkClick = openNoteFromPreviewLink,
-            onThemeToggle = { viewModel.toggleTheme(isDarkTheme) },
+            onThemeToggle = toggleTheme,
             onToggleColorPicker = toggleColorPicker,
             onBackgroundColorChange = viewModel::onBackgroundColorChange,
             onTitleChange = viewModel::onTitleChange,
@@ -292,12 +308,15 @@ fun EditorScreen(
                 commitActiveEditContent()
                 viewModel.redoContentChange()
             },
-            onCreationDateTap = { state.showDatePicker = true },
+            onCreationDateTap = {
+                if (!uiState.isReadOnly) state.showDatePicker = true
+            },
             onSearchOpen = openSearch,
             onSearchClose = closeSearch,
             onSearchQueryChange = updateSearchQuery,
             onSearchPrevious = searchPrevious,
-            onSearchNext = searchNext
+            onSearchNext = searchNext,
+            onUnlockVault = openVaultAccess
         )
     )
 
@@ -330,14 +349,17 @@ private fun EditorScreenState.openNoteLinkPickerDetachedFromEditor(focusManager:
 private fun EditorUiState.debugEditorSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
         "loading=$isLoading dirty=$isDirty saving=$isSaving " +
-        "preview=$showPreview contentVersion=$contentVersion selection=$contentSelectionOffset " +
-        "${NexNoteDebugLog.textSummary("title", title)} " +
-        NexNoteDebugLog.textSummary("content", content)
+        "preview=$showPreview vault=$isVaultNote readOnly=$isReadOnly " +
+        "contentVersion=$contentVersion selection=$contentSelectionOffset " +
+        "${NexNoteDebugLog.textSummary("title", title, redact = redactContentForLogs)} " +
+        NexNoteDebugLog.textSummary("content", content, redact = redactContentForLogs)
 }
 
-private fun androidx.compose.ui.text.input.TextFieldValue.debugTextFieldValueSummary(): String {
+private fun androidx.compose.ui.text.input.TextFieldValue.debugTextFieldValueSummary(
+    redact: Boolean
+): String {
     return "selection=${selection.start}-${selection.end} " +
-        NexNoteDebugLog.textSummary("text", text)
+        NexNoteDebugLog.textSummary("text", text, redact = redact)
 }
 
 private fun TextRange.coerceInText(textLength: Int): TextRange {

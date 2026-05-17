@@ -16,6 +16,7 @@ internal data class AgendaActions(
     val onToggleView: () -> Unit,
     val onRemoveTagFilter: (String) -> Unit,
     val onClearTagFilters: () -> Unit,
+    val onNewNote: (Long) -> Unit,
     val onNoteClick: (Long) -> Unit,
     val onTogglePin: (Note) -> Unit,
     val onDuplicateNote: (Note) -> Unit,
@@ -29,16 +30,18 @@ internal data class AgendaActions(
 internal fun rememberAgendaActions(
     viewModel: AgendaViewModel,
     onNoteClick: (Long) -> Unit,
+    onNewNote: (Long) -> Unit,
     onRequestNoteActions: (Note) -> Unit
 ): AgendaActions {
-    return remember(viewModel, onNoteClick, onRequestNoteActions) {
-        buildAgendaActions(viewModel, onNoteClick, onRequestNoteActions)
+    return remember(viewModel, onNoteClick, onNewNote, onRequestNoteActions) {
+        buildAgendaActions(viewModel, onNoteClick, onNewNote, onRequestNoteActions)
     }
 }
 
 private fun buildAgendaActions(
     viewModel: AgendaViewModel,
     onNoteClick: (Long) -> Unit,
+    onNewNote: (Long) -> Unit,
     onRequestNoteActions: (Note) -> Unit
 ): AgendaActions = AgendaActions(
     onPreviousMonth = viewModel::navigateToPreviousMonth,
@@ -51,6 +54,7 @@ private fun buildAgendaActions(
     onToggleView = viewModel::toggleViewMode,
     onRemoveTagFilter = viewModel::removeTagFilter,
     onClearTagFilters = viewModel::clearTagFilters,
+    onNewNote = onNewNote,
     onNoteClick = onNoteClick,
     onTogglePin = viewModel::togglePin,
     onDuplicateNote = viewModel::duplicateNote,

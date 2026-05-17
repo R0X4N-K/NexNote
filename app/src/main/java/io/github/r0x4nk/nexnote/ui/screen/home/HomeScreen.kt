@@ -46,6 +46,8 @@ fun HomeScreen(
     onNewNote: () -> Unit,
     onNewNoteFromTemplate: (templateId: Long) -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenVault: () -> Unit,
+    onMoveNoteToVault: (noteId: Long) -> Unit,
     floatingBottomPadding: Dp = 0.dp,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
@@ -85,7 +87,8 @@ fun HomeScreen(
                 onSearchToggle = viewModel::onSearchToggle,
                 onSortToggle = viewModel::toggleSortOrder,
                 onViewModeToggle = viewModel::toggleViewMode,
-                onOpenTrash = onOpenTrash
+                onOpenTrash = onOpenTrash,
+                onOpenVault = onOpenVault
             )
         }
     ) { innerPadding ->
@@ -111,6 +114,7 @@ fun HomeScreen(
         clipboardCallbacks = clipboardCallbacks,
         onDuplicate = viewModel::duplicateNote,
         onDelete = viewModel::requestTrash,
+        onMoveToVault = { note -> onMoveNoteToVault(note.id) },
         onDismiss = { activeActionsNote = null }
     )
 

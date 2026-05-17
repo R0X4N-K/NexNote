@@ -17,10 +17,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.SpanStyle
@@ -84,14 +88,23 @@ internal fun TitleField(
     readOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    var hasFocus by remember { mutableStateOf(false) }
+    val isExpanded = EditorTitleFieldPolicy.isExpanded(
+        hasFocus = hasFocus,
+        readOnly = readOnly
+    )
+
     BasicTextField(
         value = value,
         onValueChange = { nextValue ->
-            if (!readOnly) onValueChange(nextValue)
+            if (!readOnly) onValueChange(EditorTitleFieldPolicy.normalizeInput(nextValue))
         },
-        modifier = modifier,
+        modifier = modifier.onFocusChanged { focusState ->
+            hasFocus = focusState.isFocused
+        },
         readOnly = readOnly,
-        singleLine = true,
+        singleLine = !isExpanded,
+        maxLines = EditorTitleFieldPolicy.maxLines(isExpanded),
         textStyle = MaterialTheme.typography.titleLarge.copy(
             color = MaterialTheme.colorScheme.onSurface
         ),
@@ -118,6 +131,7 @@ internal fun TitleField(
 internal fun ContentField(
     textFieldState: TextFieldState,
     scrollState: ScrollState,
+    readOnly: Boolean = false,
     onContentEdited: () -> Unit,
     onSelectionChange: (TextRange) -> Unit = {},
     onLayoutResult: (TextLayoutResult) -> Unit = {},
@@ -178,6 +192,7 @@ internal fun ContentField(
     BasicTextField(
         state = textFieldState,
         modifier = modifier,
+        readOnly = readOnly,
         inputTransformation = inputTransformation,
         textStyle = MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface

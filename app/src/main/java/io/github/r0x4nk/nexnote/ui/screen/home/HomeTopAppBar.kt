@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +38,8 @@ internal fun HomeTopAppBar(
     onSearchToggle: (Boolean) -> Unit,
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
-    onOpenTrash: () -> Unit
+    onOpenTrash: () -> Unit,
+    onOpenVault: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -53,7 +55,8 @@ internal fun HomeTopAppBar(
                 onSearchToggle = onSearchToggle,
                 onSortToggle = onSortToggle,
                 onViewModeToggle = onViewModeToggle,
-                onOpenTrash = onOpenTrash
+                onOpenTrash = onOpenTrash,
+                onOpenVault = onOpenVault
             )
         },
         colors = nexTopAppBarColors(),
@@ -115,7 +118,8 @@ private fun HomeTopAppBarActions(
     onSearchToggle: (Boolean) -> Unit,
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
-    onOpenTrash: () -> Unit
+    onOpenTrash: () -> Unit,
+    onOpenVault: () -> Unit
 ) {
     if (uiState.isSearchActive) {
         NexIconButton(
@@ -129,7 +133,8 @@ private fun HomeTopAppBarActions(
             onSearchToggle = onSearchToggle,
             onSortToggle = onSortToggle,
             onViewModeToggle = onViewModeToggle,
-            onOpenTrash = onOpenTrash
+            onOpenTrash = onOpenTrash,
+            onOpenVault = onOpenVault
         )
     }
 }
@@ -140,7 +145,8 @@ private fun HomeBrowsingActions(
     onSearchToggle: (Boolean) -> Unit,
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
-    onOpenTrash: () -> Unit
+    onOpenTrash: () -> Unit,
+    onOpenVault: () -> Unit
 ) {
     SortOrderButton(sortOrder = uiState.sortOrder, onClick = onSortToggle)
     ViewModeButton(viewMode = uiState.viewMode, onClick = onViewModeToggle)
@@ -148,6 +154,11 @@ private fun HomeBrowsingActions(
         imageVector = Icons.Default.Search,
         contentDescription = "Search",
         onClick = { onSearchToggle(true) }
+    )
+    NexIconButton(
+        imageVector = Icons.Default.Lock,
+        contentDescription = "Vault",
+        onClick = onOpenVault
     )
     NexIconButton(
         imageVector = Icons.Default.Delete,

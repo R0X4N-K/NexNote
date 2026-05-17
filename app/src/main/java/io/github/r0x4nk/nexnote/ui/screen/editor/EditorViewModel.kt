@@ -8,17 +8,21 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.r0x4nk.nexnote.NexNoteApp
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsForNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
@@ -41,13 +45,16 @@ class EditorViewModel(
     private val deleteNoteImage: DeleteNoteImageUseCase,
     private val getNoteImageFile: GetNoteImageFileUseCase,
     private val getNoteById: GetNoteByIdUseCase,
+    private val getVaultNoteById: GetVaultNoteByIdUseCase? = null,
     private val getTemplateById: GetTemplateByIdUseCase,
     private val saveNote: SaveNoteUseCase,
     private val saveTemplate: SaveTemplateUseCase,
+    private val saveVaultNote: SaveVaultNoteUseCase? = null,
     private val setNotePreviewMode: SetNotePreviewModeUseCase,
     observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase? = null,
     private val observeTagsForNote: ObserveTagsForNoteUseCase? = null,
     private val indexNoteTags: IndexNoteTagsUseCase? = null,
+    observeVaultState: ObserveVaultStateUseCase? = null,
     observeThemeMode: ObserveThemeModeUseCase? = null,
     private val setThemeMode: SetThemeModeUseCase? = null,
     private val initialMode: EditorMode,
@@ -57,7 +64,9 @@ class EditorViewModel(
 
     private val _uiState = MutableStateFlow(
         EditorUiState(
-            isLoading = initialMode.startsWithLoading
+            isLoading = initialMode.startsWithLoading,
+            isVaultNote = initialMode.isVaultNote,
+            isReadOnly = initialMode.isReadOnly
         )
     )
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -104,9 +113,11 @@ class EditorViewModel(
         uiState = _uiState,
         saveNote = saveNote,
         saveTemplate = saveTemplate,
+        saveVaultNote = saveVaultNote,
         indexNoteTags = indexNoteTags,
         scope = viewModelScope,
-        autosaveDelayMs = AUTOSAVE_DELAY_MS
+        autosaveDelayMs = AUTOSAVE_DELAY_MS,
+        savesEnabled = !initialMode.isReadOnly
     )
     private val imageActions = EditorImageActions(
         uiState = _uiState,
@@ -119,6 +130,7 @@ class EditorViewModel(
     private val loadDelegate = EditorLoadDelegate(
         uiState = _uiState,
         getNoteById = getNoteById,
+        getVaultNoteById = getVaultNoteById,
         getTemplateById = getTemplateById,
         scheduleAutosave = { scheduleAutosave() },
         resetContentHistory = ::resetContentHistory
@@ -132,14 +144,25 @@ class EditorViewModel(
         viewModelScope.launch {
             loadDelegate.loadInitial(initialMode)
         }
+        if (initialMode.isVaultNote && observeVaultState != null) {
+            viewModelScope.launch {
+                observeVaultState().collect { state ->
+                    if (state != VaultState.UNLOCKED) {
+                        lockVaultEditor(state)
+                    }
+                }
+            }
+        }
     }
 
     // ── Field updates ─────────────────────────────────────────────────────────
 
     fun onTitleChange(value: String) {
+        if (ignoreReadOnlyChange("onTitleChange")) return
+        val redact = _uiState.value.redactContentForLogs
         NexNoteDebugLog.viewModel(
             event = "onTitleChange",
-            details = "${NexNoteDebugLog.textSummary("newTitle", value)} " +
+            details = "${NexNoteDebugLog.textSummary("newTitle", value, redact = redact)} " +
                 uiState.value.debugViewModelSummary()
         )
         _uiState.update { it.copy(title = value, isDirty = true, errorMessage = null) }
@@ -147,16 +170,20 @@ class EditorViewModel(
     }
 
     fun onContentChange(value: String, selectionOffset: Int? = null) {
+        if (ignoreReadOnlyChange("onContentChange")) return
+        val redact = _uiState.value.redactContentForLogs
         NexNoteDebugLog.viewModel(
             event = "onContentChangeReceived",
-            details = "selection=$selectionOffset ${NexNoteDebugLog.textSummary("newContent", value)} " +
+            details = "selection=$selectionOffset " +
+                "${NexNoteDebugLog.textSummary("newContent", value, redact = redact)} " +
                 uiState.value.debugViewModelSummary()
         )
         // Reject pastes or inputs that would exceed the safe layout limit.
         if (value.length > MAX_CONTENT_LENGTH) {
             NexNoteDebugLog.viewModel(
                 event = "onContentChangeRejectedTooLong",
-                details = "selection=$selectionOffset ${NexNoteDebugLog.textSummary("newContent", value)}"
+                details = "selection=$selectionOffset " +
+                    NexNoteDebugLog.textSummary("newContent", value, redact = redact)
             )
             _uiState.update {
                 it.copy(errorMessage = "Text too long (max ${MAX_CONTENT_LENGTH / 1_000}k characters)")
@@ -198,11 +225,13 @@ class EditorViewModel(
     }
 
     fun undoContentChange() {
+        if (ignoreReadOnlyChange("undoContentChange")) return
         NexNoteDebugLog.viewModel(event = "undoContentChange", details = uiState.value.debugViewModelSummary())
         contentHistory.undo()?.let(::applyHistorySnapshot)
     }
 
     fun redoContentChange() {
+        if (ignoreReadOnlyChange("redoContentChange")) return
         NexNoteDebugLog.viewModel(event = "redoContentChange", details = uiState.value.debugViewModelSummary())
         contentHistory.redo()?.let(::applyHistorySnapshot)
     }
@@ -213,6 +242,7 @@ class EditorViewModel(
     }
 
     fun onCreationDateChange(newTimestamp: Long) {
+        if (ignoreReadOnlyChange("onCreationDateChange")) return
         NexNoteDebugLog.viewModel(
             event = "onCreationDateChange",
             details = "newTimestamp=$newTimestamp ${uiState.value.debugViewModelSummary()}"
@@ -222,6 +252,7 @@ class EditorViewModel(
     }
 
     fun onBackgroundColorChange(color: Int?) {
+        if (ignoreReadOnlyChange("onBackgroundColorChange")) return
         NexNoteDebugLog.viewModel(
             event = "onBackgroundColorChange",
             details = "color=$color ${uiState.value.debugViewModelSummary()}"
@@ -232,6 +263,54 @@ class EditorViewModel(
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    private fun lockVaultEditor(vaultState: VaultState) {
+        val current = _uiState.value
+        if (!current.isVaultNote || current.isVaultLocked) return
+
+        NexNoteDebugLog.viewModel(
+            event = "lockVaultEditor",
+            details = "vaultState=$vaultState noteId=${current.noteId} dirty=${current.isDirty}"
+        )
+        saveDelegate.cancelPendingAutosave()
+        contentHistory.clear()
+        _uiState.update {
+            it.copy(
+                title = "",
+                content = "",
+                imagePaths = emptyList(),
+                isVaultLocked = true,
+                isReadOnly = true,
+                isDirty = false,
+                isSaving = false,
+                errorMessage = "Vault locked",
+                showPreview = false,
+                openedDirectlyInPreview = false,
+                openedDirectlyInEdit = false,
+                contentVersion = it.contentVersion + 1,
+                contentSelectionOffset = null
+            )
+        }
+    }
+
+    private fun ignoreReadOnlyChange(event: String): Boolean {
+        if (!_uiState.value.isReadOnly) return false
+        NexNoteDebugLog.viewModel(
+            event = event,
+            details = "ignored=readOnlyVaultNote noteId=${_uiState.value.noteId}"
+        )
+        return true
+    }
+
+    private fun ignoreVaultImageChange(event: String): Boolean {
+        if (!_uiState.value.isVaultNote) return false
+        NexNoteDebugLog.viewModel(
+            event = event,
+            details = "ignored=vaultImageEditingUnsupported noteId=${_uiState.value.noteId}"
+        )
+        _uiState.update { it.copy(errorMessage = "Vault images are not editable yet") }
+        return true
     }
 
     fun onTagChipClick(tagName: String) {
@@ -258,6 +337,8 @@ class EditorViewModel(
         openImageInputStream: () -> InputStream?,
         insertionOffset: Int? = null
     ) {
+        if (ignoreReadOnlyChange("onImagePicked")) return
+        if (ignoreVaultImageChange("onImagePicked")) return
         imageActions.onImagePicked(openImageInputStream, insertionOffset)
     }
 
@@ -266,6 +347,8 @@ class EditorViewModel(
      * Markdown tag from the content.
      */
     fun onRemoveImage(relativePath: String) {
+        if (ignoreReadOnlyChange("onRemoveImage")) return
+        if (ignoreVaultImageChange("onRemoveImage")) return
         imageActions.onRemoveImage(relativePath)
     }
 
@@ -295,8 +378,14 @@ class EditorViewModel(
             it.copy(
                 showPreview = newValue,
                 openedDirectlyInPreview = false,
-                openedDirectlyInEdit = false
+                openedDirectlyInEdit = false,
+                isDirty = if (current.isVaultNote) true else it.isDirty
             )
+        }
+        if (current.isReadOnly) return
+        if (current.isVaultNote) {
+            scheduleAutosave()
+            return
         }
         if (!current.isTemplateMode && current.noteId != NO_ID) {
             viewModelScope.launch { setNotePreviewMode(current.noteId, newValue) }
@@ -320,13 +409,19 @@ class EditorViewModel(
     }
 
     private fun scheduleAutosave() {
+        if (_uiState.value.isReadOnly) return
         saveDelegate.scheduleAutosave()
     }
 
     private fun resetContentHistory(content: String, selectionOffset: Int?) {
         NexNoteDebugLog.viewModel(
             event = "resetContentHistory",
-            details = "selection=$selectionOffset ${NexNoteDebugLog.textSummary("content", content)}"
+            details = "selection=$selectionOffset " +
+                NexNoteDebugLog.textSummary(
+                    "content",
+                    content,
+                    redact = _uiState.value.redactContentForLogs
+                )
         )
         contentHistory.reset(
             EditorContentSnapshot(text = content, selectionOffset = selectionOffset)
@@ -337,14 +432,20 @@ class EditorViewModel(
         previous: EditorContentSnapshot,
         next: EditorContentSnapshot
     ) {
+        if (_uiState.value.isReadOnly) return
         contentHistory.recordImmediateChange(previous, next)
     }
 
     private fun applyHistorySnapshot(snapshot: EditorContentSnapshot) {
+        if (ignoreReadOnlyChange("applyHistorySnapshot")) return
         NexNoteDebugLog.viewModel(
             event = "applyHistorySnapshot",
             details = "selection=${snapshot.selectionOffset} " +
-                NexNoteDebugLog.textSummary("snapshot", snapshot.text)
+                NexNoteDebugLog.textSummary(
+                    "snapshot",
+                    snapshot.text,
+                    redact = _uiState.value.redactContentForLogs
+                )
         )
         _uiState.update { current ->
             current.copy(
@@ -395,13 +496,16 @@ class EditorViewModel(
                     deleteNoteImage      = useCases.images.deleteNoteImage,
                     getNoteImageFile     = useCases.images.getNoteImageFile,
                     getNoteById           = useCases.notes.getNoteById,
+                    getVaultNoteById      = useCases.vault.getVaultNoteById,
                     getTemplateById       = useCases.templates.getTemplateById,
                     saveNote              = useCases.notes.saveNote,
                     saveTemplate          = useCases.templates.saveTemplate,
+                    saveVaultNote         = useCases.vault.saveVaultNote,
                     setNotePreviewMode    = useCases.notes.setNotePreviewMode,
                     observeNoteLinkCandidates = useCases.notes.observeNoteLinkCandidates,
                     observeTagsForNote    = useCases.tags.observeTagsForNote,
                     indexNoteTags         = useCases.tags.indexNoteTags,
+                    observeVaultState     = useCases.vault.observeVaultState,
                     observeThemeMode      = useCases.preferences.observeThemeMode,
                     setThemeMode          = useCases.preferences.setThemeMode,
                     initialMode           = mode
@@ -414,9 +518,10 @@ class EditorViewModel(
 private fun EditorUiState.debugViewModelSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
         "loading=$isLoading dirty=$isDirty saving=$isSaving " +
+        "vault=$isVaultNote readOnly=$isReadOnly " +
         "preview=$showPreview openedDirectlyInPreview=$openedDirectlyInPreview " +
         "openedDirectlyInEdit=$openedDirectlyInEdit " +
         "contentVersion=$contentVersion selection=$contentSelectionOffset " +
-        "${NexNoteDebugLog.textSummary("title", title)} " +
-        NexNoteDebugLog.textSummary("content", content)
+        "${NexNoteDebugLog.textSummary("title", title, redact = redactContentForLogs)} " +
+        NexNoteDebugLog.textSummary("content", content, redact = redactContentForLogs)
 }

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileCopy
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -127,6 +128,7 @@ internal fun NoteActionsSheet(
     clipboardCallbacks: NoteClipboardCallbacks,
     onDuplicate: (Note) -> Unit,
     onDelete: (Note) -> Unit,
+    onMoveToVault: ((Note) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     if (note == null) return
@@ -150,7 +152,12 @@ internal fun NoteActionsSheet(
             HorizontalDivider()
             when (page) {
                 NoteActionsPage.Actions -> NoteActionsMainPage(
+                    showMoveToVault = onMoveToVault != null && !note.isInVault,
                     onCopy = { page = NoteActionsPage.Copy },
+                    onMoveToVault = {
+                        onMoveToVault?.invoke(note)
+                        onDismiss()
+                    },
                     onDuplicate = {
                         onDuplicate(note)
                         onDismiss()
@@ -199,7 +206,9 @@ private fun NoteActionsHeader(
 
 @Composable
 private fun NoteActionsMainPage(
+    showMoveToVault: Boolean,
     onCopy: () -> Unit,
+    onMoveToVault: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -213,6 +222,13 @@ private fun NoteActionsMainPage(
         icon = Icons.Outlined.FileCopy,
         onClick = onDuplicate
     )
+    if (showMoveToVault) {
+        NoteActionRow(
+            text = "Move to Vault",
+            icon = Icons.Outlined.Lock,
+            onClick = onMoveToVault
+        )
+    }
     NoteActionRow(
         text = "Delete",
         icon = Icons.Outlined.Delete,

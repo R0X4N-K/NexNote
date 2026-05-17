@@ -4,20 +4,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.ui.screen.vault.VaultAndroidCredentialPromptCoordinator
 
 @Composable
 fun SettingsScreen(
+    onOpenVault: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val vaultPinChangeState by viewModel.vaultPinChangeState.collectAsStateWithLifecycle()
+    val vaultResetState by viewModel.vaultResetState.collectAsStateWithLifecycle()
+
+    VaultAndroidCredentialPromptCoordinator(
+        requestId = vaultPinChangeState.androidCredentialRefreshPromptRequestId,
+        isPromptPending = vaultPinChangeState.isAndroidCredentialRefreshPromptPending,
+        onPromptResult = viewModel::onAndroidCredentialRefreshPromptResult
+    )
 
     SettingsScreenContent(
         uiState = uiState,
+        vaultPinChangeState = vaultPinChangeState,
+        vaultResetState = vaultResetState,
         onThemeModeChange = viewModel::setThemeMode,
         onAccentColorChange = viewModel::setAccentColor,
         onFontScaleChange = viewModel::setFontScale,
         onNoteCardStyleChange = viewModel::setNoteCardStyle,
         onLeftHandedChange = viewModel::setLeftHanded,
-        onTimezoneChange = viewModel::setTimezoneId
+        onTimezoneChange = viewModel::setTimezoneId,
+        onOpenVault = onOpenVault,
+        onLockVault = viewModel::lockVault,
+        onProtectVaultRecentPreviewsChange = viewModel::setProtectVaultRecentPreviews,
+        onLockVaultOnBackgroundChange = viewModel::setLockVaultOnBackground,
+        onVaultAutoLockTimeoutChange = viewModel::setVaultAutoLockTimeout,
+        onUnlockVaultWithAndroidCredentialChange =
+            viewModel::setUnlockVaultWithAndroidCredential,
+        onChangeVaultPin = viewModel::changeVaultPin,
+        onClearVaultPinChangeFeedback = viewModel::clearVaultPinChangeFeedback,
+        onRequestVaultReset = viewModel::requestVaultReset,
+        onCancelVaultReset = viewModel::cancelVaultReset,
+        onConfirmVaultReset = viewModel::confirmVaultReset,
+        onClearVaultResetFeedback = viewModel::clearVaultResetFeedback
     )
 }

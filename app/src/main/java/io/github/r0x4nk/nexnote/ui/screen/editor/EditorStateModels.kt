@@ -27,9 +27,15 @@ data class EditorUiState(
     val isPinned: Boolean = false,
     val imagePaths: List<String> = emptyList(),
     val backgroundColor: Int? = null,
+    val isVaultNote: Boolean = false,
+    val isVaultLocked: Boolean = false,
+    val isReadOnly: Boolean = false,
     val isDirty: Boolean = false,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val contentVersion: Int = 0,
     val contentSelectionOffset: Int? = null
 )
+
+internal val EditorUiState.redactContentForLogs: Boolean
+    get() = isVaultNote || isReadOnly

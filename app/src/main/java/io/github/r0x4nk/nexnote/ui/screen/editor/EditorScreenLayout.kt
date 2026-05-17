@@ -12,19 +12,29 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -78,7 +88,8 @@ internal data class EditorScreenActions(
     val onSearchClose: () -> Unit,
     val onSearchQueryChange: (String) -> Unit,
     val onSearchPrevious: () -> Unit,
-    val onSearchNext: () -> Unit
+    val onSearchNext: () -> Unit,
+    val onUnlockVault: () -> Unit
 )
 
 @Composable
@@ -128,8 +139,9 @@ private fun EditorScreenTopBar(
     )
     EditorTopBar(
         isSaving = content.uiState.isSaving,
-        title = content.uiState.title,
+        title = if (content.uiState.isVaultLocked) "Vault locked" else content.uiState.title,
         isTemplateMode = content.uiState.isTemplateMode,
+        isReadOnly = content.uiState.isReadOnly,
         containerColor = content.noteBackground,
         toolingState = toolingState,
         toolingActions = toolingActions,
@@ -169,6 +181,7 @@ private fun EditorScreenBody(
     val keepOpenForToolbarMenu = content.state.showLinkTypeMenu || content.state.showHeadingMenu
     val toolbarVisible = (content.isKeyboardVisible || keepOpenForToolbarMenu) &&
         !content.uiState.showPreview &&
+        !content.uiState.isReadOnly &&
         !content.state.noteSearch.isActive &&
         !content.state.showNoteLinkPicker &&
         !content.uiState.isLoading
@@ -178,6 +191,14 @@ private fun EditorScreenBody(
             .fillMaxSize()
             .background(content.noteBackground)
     ) {
+        if (content.uiState.isVaultLocked) {
+            LockedVaultEditorBody(
+                onUnlockVault = actions.onUnlockVault,
+                modifier = Modifier.fillMaxSize()
+            )
+            return@Box
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -221,6 +242,7 @@ private fun EditorScreenBody(
         EditorKeyboardToolbar(
             visible = toolbarVisible,
             isTemplateMode = content.uiState.isTemplateMode,
+            canInsertImages = !content.uiState.isVaultNote,
             canUndo = content.undoRedoState.canUndo,
             canRedo = content.undoRedoState.canRedo,
             linkMenuExpanded = content.state.showLinkTypeMenu,
@@ -266,6 +288,54 @@ private fun EditorScreenBody(
 }
 
 @Composable
+private fun LockedVaultEditorBody(
+    onUnlockVault: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(44.dp)
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = "Vault locked",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Unlock the Vault to view this note.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(18.dp))
+            Button(
+                onClick = onUnlockVault,
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LockOpen,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text("Unlock Vault")
+            }
+        }
+    }
+}
+
+@Composable
 private fun EditorModeTabsArea(
     content: EditorScreenScaffoldContent,
     actions: EditorScreenActions
@@ -295,7 +365,7 @@ private fun EditorColorPickerPanel(
     noteBackground: Color,
     onBackgroundColorChange: (Int?) -> Unit
 ) {
-    if (!uiState.isTemplateMode) {
+    if (!uiState.isTemplateMode && !uiState.isReadOnly) {
         AnimatedVisibility(
             visible = state.showColorPicker,
             enter = editorExpandEnter(),
@@ -324,7 +394,7 @@ private fun EditorTitleArea(
         onValueChange = onTitleChange,
         placeholder = if (uiState.isTemplateMode) "Template name" else "Title",
         onNext = { state.contentFocusRequester.requestFocus() },
-        readOnly = uiState.showPreview,
+        readOnly = uiState.showPreview || uiState.isReadOnly,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)

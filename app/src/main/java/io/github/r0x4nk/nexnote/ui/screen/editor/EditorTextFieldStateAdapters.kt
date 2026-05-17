@@ -43,7 +43,8 @@ internal fun EditorScreenState.currentContentTextFieldValue(): TextFieldValue {
 internal fun EditorScreenState.commitContentTextFieldValue(
     modelContent: String,
     modelContentVersion: Int,
-    onContentChange: (String, Int?) -> Unit
+    onContentChange: (String, Int?) -> Unit,
+    redactContent: Boolean = false
 ): Boolean {
     val committedValue = EditorContentCommitPolicy.resolve(
         EditorContentCommitInput(
@@ -57,10 +58,10 @@ internal fun EditorScreenState.commitContentTextFieldValue(
     )
     NexNoteDebugLog.editor(
         event = "commitContentTextFieldValueResolved",
-        details = "resolved=${committedValue?.text?.let { NexNoteDebugLog.textSummary("text", it) } ?: "null"} " +
+        details = "resolved=${committedValue?.text?.let { NexNoteDebugLog.textSummary("text", it, redact = redactContent) } ?: "null"} " +
             "modelVersion=$modelContentVersion syncedVersion=$syncedContentVersion " +
             "pendingEdit=$hasPendingContentCommit " +
-            NexNoteDebugLog.textSummary("model", modelContent)
+            NexNoteDebugLog.textSummary("model", modelContent, redact = redactContent)
     )
     committedValue ?: return false
 

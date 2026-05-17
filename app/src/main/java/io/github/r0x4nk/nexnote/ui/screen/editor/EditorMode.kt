@@ -10,24 +10,34 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
  * through the ViewModel.
  */
 sealed class EditorMode {
-    data object NewNote : EditorMode()
+    data class NewNote(val initialCreationDate: Long? = null) : EditorMode()
+    data object NewVaultNote : EditorMode()
     data class ExistingNote(val noteId: Long) : EditorMode()
+    data class VaultNote(val noteId: Long) : EditorMode()
     data class NewFromTemplate(val templateId: Long) : EditorMode()
     data object NewTemplate : EditorMode()
     data class EditTemplate(val templateId: Long) : EditorMode()
 
     internal val startsWithLoading: Boolean
-        get() = this !is NewNote
+        get() = this !is NewNote && this != NewVaultNote
 
     internal val initialContentAnimationsEnabled: Boolean
-        get() = this !is ExistingNote
+        get() = this !is ExistingNote && this !is VaultNote
+
+    internal val isReadOnly: Boolean
+        get() = false
+
+    internal val isVaultNote: Boolean
+        get() = this is VaultNote || this == NewVaultNote
 
     internal val routeNoteId: Long
         get() = when (this) {
             is ExistingNote -> noteId
             is EditTemplate,
             is NewFromTemplate,
-            NewNote,
+            is VaultNote,
+            NewVaultNote,
+            is NewNote,
             NewTemplate -> NO_ID
         }
 
@@ -36,7 +46,9 @@ sealed class EditorMode {
             is NewFromTemplate -> templateId
             is EditTemplate,
             is ExistingNote,
-            NewNote,
+            is VaultNote,
+            NewVaultNote,
+            is NewNote,
             NewTemplate -> NO_ID
         }
 
@@ -46,12 +58,25 @@ sealed class EditorMode {
             is EditTemplate -> templateId
             is ExistingNote,
             is NewFromTemplate,
-            NewNote -> NO_ID
+            is VaultNote,
+            NewVaultNote,
+            is NewNote -> NO_ID
+        }
+
+    internal val routeCreationDate: Long
+        get() = when (this) {
+            is NewNote -> initialCreationDate ?: NO_CREATION_DATE
+            is EditTemplate,
+            is ExistingNote,
+            is NewFromTemplate,
+            is VaultNote,
+            NewVaultNote,
+            NewTemplate -> NO_CREATION_DATE
         }
 
     internal fun debugRouteSummary(): String {
         return "mode=$this routeNoteId=$routeNoteId routeTemplateId=$routeTemplateId " +
-            "routeEditTemplateId=$routeEditTemplateId"
+            "routeEditTemplateId=$routeEditTemplateId routeCreationDate=$routeCreationDate"
     }
 
     companion object {
@@ -61,16 +86,26 @@ sealed class EditorMode {
         /** Route sentinel for opening the template editor in create mode. */
         const val NEW_TEMPLATE_ID = -1L
 
+        /** Route sentinel for opening the editor to create a Vault note. */
+        const val NEW_VAULT_NOTE_ID = -1L
+
+        /** Sentinel: no route-provided creation date. */
+        const val NO_CREATION_DATE = 0L
+
         fun fromRoute(
             noteId: Long = NO_ID,
             templateId: Long = NO_ID,
-            editTemplateId: Long = NO_ID
+            editTemplateId: Long = NO_ID,
+            creationDate: Long = NO_CREATION_DATE,
+            vaultNoteId: Long = NO_ID
         ): EditorMode = when {
+            vaultNoteId == NEW_VAULT_NOTE_ID -> NewVaultNote
+            vaultNoteId != NO_ID -> VaultNote(vaultNoteId)
             editTemplateId == NEW_TEMPLATE_ID -> NewTemplate
             editTemplateId != NO_ID -> EditTemplate(editTemplateId)
             noteId != NO_ID -> ExistingNote(noteId)
             templateId != NO_ID -> NewFromTemplate(templateId)
-            else -> NewNote
+            else -> NewNote(creationDate.takeIf { it != NO_CREATION_DATE })
         }
     }
 }

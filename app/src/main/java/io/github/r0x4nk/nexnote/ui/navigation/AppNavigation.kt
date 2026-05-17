@@ -1,5 +1,13 @@
 package io.github.r0x4nk.nexnote.ui.navigation
 
+import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.SystemClock
+import android.view.Window
+import android.view.WindowManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,17 +36,28 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
+import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlay
 
 /**
@@ -62,11 +81,42 @@ import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlay
  * radial arc direction so items always stay fully on-screen.
  */
 @Composable
-fun AppNavigation(isLeftHanded: Boolean = false) {
+fun AppNavigation(
+    isLeftHanded: Boolean = false,
+    protectVaultRecentPreviews: Boolean = true,
+    lockVaultOnBackground: Boolean = true,
+    vaultAutoLockTimeout: VaultAutoLockTimeout = VaultAutoLockTimeout.IMMEDIATELY,
+    vaultState: VaultState = VaultState.NOT_CONFIGURED,
+    onVaultAutoLockRequested: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val showBottomBar = currentDestination?.route in bottomNavRoutes
+    val vaultNoteId = backStackEntry?.arguments?.getLong(Screen.Editor.ARG_VAULT_NOTE_ID)
+    val protectWindow = shouldProtectVaultRecentPreviews(
+        protectVaultRecentPreviews = protectVaultRecentPreviews,
+        vaultState = vaultState,
+        route = currentDestination?.route,
+        vaultNoteId = vaultNoteId
+    )
+
+    VaultRecentPreviewProtectionEffect(protectWindow)
+    VaultAutoLockOnStopEffect(
+        vaultState = vaultState,
+        lockImmediatelyOnBackground = lockVaultOnBackground,
+        onLockVault = onVaultAutoLockRequested
+    )
+    VaultAutoLockOnScreenOffEffect(
+        vaultState = vaultState,
+        lockImmediatelyOnBackground = lockVaultOnBackground,
+        onLockVault = onVaultAutoLockRequested
+    )
+    VaultAutoLockOnResumeEffect(
+        vaultState = vaultState,
+        vaultAutoLockTimeout = vaultAutoLockTimeout,
+        onLockVault = onVaultAutoLockRequested
+    )
 
     Scaffold(
         modifier            = Modifier.fillMaxSize(),
@@ -84,6 +134,157 @@ fun AppNavigation(isLeftHanded: Boolean = false) {
             innerPadding = innerPadding,
             isLeftHanded = isLeftHanded
         )
+    }
+}
+
+@Composable
+private fun VaultAutoLockOnScreenOffEffect(
+    vaultState: VaultState,
+    lockImmediatelyOnBackground: Boolean,
+    onLockVault: () -> Unit
+) {
+    val context = LocalContext.current
+    val currentVaultState by rememberUpdatedState(vaultState)
+    val currentLockImmediatelyOnBackground by rememberUpdatedState(lockImmediatelyOnBackground)
+    val currentOnLockVault by rememberUpdatedState(onLockVault)
+
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_OFF &&
+                    shouldAutoLockVaultOnScreenOff(
+                        lockImmediatelyOnBackground = currentLockImmediatelyOnBackground,
+                        vaultState = currentVaultState
+                    )
+                ) {
+                    currentOnLockVault()
+                }
+            }
+        }
+
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(Intent.ACTION_SCREEN_OFF),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
+    }
+}
+
+@Composable
+private fun VaultAutoLockOnStopEffect(
+    vaultState: VaultState,
+    lockImmediatelyOnBackground: Boolean,
+    onLockVault: () -> Unit
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = LocalContext.current as? Activity
+    val currentVaultState by rememberUpdatedState(vaultState)
+    val currentLockImmediatelyOnBackground by rememberUpdatedState(lockImmediatelyOnBackground)
+    val currentOnLockVault by rememberUpdatedState(onLockVault)
+
+    DisposableEffect(lifecycleOwner, activity) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP &&
+                shouldAutoLockVaultOnStop(
+                    lockImmediatelyOnBackground = currentLockImmediatelyOnBackground,
+                    vaultState = currentVaultState,
+                    isChangingConfigurations = activity?.isChangingConfigurations == true
+                )
+            ) {
+                currentOnLockVault()
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+}
+
+/**
+ * Auto-lock the Vault on app resume based on [VaultAutoLockTimeout].
+ *
+ * Records a monotonic background timestamp on [Lifecycle.Event.ON_STOP] regardless of
+ * the immediate background lock preference, then evaluates [shouldAutoLockVaultOnResume]
+ * on [Lifecycle.Event.ON_START] and invokes [onLockVault] when the policy requires it.
+ *
+ * The timestamp lives only in memory at this composable scope: it is not persisted to
+ * DataStore and is intentionally reset when the activity is destroyed and recreated.
+ * Configuration changes (e.g. rotation) skip the recording to avoid spurious resume
+ * locks right after recreation. Vault contents, PIN, keys and decrypted state are
+ * never read by this effect.
+ */
+@Composable
+private fun VaultAutoLockOnResumeEffect(
+    vaultState: VaultState,
+    vaultAutoLockTimeout: VaultAutoLockTimeout,
+    onLockVault: () -> Unit
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = LocalContext.current as? Activity
+    val currentVaultState by rememberUpdatedState(vaultState)
+    val currentVaultAutoLockTimeout by rememberUpdatedState(vaultAutoLockTimeout)
+    val currentOnLockVault by rememberUpdatedState(onLockVault)
+    val backgroundTimestampHolder = remember { LongArray(1) { Long.MIN_VALUE } }
+
+    DisposableEffect(lifecycleOwner, activity) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    if (activity?.isChangingConfigurations != true) {
+                        backgroundTimestampHolder[0] = SystemClock.elapsedRealtime()
+                    }
+                }
+                Lifecycle.Event.ON_START -> {
+                    val backgroundAt = backgroundTimestampHolder[0]
+                    if (backgroundAt != Long.MIN_VALUE) {
+                        val elapsed = SystemClock.elapsedRealtime() - backgroundAt
+                        backgroundTimestampHolder[0] = Long.MIN_VALUE
+                        if (shouldAutoLockVaultOnResume(
+                                timeout = currentVaultAutoLockTimeout,
+                                vaultState = currentVaultState,
+                                elapsedSinceBackgroundMillis = elapsed
+                            )
+                        ) {
+                            currentOnLockVault()
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+}
+
+@Composable
+private fun VaultRecentPreviewProtectionEffect(protectWindow: Boolean) {
+    val window = (LocalContext.current as? Activity)?.window
+    SideEffect {
+        window?.setSecurePreviewProtection(protectWindow)
+    }
+    DisposableEffect(window) {
+        onDispose {
+            window?.setSecurePreviewProtection(false)
+        }
+    }
+}
+
+private fun Window.setSecurePreviewProtection(enabled: Boolean) {
+    if (enabled) {
+        addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    } else {
+        clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 }
 

@@ -104,6 +104,7 @@ internal fun ColumnScope.EditorContentModeBox(
                 EditorContentTarget.Edit -> {
                     EditorContentField(
                         state = state,
+                        readOnly = uiState.isReadOnly,
                         keyboardToolbarVisible = keyboardToolbarVisible,
                         onContentEdited = onContentEdited,
                         onContentSelectionChange = onContentSelectionChange
@@ -117,6 +118,7 @@ internal fun ColumnScope.EditorContentModeBox(
             modelContentVersion = uiState.contentVersion,
             targets = noteLinkTargets,
             enabled = !uiState.showPreview &&
+                !uiState.isReadOnly &&
                 !state.noteSearch.isActive &&
                 !state.showNoteLinkPicker,
             onTargetSelected = onNoteLinkAutocompleteSelected,
@@ -182,6 +184,7 @@ private fun EditorMarkdownPreview(
 @Composable
 private fun EditorContentField(
     state: EditorScreenState,
+    readOnly: Boolean,
     keyboardToolbarVisible: Boolean,
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit
@@ -194,6 +197,7 @@ private fun EditorContentField(
     ContentField(
         textFieldState = state.contentTextFieldState,
         scrollState = state.contentScrollState,
+        readOnly = readOnly,
         onContentEdited = onContentEdited,
         onSelectionChange = onContentSelectionChange,
         onLayoutResult = { state.textLayoutResult = it },

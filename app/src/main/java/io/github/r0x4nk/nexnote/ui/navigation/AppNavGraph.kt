@@ -21,6 +21,7 @@ import io.github.r0x4nk.nexnote.ui.screen.settings.SettingsScreen
 import io.github.r0x4nk.nexnote.ui.screen.tags.TagsScreen
 import io.github.r0x4nk.nexnote.ui.screen.templates.TemplatesScreen
 import io.github.r0x4nk.nexnote.ui.screen.trash.TrashScreen
+import io.github.r0x4nk.nexnote.ui.screen.vault.VaultScreen
 
 @Composable
 internal fun AppNavHost(
@@ -49,11 +50,12 @@ private fun NavGraphBuilder.bottomNavDestinations(
     agendaDestination(navController, floatingBottomPadding)
     tagsDestination(navController, floatingBottomPadding)
     templatesDestination(navController, floatingBottomPadding)
-    settingsDestination()
+    settingsDestination(navController)
 }
 
 private fun NavGraphBuilder.backStackDestinations(navController: NavHostController) {
     trashDestination(navController)
+    vaultDestination(navController)
     exportDestination(navController)
     editorDestination(navController)
 }
@@ -76,6 +78,12 @@ private fun NavGraphBuilder.homeDestination(
             onOpenTrash = {
                 navController.navigate(Screen.Trash.route)
             },
+            onOpenVault = {
+                navController.navigate(Screen.Vault.route())
+            },
+            onMoveNoteToVault = { noteId ->
+                navController.navigate(Screen.Vault.moveNoteRoute(noteId))
+            },
             floatingBottomPadding = floatingBottomPadding
         )
     }
@@ -89,6 +97,9 @@ private fun NavGraphBuilder.agendaDestination(
         AgendaScreen(
             onNoteClick = { noteId ->
                 navController.navigate(Screen.Editor.existingNoteRoute(noteId))
+            },
+            onNewNote = { creationDate ->
+                navController.navigate(Screen.Editor.newNoteRoute(creationDate))
             },
             floatingBottomPadding = floatingBottomPadding
         )
@@ -131,9 +142,13 @@ private fun NavGraphBuilder.templatesDestination(
     }
 }
 
-private fun NavGraphBuilder.settingsDestination() {
+private fun NavGraphBuilder.settingsDestination(navController: NavHostController) {
     composable(Screen.Settings.route) {
-        SettingsScreen()
+        SettingsScreen(
+            onOpenVault = {
+                navController.navigate(Screen.Vault.route())
+            }
+        )
     }
 }
 
@@ -146,6 +161,28 @@ private fun NavGraphBuilder.trashDestination(navController: NavHostController) {
         popExitTransition  = { forwardExitTransition() }
     ) {
         TrashScreen(navController = navController)
+    }
+}
+
+private fun NavGraphBuilder.vaultDestination(navController: NavHostController) {
+    composable(
+        route              = Screen.Vault.route,
+        enterTransition    = { forwardEnterTransition() },
+        exitTransition     = { forwardExitTransition() },
+        popEnterTransition = { backwardEnterTransition() },
+        popExitTransition  = { forwardExitTransition() },
+        arguments          = vaultArguments()
+    ) { backStack ->
+        VaultScreen(
+            pendingMoveNoteId = backStack.vaultMoveNoteId(),
+            onBack = { navController.popBackStack() },
+            onCreateVaultNote = {
+                navController.navigate(Screen.Editor.newVaultNoteRoute())
+            },
+            onNoteClick = { noteId ->
+                navController.navigate(Screen.Editor.vaultNoteRoute(noteId))
+            }
+        )
     }
 }
 
@@ -204,12 +241,21 @@ private fun editorExportAction(
         }
         is EditorMode.EditTemplate,
         is EditorMode.NewFromTemplate,
-        EditorMode.NewNote,
+        EditorMode.NewVaultNote,
+        is EditorMode.NewNote,
+        is EditorMode.VaultNote,
         EditorMode.NewTemplate -> null
     }
 
 private fun exportArguments() = listOf(
     navArgument(Screen.Export.ARG_NOTE_ID) {
+        type         = NavType.LongType
+        defaultValue = Screen.NO_ID
+    }
+)
+
+private fun vaultArguments() = listOf(
+    navArgument(Screen.Vault.ARG_MOVE_NOTE_ID) {
         type         = NavType.LongType
         defaultValue = Screen.NO_ID
     }
@@ -227,26 +273,44 @@ private fun editorArguments() = listOf(
     navArgument(Screen.Editor.ARG_EDIT_TEMPLATE_ID) {
         type         = NavType.LongType
         defaultValue = Screen.NO_ID
+    },
+    navArgument(Screen.Editor.ARG_CREATION_DATE) {
+        type         = NavType.LongType
+        defaultValue = Screen.NO_CREATION_DATE
+    },
+    navArgument(Screen.Editor.ARG_VAULT_NOTE_ID) {
+        type         = NavType.LongType
+        defaultValue = Screen.NO_ID
     }
 )
 
 private fun NavBackStackEntry.exportNoteId(): Long =
     arguments?.getLong(Screen.Export.ARG_NOTE_ID) ?: Screen.NO_ID
 
+private fun NavBackStackEntry.vaultMoveNoteId(): Long =
+    arguments?.getLong(Screen.Vault.ARG_MOVE_NOTE_ID) ?: Screen.NO_ID
+
 private fun NavBackStackEntry.editorArgs(): EditorRouteArgs = EditorRouteArgs(
     noteId = arguments?.getLong(Screen.Editor.ARG_NOTE_ID) ?: Screen.NO_ID,
     templateId = arguments?.getLong(Screen.Editor.ARG_TEMPLATE_ID) ?: Screen.NO_ID,
-    editTemplateId = arguments?.getLong(Screen.Editor.ARG_EDIT_TEMPLATE_ID) ?: Screen.NO_ID
+    editTemplateId = arguments?.getLong(Screen.Editor.ARG_EDIT_TEMPLATE_ID) ?: Screen.NO_ID,
+    creationDate = arguments?.getLong(Screen.Editor.ARG_CREATION_DATE)
+        ?: Screen.NO_CREATION_DATE,
+    vaultNoteId = arguments?.getLong(Screen.Editor.ARG_VAULT_NOTE_ID) ?: Screen.NO_ID
 )
 
 private data class EditorRouteArgs(
     val noteId: Long,
     val templateId: Long,
-    val editTemplateId: Long
+    val editTemplateId: Long,
+    val creationDate: Long,
+    val vaultNoteId: Long
 ) {
     fun toEditorMode(): EditorMode = EditorMode.fromRoute(
         noteId = noteId,
         templateId = templateId,
-        editTemplateId = editTemplateId
+        editTemplateId = editTemplateId,
+        creationDate = creationDate,
+        vaultNoteId = vaultNoteId
     )
 }

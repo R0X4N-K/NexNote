@@ -10,6 +10,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
+import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.ui.navigation.AppNavigation
 import io.github.r0x4nk.nexnote.ui.theme.NexNoteTheme
 
@@ -18,13 +20,26 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val preferences = (application as NexNoteApp).useCases.preferences
+        val useCases = (application as NexNoteApp).useCases
+        val preferences = useCases.preferences
+        val vault = useCases.vault
 
         setContent {
             val themeMode by preferences.observeThemeMode().collectAsStateWithLifecycle(ThemeMode.SYSTEM)
             val fontScale by preferences.observeFontScale().collectAsStateWithLifecycle(FontScale.NORMAL)
             val isLeftHanded by preferences.observeLeftHanded().collectAsStateWithLifecycle(false)
             val accentColor by preferences.observeAccentColor().collectAsStateWithLifecycle(AccentColor.VIOLET)
+            val protectVaultRecentPreviews by preferences
+                .observeVaultRecentPreviewsProtection()
+                .collectAsStateWithLifecycle(true)
+            val lockVaultOnBackground by preferences
+                .observeVaultLockOnBackground()
+                .collectAsStateWithLifecycle(true)
+            val vaultAutoLockTimeout by preferences
+                .observeVaultAutoLockTimeout()
+                .collectAsStateWithLifecycle(VaultAutoLockTimeout.IMMEDIATELY)
+            val vaultState by vault.observeVaultState()
+                .collectAsStateWithLifecycle(VaultState.NOT_CONFIGURED)
 
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT     -> false
@@ -40,7 +55,14 @@ class MainActivity : ComponentActivity() {
                 fontScale   = fontScale.multiplier,
                 accentColor = accentColor
             ) {
-                AppNavigation(isLeftHanded = isLeftHanded)
+                AppNavigation(
+                    isLeftHanded = isLeftHanded,
+                    protectVaultRecentPreviews = protectVaultRecentPreviews,
+                    lockVaultOnBackground = lockVaultOnBackground,
+                    vaultAutoLockTimeout = vaultAutoLockTimeout,
+                    vaultState = vaultState,
+                    onVaultAutoLockRequested = { vault.lockVault() }
+                )
             }
         }
     }

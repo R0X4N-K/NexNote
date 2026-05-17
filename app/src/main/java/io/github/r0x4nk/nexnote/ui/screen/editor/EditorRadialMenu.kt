@@ -1,17 +1,14 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Note
-import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
@@ -27,32 +24,33 @@ internal fun EditorRadialMenuBindings(
     isKeyboardVisible: Boolean,
     showPreview: Boolean,
     isTemplateMode: Boolean,
+    isDarkTheme: Boolean,
     state: EditorScreenState,
-    launchImagePickerAtCursor: () -> Unit,
-    onInsertChecklist: () -> Unit,
-    onInsertNoteLink: () -> Unit,
     onToggleColorPicker: () -> Unit,
-    insertAtCursor: (String) -> Unit,
+    onThemeToggle: () -> Unit,
+    onSearchOpen: () -> Unit,
     scope: CoroutineScope
 ) {
-    RadialMenuFabHideEffect(hide = isKeyboardVisible)
-    EditorRadialMenuScrollBindings(showPreview, state, scope)
+    RadialMenuFabHideEffect(hide = isKeyboardVisible || !showPreview)
+    if (showPreview) {
+        EditorRadialMenuScrollBindings(state, scope)
+    }
     RadialMenuEffect(
-        items = rememberEditorRadialMenuItems(
-            launchImagePickerAtCursor,
+        items = rememberEditorPreviewRadialMenuItems(
+            showPreview,
             isTemplateMode,
-            onInsertChecklist,
-            onInsertNoteLink,
+            isDarkTheme,
             onToggleColorPicker,
-            insertAtCursor
+            onThemeToggle,
+            onSearchOpen
         ),
-        fabIcon = Icons.Default.Tune
+        fabIcon = if (showPreview) Icons.Default.Tune else null,
+        fabContentDescription = if (showPreview) "Open preview tools" else null
     )
 }
 
 @Composable
 private fun EditorRadialMenuScrollBindings(
-    showPreview: Boolean,
     state: EditorScreenState,
     scope: CoroutineScope
 ) {
@@ -65,22 +63,12 @@ private fun EditorRadialMenuScrollBindings(
     RadialMenuScrollEffect(
         onScrollToTop = {
             scrollRunner.launch {
-                if (showPreview) {
-                    state.previewListState.animateScrollToPreviewTop()
-                } else {
-                    state.selectContentEdge(offset = 0)
-                    state.contentScrollState.animateQuickScrollToTop()
-                }
+                state.previewListState.animateScrollToPreviewTop()
             }
         },
         onScrollToBottom = {
             scrollRunner.launch {
-                if (showPreview) {
-                    state.previewListState.animateScrollToPreviewBottom()
-                } else {
-                    state.selectContentEdge(offset = state.contentFieldValue.text.length)
-                    state.contentScrollState.animateQuickScrollToBottom()
-                }
+                state.previewListState.animateScrollToPreviewBottom()
             }
         }
     )
@@ -112,68 +100,25 @@ internal class EditorScrollShortcutRunner(
     }
 }
 
-private fun EditorScreenState.selectContentEdge(offset: Int) {
-    val current = currentContentTextFieldValue()
-    val safeOffset = offset.coerceIn(0, current.text.length)
-    setContentFieldValue(
-        TextFieldValue(
-            text = current.text,
-            selection = TextRange(safeOffset)
-        )
-    )
-}
-
 @Composable
-private fun rememberEditorRadialMenuItems(
-    launchImagePickerAtCursor: () -> Unit,
+private fun rememberEditorPreviewRadialMenuItems(
+    showPreview: Boolean,
     isTemplateMode: Boolean,
-    onInsertChecklist: () -> Unit,
-    onInsertNoteLink: () -> Unit,
+    isDarkTheme: Boolean,
     onToggleColorPicker: () -> Unit,
-    insertAtCursor: (String) -> Unit
+    onThemeToggle: () -> Unit,
+    onSearchOpen: () -> Unit
 ): List<RadialMenuItem> = remember(
-    launchImagePickerAtCursor,
+    showPreview,
     isTemplateMode,
-    onInsertChecklist,
-    onInsertNoteLink,
+    isDarkTheme,
     onToggleColorPicker,
-    insertAtCursor
+    onThemeToggle,
+    onSearchOpen
 ) {
+    if (!showPreview) return@remember emptyList()
+
     buildList {
-        if (!isTemplateMode) {
-            add(
-                RadialMenuItem(
-                    icon = Icons.Default.Image,
-                    label = "",
-                    action = launchImagePickerAtCursor,
-                    contentDescription = "Insert image"
-                )
-            )
-        }
-        add(
-            RadialMenuItem(
-                icon = Icons.Default.CheckBox,
-                label = "",
-                action = onInsertChecklist,
-                contentDescription = "Insert checklist"
-            )
-        )
-        add(
-            RadialMenuItem(
-                icon = Icons.Default.Link,
-                label = "",
-                action = { insertAtCursor(MARKDOWN_WEB_LINK_SNIPPET) },
-                contentDescription = "Insert web link"
-            )
-        )
-        add(
-            RadialMenuItem(
-                icon = Icons.AutoMirrored.Filled.Note,
-                label = "",
-                action = onInsertNoteLink,
-                contentDescription = "Insert note link"
-            )
-        )
         if (!isTemplateMode) {
             add(
                 RadialMenuItem(
@@ -184,5 +129,25 @@ private fun rememberEditorRadialMenuItems(
                 )
             )
         }
+        add(
+            RadialMenuItem(
+                icon = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
+                label = "",
+                action = onThemeToggle,
+                contentDescription = if (isDarkTheme) {
+                    "Switch to light theme"
+                } else {
+                    "Switch to dark theme"
+                }
+            )
+        )
+        add(
+            RadialMenuItem(
+                icon = Icons.Default.Search,
+                label = "",
+                action = onSearchOpen,
+                contentDescription = "Search in note"
+            )
+        )
     }
 }

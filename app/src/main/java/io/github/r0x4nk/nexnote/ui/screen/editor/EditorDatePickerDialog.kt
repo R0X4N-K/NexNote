@@ -15,7 +15,7 @@ internal fun EditorCreationDateDialog(
     state: EditorScreenState,
     viewModel: EditorViewModel
 ) {
-    if (state.showDatePicker && !uiState.isTemplateMode) {
+    if (state.showDatePicker && !uiState.isTemplateMode && !uiState.isReadOnly) {
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = uiState.creationDate
         )

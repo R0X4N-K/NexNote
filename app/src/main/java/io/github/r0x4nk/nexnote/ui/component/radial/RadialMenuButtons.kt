@@ -143,7 +143,8 @@ internal fun StaticMenuButton(
     fabY: Float,
     buttonSizePx: Float,
     closedIcon: ImageVector = Icons.Default.Add,
-    onToggle: () -> Unit,
+    closedContentDescription: String = "Open menu",
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density      = LocalDensity.current
@@ -157,11 +158,11 @@ internal fun StaticMenuButton(
             .shadow(elevation = 8.dp, shape = FAB_SHAPE, clip = false)
             .clip(FAB_SHAPE)
             .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(onClick = onToggle)
+            .clickable(onClick = onClick)
     ) {
         Icon(
             imageVector        = if (isMenuOpen) Icons.Default.Close else closedIcon,
-            contentDescription = if (isMenuOpen) "Close menu" else "Open menu",
+            contentDescription = if (isMenuOpen) "Close menu" else closedContentDescription,
             tint               = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier           = androidx.compose.ui.Modifier.size(24.dp)
         )

@@ -4,6 +4,8 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
+import io.github.r0x4nk.nexnote.domain.model.VaultState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,7 +20,12 @@ internal data class SettingsUiStateFlows(
     val timezoneId: Flow<String>,
     val isLeftHanded: Flow<Boolean>,
     val accentColor: Flow<AccentColor>,
-    val noteCardStyle: Flow<NoteCardStyle>
+    val noteCardStyle: Flow<NoteCardStyle>,
+    val vaultState: Flow<VaultState>,
+    val protectVaultRecentPreviews: Flow<Boolean>,
+    val lockVaultOnBackground: Flow<Boolean>,
+    val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout>,
+    val unlockVaultWithAndroidCredential: Flow<Boolean>
 )
 
 private data class SettingsDisplayPreferences(
@@ -33,6 +40,14 @@ private data class SettingsInteractionPreferences(
     val noteCardStyle: NoteCardStyle
 )
 
+private data class SettingsVaultPreferences(
+    val vaultState: VaultState,
+    val protectRecentPreviews: Boolean,
+    val lockOnBackground: Boolean,
+    val autoLockTimeout: VaultAutoLockTimeout,
+    val unlockWithAndroidCredential: Boolean
+)
+
 internal fun buildSettingsUiStateFlow(
     flows: SettingsUiStateFlows,
     scope: CoroutineScope
@@ -44,9 +59,17 @@ internal fun buildSettingsUiStateFlow(
             flows.accentColor,
             flows.noteCardStyle,
             ::SettingsInteractionPreferences
+        ),
+        combine(
+            flows.vaultState,
+            flows.protectVaultRecentPreviews,
+            flows.lockVaultOnBackground,
+            flows.vaultAutoLockTimeout,
+            flows.unlockVaultWithAndroidCredential,
+            ::SettingsVaultPreferences
         )
-    ) { display, interaction ->
-        buildSettingsUiState(display, interaction)
+    ) { display, interaction, vault ->
+        buildSettingsUiState(display, interaction, vault)
     }.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -56,7 +79,8 @@ internal fun buildSettingsUiStateFlow(
 
 private fun buildSettingsUiState(
     display: SettingsDisplayPreferences,
-    interaction: SettingsInteractionPreferences
+    interaction: SettingsInteractionPreferences,
+    vault: SettingsVaultPreferences
 ): SettingsUiState {
     return SettingsUiState(
         themeMode = display.themeMode,
@@ -65,6 +89,11 @@ private fun buildSettingsUiState(
         availableTimezones = TimeZone.getAvailableIDs().toList().sorted(),
         isLeftHanded = interaction.isLeftHanded,
         accentColor = interaction.accentColor,
-        noteCardStyle = interaction.noteCardStyle
+        noteCardStyle = interaction.noteCardStyle,
+        vaultState = vault.vaultState,
+        protectVaultRecentPreviews = vault.protectRecentPreviews,
+        lockVaultOnBackground = vault.lockOnBackground,
+        vaultAutoLockTimeout = vault.autoLockTimeout,
+        unlockVaultWithAndroidCredential = vault.unlockWithAndroidCredential
     )
 }

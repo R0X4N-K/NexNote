@@ -5,6 +5,7 @@ import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,15 +22,23 @@ internal class EditorSaveDelegate(
     private val uiState: MutableStateFlow<EditorUiState>,
     private val saveNote: SaveNoteUseCase,
     private val saveTemplate: SaveTemplateUseCase,
+    private val saveVaultNote: SaveVaultNoteUseCase?,
     private val indexNoteTags: IndexNoteTagsUseCase?,
     private val scope: CoroutineScope,
     private val autosaveDelayMs: Long,
+    private val savesEnabled: Boolean = true,
     private val tagIndexDedup: TagIndexDedupPolicy = TagIndexDedupPolicy()
 ) {
     private val saveMutex = Mutex()
     private var autosaveJob: Job? = null
 
+    fun cancelPendingAutosave() {
+        autosaveJob?.cancel()
+        autosaveJob = null
+    }
+
     fun scheduleAutosave() {
+        if (!savesEnabled) return
         NexNoteDebugLog.persistence(
             event = "scheduleAutosave",
             details = uiState.value.debugSaveSummary()
@@ -46,8 +55,7 @@ internal class EditorSaveDelegate(
             event = "flushPendingChanges",
             details = uiState.value.debugSaveSummary()
         )
-        autosaveJob?.cancel()
-        autosaveJob = null
+        cancelPendingAutosave()
         performSave()
     }
 
@@ -72,6 +80,7 @@ internal class EditorSaveDelegate(
      *         `false` if the underlying save failed.
      */
     suspend fun ensurePersisted(): Boolean = saveMutex.withLock {
+        if (!savesEnabled) return@withLock false
         val snapshot = uiState.value
         NexNoteDebugLog.persistence(
             event = "ensurePersistedStart",
@@ -80,6 +89,9 @@ internal class EditorSaveDelegate(
 
         // Already has an id (note) or is editing a template — nothing to do.
         // Templates intentionally do not participate in the image flow.
+        if (snapshot.isVaultNote) {
+            return@withLock snapshot.noteId != EditorViewModel.NO_ID
+        }
         if (snapshot.isTemplateMode || snapshot.noteId != EditorViewModel.NO_ID) {
             return@withLock true
         }
@@ -103,6 +115,16 @@ internal class EditorSaveDelegate(
     }
 
     suspend fun performSave(): Boolean = saveMutex.withLock {
+        if (!savesEnabled) {
+            autosaveJob?.cancel()
+            autosaveJob = null
+            uiState.update { it.copy(isSaving = false, isDirty = false) }
+            NexNoteDebugLog.persistence(
+                event = "performSaveSkipped",
+                details = "reason=readOnly ${uiState.value.debugSaveSummary()}"
+            )
+            return@withLock true
+        }
         val snapshot = uiState.value
         val shouldSaveSnapshot = shouldSave(snapshot)
         NexNoteDebugLog.persistence(
@@ -120,7 +142,11 @@ internal class EditorSaveDelegate(
 
         uiState.update { it.copy(isSaving = true, errorMessage = null) }
         return@withLock try {
-            if (snapshot.isTemplateMode) saveAsTemplate(snapshot) else saveAsNote(snapshot)
+            when {
+                snapshot.isTemplateMode -> saveAsTemplate(snapshot)
+                snapshot.isVaultNote -> saveAsVaultNote(snapshot)
+                else -> saveAsNote(snapshot)
+            }
             NexNoteDebugLog.persistence(
                 event = "performSaveSuccess",
                 details = uiState.value.debugSaveSummary()
@@ -138,6 +164,7 @@ internal class EditorSaveDelegate(
     }
 
     fun flushOnCleared() {
+        if (!savesEnabled) return
         val state = uiState.value
         NexNoteDebugLog.persistence(
             event = "flushOnCleared",
@@ -167,6 +194,35 @@ internal class EditorSaveDelegate(
             )
             NexNoteDebugLog.persistence(
                 event = "saveAsNoteAfterRepository",
+                details = "savedId=$savedId changedDuringSave=$changedDuringSave " +
+                    "current=${current.debugSaveSummary()}"
+            )
+            current.copy(
+                noteId = if (snapshot.noteId == EditorViewModel.NO_ID) savedId else current.noteId,
+                lastModifiedDate = savedAt,
+                isSaving = false,
+                isDirty = changedDuringSave
+            )
+        }
+    }
+
+    private suspend fun saveAsVaultNote(snapshot: EditorUiState) {
+        val saveVault = saveVaultNote ?: error("Vault note save use case is not available")
+        val savedAt = System.currentTimeMillis()
+        val note = buildNote(snapshot).copy(isInVault = true)
+        NexNoteDebugLog.persistence(
+            event = "saveAsVaultNoteBeforeRepository",
+            details = NexNoteDebugLog.noteSummary("note", note)
+        )
+        val savedId = saveVault(note)
+
+        uiState.update { current ->
+            val changedDuringSave = EditorSaveChangePolicy.hasUnsavedNoteChanges(
+                savedSnapshot = snapshot,
+                currentState = current
+            )
+            NexNoteDebugLog.persistence(
+                event = "saveAsVaultNoteAfterRepository",
                 details = "savedId=$savedId changedDuringSave=$changedDuringSave " +
                     "current=${current.debugSaveSummary()}"
             )
@@ -281,7 +337,8 @@ internal class EditorSaveDelegate(
 private fun EditorUiState.debugSaveSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
         "dirty=$isDirty saving=$isSaving loading=$isLoading preview=$showPreview " +
+        "vault=$isVaultNote readOnly=$isReadOnly " +
         "contentVersion=$contentVersion selection=$contentSelectionOffset " +
-        "${NexNoteDebugLog.textSummary("title", title)} " +
-        NexNoteDebugLog.textSummary("content", content)
+        "${NexNoteDebugLog.textSummary("title", title, redact = redactContentForLogs)} " +
+        NexNoteDebugLog.textSummary("content", content, redact = redactContentForLogs)
 }

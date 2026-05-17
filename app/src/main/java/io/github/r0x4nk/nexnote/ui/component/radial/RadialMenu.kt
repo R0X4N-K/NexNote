@@ -33,6 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,9 +44,9 @@ import kotlin.math.roundToInt
 private val RADIUS_DP = 140.dp
 private val EXTENDED_RADIUS_DP = 168.dp
 
-// Diameter of the circular icon background.
+// Diameter of the circular icon background. Keep this fixed so radial tools
+// remain visually consistent across screens and item counts.
 private val ICON_SIZE_DP = 48.dp
-private val EXTENDED_ICON_SIZE_DP = 44.dp
 
 // Width of the item Column (icon + label). 80 dp fits icon-only items while
 // leaving comfortable visual separation for items at 25°–37° apart on a 140 dp radius.
@@ -82,6 +83,7 @@ fun RadialMenu(
     items: List<RadialMenuItem>,
     onItemClick: (Int) -> Unit,
     onDismiss: () -> Unit,
+    radiusOffset: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     if (!state.isOpen || items.isEmpty()) return
@@ -98,8 +100,12 @@ fun RadialMenu(
     )
 
     val useExtendedLayout = items.size >= EXTENDED_LAYOUT_ITEM_THRESHOLD
-    val radiusDp          = if (useExtendedLayout) EXTENDED_RADIUS_DP else RADIUS_DP
-    val iconSizeDp        = if (useExtendedLayout) EXTENDED_ICON_SIZE_DP else ICON_SIZE_DP
+    val radiusDp          = if (useExtendedLayout) {
+        EXTENDED_RADIUS_DP + radiusOffset
+    } else {
+        RADIUS_DP + radiusOffset
+    }
+    val iconSizeDp        = ICON_SIZE_DP
     val itemWidthDp       = if (useExtendedLayout) EXTENDED_ITEM_WIDTH_DP else ITEM_WIDTH_DP
 
     val radiusPx        = with(density) { radiusDp.toPx() }
@@ -131,7 +137,7 @@ fun RadialMenu(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(state, items) {
+                .pointerInput(state, items, radiusPx) {
                     detectTapGestures { tapOffset ->
                         val hitIndex = findItemHit(
                             tap             = tapOffset,

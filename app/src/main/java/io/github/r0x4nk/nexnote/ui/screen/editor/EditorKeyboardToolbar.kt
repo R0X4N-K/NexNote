@@ -109,6 +109,7 @@ private val EditorToolbarHeadingTextSize = 17.sp
 internal fun EditorKeyboardToolbar(
     visible: Boolean,
     isTemplateMode: Boolean,
+    canInsertImages: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
     linkMenuExpanded: Boolean,
@@ -183,6 +184,7 @@ internal fun EditorKeyboardToolbar(
                 Spacer(Modifier.width(EditorToolbarHistoryGap))
                 EditorToolbarScrollableActions(
                     isTemplateMode = isTemplateMode,
+                    canInsertImages = canInsertImages,
                     linkMenuExpanded = linkMenuExpanded,
                     onLinkMenuExpandedChange = onLinkMenuExpandedChange,
                     headingMenuExpanded = headingMenuExpanded,
@@ -242,6 +244,7 @@ private fun EditorToolbarHistoryActions(
 @Composable
 private fun EditorToolbarScrollableActions(
     isTemplateMode: Boolean,
+    canInsertImages: Boolean,
     linkMenuExpanded: Boolean,
     onLinkMenuExpandedChange: (Boolean) -> Unit,
     headingMenuExpanded: Boolean,
@@ -294,7 +297,7 @@ private fun EditorToolbarScrollableActions(
         EditorToolbarIcon(onToggleInlineCode, Icons.Default.Code, "Inline code")
         EditorToolbarIcon(onInsertCodeBlock, Icons.Default.DataObject, "Code block")
         EditorToolbarIcon(onToggleQuote, Icons.Default.FormatQuote, "Quote")
-        if (!isTemplateMode) {
+        if (!isTemplateMode && canInsertImages) {
             EditorToolbarIcon(onInsertImage, Icons.Default.Image, "Insert image")
         }
         EditorToolbarIcon(onInsertHorizontalRule, Icons.Default.HorizontalRule, "Horizontal rule")

@@ -24,10 +24,12 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
+import io.github.r0x4nk.nexnote.util.DateUtils
 
 @Composable
 fun AgendaScreen(
     onNoteClick: (Long) -> Unit,
+    onNewNote: (Long) -> Unit,
     floatingBottomPadding: Dp = 0.dp,
     viewModel: AgendaViewModel = viewModel(factory = AgendaViewModel.Factory)
 ) {
@@ -41,6 +43,7 @@ fun AgendaScreen(
     val actions = rememberAgendaActions(
         viewModel = viewModel,
         onNoteClick = onNoteClick,
+        onNewNote = onNewNote,
         onRequestNoteActions = { note -> activeActionsNote = note }
     )
 
@@ -67,17 +70,21 @@ fun AgendaScreen(
     BackHandler(enabled = uiState.isSearchActive) {
         actions.onSearchToggle(false)
     }
-    AgendaRadialMenu(
-        viewMode = uiState.viewMode,
-        actions = actions
-    )
-
     if (uiState.isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
     }
+
+    AgendaNewNoteFab(
+        selectedDateMillis = DateUtils.toMillis(
+            uiState.selectedYear,
+            uiState.selectedMonth,
+            uiState.selectedDay
+        ),
+        actions = actions
+    )
 
     AgendaScreenLayout(
         layoutState = AgendaLayoutState(

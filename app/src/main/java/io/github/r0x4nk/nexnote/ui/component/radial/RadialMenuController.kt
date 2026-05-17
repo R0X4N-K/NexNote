@@ -7,6 +7,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,10 +26,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
  * items — used by the editor to hide the FAB while the keyboard is open.
  */
 class RadialMenuController {
+    private var activeRegistration: Any? = null
+
     var items by mutableStateOf<List<RadialMenuItem>>(emptyList())
         internal set
 
     var fabIcon by mutableStateOf<ImageVector?>(null)
+        internal set
+
+    var fabContentDescription by mutableStateOf<String?>(null)
+        internal set
+
+    var fabAction by mutableStateOf<(() -> Unit)?>(null)
         internal set
 
     var overrideFabHidden by mutableStateOf(false)
@@ -56,55 +65,127 @@ class RadialMenuController {
      */
     var transientBottomObstructionPx by mutableIntStateOf(0)
         internal set
+
+    internal fun register(
+        owner: Any,
+        items: List<RadialMenuItem>,
+        fabIcon: ImageVector?,
+        fabContentDescription: String?,
+        fabAction: (() -> Unit)?
+    ) {
+        activeRegistration = owner
+        this.items = items
+        this.fabIcon = fabIcon
+        this.fabContentDescription = fabContentDescription
+        this.fabAction = fabAction
+    }
+
+    internal fun clearRegistration(owner: Any) {
+        if (activeRegistration !== owner) return
+        activeRegistration = null
+        items = emptyList()
+        fabIcon = null
+        fabContentDescription = null
+        fabAction = null
+    }
 }
 
 val LocalRadialMenuController = compositionLocalOf { RadialMenuController() }
 
 /**
- * Called from each screen to register its radial menu items and an optional
- * closed-state FAB icon for the current destination.
+ * Called from each screen to register its radial menu items and optional
+ * closed-state FAB metadata for the current destination.
  *
  * Items are only applied when the owning back-stack entry is **RESUMED**.
  * During a predictive-back gesture the destination screen is composed at
  * lifecycle state STARTED (not RESUMED), so this guard prevents the FAB from
  * appearing in the preview frame before the transition is committed.
  *
- * Items (and the FAB icon) are cleared automatically in
+ * Items (and FAB metadata) are cleared automatically in
  * [DisposableEffect.onDispose] when the screen leaves composition, but only if
- * they have not already been replaced by the incoming screen — the referential-
- * equality check on [items] prevents the navigation race where the new screen
- * sets its items and then the old screen's dispose clears everything.
+ * the same registration still owns the controller. That owner-token check
+ * prevents the navigation race where the new screen sets its FAB state and then
+ * the old screen's dispose clears everything.
  *
- * @param items   Items to show in the radial arc.
+ * @param items Items to show in the radial arc.
  * @param fabIcon Closed-state icon for the FAB. Null falls back to Add.
+ * @param fabContentDescription Accessibility label for the closed FAB.
  */
 @Composable
-fun RadialMenuEffect(items: List<RadialMenuItem>, fabIcon: ImageVector? = null) {
+fun RadialMenuEffect(
+    items: List<RadialMenuItem>,
+    fabIcon: ImageVector? = null,
+    fabContentDescription: String? = null
+) {
+    RadialFabRegistrationEffect(
+        items = items,
+        fabIcon = fabIcon,
+        fabContentDescription = fabContentDescription,
+        directFabAction = null
+    )
+}
+
+/**
+ * Registers the shared FAB as a single direct action for screens that do not
+ * need a radial arc. This keeps one-item menus from adding an unnecessary
+ * second tap while preserving the same placement, insets, and snackbar lift
+ * behaviour as [RadialMenuEffect].
+ */
+@Composable
+fun RadialFabActionEffect(
+    contentDescription: String,
+    onClick: () -> Unit,
+    fabIcon: ImageVector? = null
+) {
+    RadialFabRegistrationEffect(
+        items = emptyList(),
+        fabIcon = fabIcon,
+        fabContentDescription = contentDescription,
+        directFabAction = onClick
+    )
+}
+
+@Composable
+private fun RadialFabRegistrationEffect(
+    items: List<RadialMenuItem>,
+    fabIcon: ImageVector?,
+    fabContentDescription: String?,
+    directFabAction: (() -> Unit)?
+) {
     val controller     = LocalRadialMenuController.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val registration   = remember { Any() }
+    val currentFabAction by rememberUpdatedState(directFabAction)
+    val hasDirectFabAction = directFabAction != null
+    val registeredFabAction: (() -> Unit)? = remember(hasDirectFabAction) {
+        if (hasDirectFabAction) {
+            { currentFabAction?.invoke() }
+        } else {
+            null
+        }
+    }
 
     // Observe lifecycle state reactively so DisposableEffect re-runs on every
     // STARTED ↔ RESUMED transition.
     val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
     val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
 
-    DisposableEffect(items, fabIcon, isResumed) {
+    DisposableEffect(items, fabIcon, fabContentDescription, registeredFabAction, isResumed) {
         if (isResumed) {
-            controller.items   = items
-            controller.fabIcon = fabIcon
+            controller.register(
+                owner = registration,
+                items = items,
+                fabIcon = fabIcon,
+                fabContentDescription = fabContentDescription,
+                fabAction = registeredFabAction
+            )
         } else {
             // Screen is in back-preview (STARTED): remove its items so the FAB
             // does not flash before the gesture is committed.
-            if (controller.items === items) {
-                controller.items   = emptyList()
-                controller.fabIcon = null
-            }
+            controller.clearRegistration(registration)
         }
         onDispose {
-            if (controller.items === items) {
-                controller.items   = emptyList()
-                controller.fabIcon = null
-            }
+            controller.clearRegistration(registration)
         }
     }
 }

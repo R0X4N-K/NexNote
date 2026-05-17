@@ -32,12 +32,14 @@ internal fun rememberTogglePreviewPreservingScroll(
     showPreview: Boolean,
     content: String,
     contentVersion: Int,
+    redactContent: Boolean,
     viewModel: EditorViewModel
 ): () -> Unit {
     val density = LocalDensity.current
     val showPreviewRef = rememberUpdatedState(showPreview)
     val contentRef = rememberUpdatedState(content)
     val contentVersionRef = rememberUpdatedState(contentVersion)
+    val redactContentRef = rememberUpdatedState(redactContent)
     val textLayoutResultRef = rememberUpdatedState(state.textLayoutResult)
     val contentViewportHeightPxRef = rememberUpdatedState(state.unobscuredContentViewportHeightPx)
 
@@ -48,13 +50,18 @@ internal fun rememberTogglePreviewPreservingScroll(
                 details = "showPreview=${showPreviewRef.value} " +
                     "field=${state.currentContentTextFieldValue().text.length} " +
                     "modelVersion=${contentVersionRef.value} " +
-                    NexNoteDebugLog.textSummary("modelContent", contentRef.value)
+                    NexNoteDebugLog.textSummary(
+                        "modelContent",
+                        contentRef.value,
+                        redact = redactContentRef.value
+                    )
             )
             if (!showPreviewRef.value) {
                 state.commitContentTextFieldValue(
                     modelContent = contentRef.value,
                     modelContentVersion = contentVersionRef.value,
-                    onContentChange = viewModel::onContentChange
+                    onContentChange = viewModel::onContentChange,
+                    redactContent = redactContentRef.value
                 )
             }
             val currentContent = state.currentContentTextFieldValue()
@@ -100,8 +107,10 @@ private fun editModeAnchorOffset(
 @Composable
 internal fun rememberInsertAtCursor(
     state: EditorScreenState,
+    redactContent: Boolean,
     viewModel: EditorViewModel
 ): (String) -> Unit {
+    val redactContentRef = rememberUpdatedState(redactContent)
     return remember(state.contentFieldValueState, viewModel) {
         { insertion ->
             val current = state.currentContentTextFieldValue()
@@ -114,8 +123,8 @@ internal fun rememberInsertAtCursor(
             NexNoteDebugLog.editor(
                 event = "insertAtCursor",
                 details = "cursor=$cursor nextCursor=$nextCursor " +
-                    "${NexNoteDebugLog.textSummary("insertion", insertion)} " +
-                    NexNoteDebugLog.textSummary("newText", newText)
+                    "${NexNoteDebugLog.textSummary("insertion", insertion, redact = redactContentRef.value)} " +
+                    NexNoteDebugLog.textSummary("newText", newText, redact = redactContentRef.value)
             )
             state.setContentFieldValue(TextFieldValue(newText, TextRange(nextCursor)))
             viewModel.onContentChange(newText, nextCursor)
@@ -127,8 +136,10 @@ internal fun rememberInsertAtCursor(
 @Composable
 internal fun rememberApplyMarkdownEdit(
     state: EditorScreenState,
+    redactContent: Boolean,
     viewModel: EditorViewModel
 ): ((String, TextRange) -> MarkdownTextEdit) -> Unit {
+    val redactContentRef = rememberUpdatedState(redactContent)
     return remember(state.contentFieldValueState, viewModel) {
         { edit ->
             val current = state.currentContentTextFieldValue()
@@ -141,7 +152,7 @@ internal fun rememberApplyMarkdownEdit(
                 event = "applyMarkdownEdit",
                 details = "selection=${current.selection.start}-${current.selection.end} " +
                     "nextSelection=${nextSelection.start}-${nextSelection.end} " +
-                    NexNoteDebugLog.textSummary("newText", result.text)
+                    NexNoteDebugLog.textSummary("newText", result.text, redact = redactContentRef.value)
             )
             state.setContentFieldValue(TextFieldValue(result.text, nextSelection))
             viewModel.onContentChange(result.text, nextSelection.end)
@@ -153,8 +164,10 @@ internal fun rememberApplyMarkdownEdit(
 @Composable
 internal fun rememberReplaceNoteLinkAutocomplete(
     state: EditorScreenState,
+    redactContent: Boolean,
     viewModel: EditorViewModel
 ): (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit {
+    val redactContentRef = rememberUpdatedState(redactContent)
     return remember(state.contentFieldValueState, viewModel) {
         { match, target ->
             val current = state.currentContentTextFieldValue()
@@ -166,7 +179,7 @@ internal fun rememberReplaceNoteLinkAutocomplete(
             NexNoteDebugLog.editor(
                 event = "replaceNoteLinkAutocomplete",
                 details = "start=$start end=$end targetId=${target.id} nextCursor=$nextCursor " +
-                    NexNoteDebugLog.textSummary("newText", newText)
+                    NexNoteDebugLog.textSummary("newText", newText, redact = redactContentRef.value)
             )
             state.setContentFieldValue(TextFieldValue(newText, TextRange(nextCursor)))
             viewModel.onContentChange(newText, nextCursor)

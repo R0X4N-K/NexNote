@@ -53,6 +53,7 @@ internal object RadialMenuOverlayDefaults {
 
 private val BUTTON_SIZE_DP         = RadialMenuOverlayDefaults.fabSize
 private val BUTTON_MARGIN_DP       = RadialMenuOverlayDefaults.fabMargin
+private val SCROLL_SHORTCUT_RADIAL_RADIUS_OFFSET = 12.dp
 
 // Fixed arc ranges keep all items safely above the navigation bar.
 //
@@ -177,16 +178,30 @@ fun RadialMenuOverlay(
 
             val fabCenter = Offset(fabX + buttonSizePx / 2f, fabY + buttonSizePx / 2f)
 
-            // Fixed safe arc: items always land above the navigation bar.
+            // Fixed safe arc: items always land above the navigation bar. The
+            // angles stay stable across screens; editor scroll shortcuts only
+            // add radial distance below.
             val arcStartDeg = if (isLeftHanded) ARC_START_LEFT else ARC_START_RIGHT
             val arcEndDeg   = if (isLeftHanded) ARC_END_LEFT   else ARC_END_RIGHT
 
-            val showFab = controller.items.isNotEmpty() && !controller.overrideFabHidden
+            val hasMenuItems = controller.items.isNotEmpty()
+            val directFabAction = controller.fabAction
+            val scrollToTop    = controller.scrollToTopAction
+            val scrollToBottom = controller.scrollToBottomAction
+            val hasScrollShortcuts = scrollToTop != null && scrollToBottom != null
+            val radiusOffset = if (hasScrollShortcuts) {
+                SCROLL_SHORTCUT_RADIAL_RADIUS_OFFSET
+            } else {
+                0.dp
+            }
+            val showFab = (hasMenuItems || directFabAction != null) && !controller.overrideFabHidden
 
             // Auto-close the radial menu whenever the FAB becomes invisible
-            // (e.g. the editor's keyboard opens while the menu is open).
-            LaunchedEffect(showFab) {
-                if (!showFab && menuState.isOpen) menuState = RadialMenuState()
+            // or stops owning radial items (e.g. switches to a direct action).
+            LaunchedEffect(showFab, hasMenuItems) {
+                if ((!showFab || !hasMenuItems) && menuState.isOpen) {
+                    menuState = RadialMenuState()
+                }
             }
 
             Box(Modifier.fillMaxSize()) {
@@ -194,10 +209,11 @@ fun RadialMenuOverlay(
                 content()
 
                 // ── Radial menu (renders below the FAB in z-order) ───────────────
-                if (menuState.isOpen) {
+                if (menuState.isOpen && hasMenuItems) {
                     RadialMenu(
                         state       = menuState,
                         items       = controller.items,
+                        radiusOffset = radiusOffset,
                         onItemClick = { index ->
                             val snapshot = controller.items.toList()
                             menuState = RadialMenuState()
@@ -210,8 +226,6 @@ fun RadialMenuOverlay(
                 // ── Scroll shortcut buttons (editor-only, stacked above the FAB) ──
                 // Shown only while an editor screen has registered scroll callbacks
                 // and the FAB itself is visible (same visibility guard).
-                val scrollToTop    = controller.scrollToTopAction
-                val scrollToBottom = controller.scrollToBottomAction
                 if (showFab && scrollToTop != null && scrollToBottom != null) {
                     ScrollShortcutButtons(
                         fabX             = fabX,
@@ -230,17 +244,27 @@ fun RadialMenuOverlay(
                         fabY         = fabY,
                         buttonSizePx = buttonSizePx,
                         closedIcon   = controller.fabIcon ?: Icons.Default.Add,
-                        onToggle     = {
-                            menuState = if (menuState.isOpen) {
-                                RadialMenuState()
-                            } else {
-                                RadialMenuState(
-                                    isOpen        = true,
-                                    center        = fabCenter,
-                                    selectedIndex = -1,
-                                    arcStartDeg   = arcStartDeg,
-                                    arcEndDeg     = arcEndDeg
-                                )
+                        closedContentDescription = closedFabContentDescription(
+                            hasDirectAction = directFabAction != null,
+                            customDescription = controller.fabContentDescription
+                        ),
+                        onClick = {
+                            val action = controller.fabAction
+                            if (action != null) {
+                                menuState = RadialMenuState()
+                                action()
+                            } else if (hasMenuItems) {
+                                menuState = if (menuState.isOpen) {
+                                    RadialMenuState()
+                                } else {
+                                    RadialMenuState(
+                                        isOpen        = true,
+                                        center        = fabCenter,
+                                        selectedIndex = -1,
+                                        arcStartDeg   = arcStartDeg,
+                                        arcEndDeg     = arcEndDeg
+                                    )
+                                }
                             }
                         }
                     )
@@ -249,3 +273,8 @@ fun RadialMenuOverlay(
         }
     }
 }
+
+private fun closedFabContentDescription(
+    hasDirectAction: Boolean,
+    customDescription: String?
+): String = customDescription ?: if (hasDirectAction) "Activate action" else "Open menu"

@@ -2,6 +2,7 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.util.DateUtils
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.update
 internal class EditorLoadDelegate(
     private val uiState: MutableStateFlow<EditorUiState>,
     private val getNoteById: GetNoteByIdUseCase,
+    private val getVaultNoteById: GetVaultNoteByIdUseCase?,
     private val getTemplateById: GetTemplateByIdUseCase,
     private val scheduleAutosave: () -> Unit,
     private val resetContentHistory: (content: String, selectionOffset: Int?) -> Unit
@@ -22,8 +24,10 @@ internal class EditorLoadDelegate(
         when (mode) {
             is EditorMode.EditTemplate -> loadTemplateForEdit(mode.templateId)
             is EditorMode.ExistingNote -> loadNote(mode.noteId)
+            EditorMode.NewVaultNote -> finishEmptyEditorLoad(null)
+            is EditorMode.VaultNote -> loadVaultNote(mode.noteId)
             is EditorMode.NewFromTemplate -> loadTemplate(mode.templateId)
-            EditorMode.NewNote -> finishEmptyEditorLoad()
+            is EditorMode.NewNote -> finishEmptyEditorLoad(mode.initialCreationDate)
             EditorMode.NewTemplate -> startNewTemplate()
         }
     }
@@ -103,6 +107,45 @@ internal class EditorLoadDelegate(
         resetContentHistory("", null)
     }
 
+    private suspend fun loadVaultNote(id: Long) {
+        NexNoteDebugLog.viewModel(event = "loadVaultNoteStart", details = "vaultNoteId=$id")
+        val note = getVaultNoteById?.invoke(id)
+        if (note == null || !note.isInVault) {
+            NexNoteDebugLog.viewModel(event = "loadVaultNoteMissing", details = "vaultNoteId=$id")
+            uiState.update { it.copy(isLoading = false, errorMessage = "Vault note not available") }
+            return
+        }
+        NexNoteDebugLog.viewModel(
+            event = "loadVaultNoteResult",
+            details = NexNoteDebugLog.noteSummary("note", note)
+        )
+
+        val loadedState = EditorUiState(
+            noteId = note.id,
+            isLoading = false,
+            title = note.title,
+            content = note.content,
+            showPreview = note.isPreviewMode,
+            openedDirectlyInPreview = note.isPreviewMode,
+            openedDirectlyInEdit = !note.isPreviewMode,
+            creationDate = note.creationDate,
+            lastModifiedDate = note.lastModifiedDate,
+            timezone = note.timezone,
+            isPinned = note.isPinned,
+            imagePaths = note.imagePaths,
+            backgroundColor = note.backgroundColor,
+            isVaultNote = true,
+            isDirty = false,
+            contentVersion = 1
+        )
+        uiState.update { loadedState }
+        NexNoteDebugLog.viewModel(
+            event = "loadVaultNoteStateApplied",
+            details = loadedState.debugLoadSummary()
+        )
+        resetContentHistory(loadedState.content, loadedState.contentSelectionOffset)
+    }
+
     private suspend fun loadTemplateForEdit(editTemplateId: Long) {
         NexNoteDebugLog.viewModel(
             event = "loadTemplateForEditStart",
@@ -140,15 +183,28 @@ internal class EditorLoadDelegate(
         resetContentHistory(loadedState.content, loadedState.contentSelectionOffset)
     }
 
-    private fun finishEmptyEditorLoad() {
-        NexNoteDebugLog.viewModel(event = "finishEmptyEditorLoad")
-        uiState.update { it.copy(isLoading = false) }
+    private fun finishEmptyEditorLoad(initialCreationDate: Long?) {
+        NexNoteDebugLog.viewModel(
+            event = "finishEmptyEditorLoad",
+            details = "initialCreationDate=$initialCreationDate"
+        )
+        uiState.update { current ->
+            if (initialCreationDate == null) {
+                current.copy(isLoading = false)
+            } else {
+                current.copy(
+                    isLoading = false,
+                    creationDate = initialCreationDate
+                )
+            }
+        }
     }
 }
 
 private fun EditorUiState.debugLoadSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +
         "loading=$isLoading dirty=$isDirty preview=$showPreview " +
+        "vault=$isVaultNote readOnly=$isReadOnly " +
         "contentVersion=$contentVersion " +
-        NexNoteDebugLog.textSummary("content", content)
+        NexNoteDebugLog.textSummary("content", content, redact = redactContentForLogs)
 }

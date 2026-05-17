@@ -1,7 +1,5 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -11,8 +9,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialFabActionEffect
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 
 @Composable
@@ -28,12 +25,9 @@ fun TemplatesScreen(
         { onNavigateToEditTemplate(Screen.NEW_TEMPLATE_ID) }
     }
 
-    RadialMenuEffect(
-        items = remember(newTemplateAction) {
-            listOf(
-                RadialMenuItem(Icons.Default.Add, "", action = newTemplateAction)
-            )
-        }
+    RadialFabActionEffect(
+        contentDescription = "Create template",
+        onClick = newTemplateAction
     )
 
     TemplatesErrorSnackbar(

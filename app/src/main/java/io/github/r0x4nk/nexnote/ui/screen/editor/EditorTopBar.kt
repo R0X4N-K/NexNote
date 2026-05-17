@@ -82,6 +82,7 @@ internal fun EditorTopBar(
     isSaving: Boolean,
     title: String,
     isTemplateMode: Boolean,
+    isReadOnly: Boolean,
     containerColor: Color,
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
@@ -137,6 +138,7 @@ internal fun EditorTopBar(
             EditorTopBarActions(
                 isSaving = isSaving,
                 isTemplateMode = isTemplateMode,
+                isReadOnly = isReadOnly,
                 toolingState = toolingState,
                 toolingActions = toolingActions,
                 searchState = searchState,
@@ -236,6 +238,7 @@ private fun EditorSearchField(
 private fun EditorTopBarActions(
     isSaving: Boolean,
     isTemplateMode: Boolean,
+    isReadOnly: Boolean,
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
     searchState: NoteSearchState,
@@ -257,6 +260,7 @@ private fun EditorTopBarActions(
     } else {
         EditorBrowsingActions(
             isTemplateMode = isTemplateMode,
+            isReadOnly = isReadOnly,
             toolingState = toolingState,
             toolingActions = toolingActions,
             onSearchOpen = onSearchOpen,
@@ -329,6 +333,7 @@ private fun EditorSearchActions(
 @Composable
 private fun EditorBrowsingActions(
     isTemplateMode: Boolean,
+    isReadOnly: Boolean,
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
     onSearchOpen: () -> Unit,
@@ -341,7 +346,7 @@ private fun EditorBrowsingActions(
             onClick = onExport
         )
     }
-    if (!isTemplateMode) {
+    if (!isTemplateMode && !isReadOnly) {
         NexIconButton(
             imageVector = Icons.Default.Palette,
             contentDescription = "Note background color",

@@ -69,7 +69,11 @@ internal fun EditorContentSyncEffect(
             event = "contentSyncEffect",
             details = "cursor=$cursorPos noteId=${uiState.noteId} " +
                 "version=${uiState.contentVersion} " +
-                NexNoteDebugLog.textSummary("content", uiState.content)
+                NexNoteDebugLog.textSummary(
+                    "content",
+                    uiState.content,
+                    redact = uiState.redactContentForLogs
+                )
         )
         state.setContentFieldValue(syncedValue)
         state.markContentCommitted()
@@ -104,7 +108,8 @@ internal fun EditorPendingContentCommitEffect(
         state.commitContentTextFieldValue(
             modelContent = uiState.content,
             modelContentVersion = uiState.contentVersion,
-            onContentChange = viewModel::onContentChange
+            onContentChange = viewModel::onContentChange,
+            redactContent = uiState.redactContentForLogs
         )
         if (state.noteSearch.isActive) {
             state.noteSearch = state.noteSearch.refresh(state.contentFieldValue.text)
@@ -268,10 +273,12 @@ internal fun EditorInitialFocusEffect(
                 runCatching { state.titleFocusRequester.requestFocus() }
             }
             is EditorMode.NewFromTemplate,
-            EditorMode.NewNote -> {
+            is EditorMode.NewNote,
+            EditorMode.NewVaultNote -> {
                 runCatching { state.contentFocusRequester.requestFocus() }
             }
-            is EditorMode.ExistingNote -> Unit
+            is EditorMode.ExistingNote,
+            is EditorMode.VaultNote -> Unit
         }
     }
 }
