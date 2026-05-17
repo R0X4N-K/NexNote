@@ -2,7 +2,12 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultState
+import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
@@ -29,6 +34,23 @@ class EditorViewModelTest : EditorViewModelTestBase() {
         assertFalse(state.isDirty)
         assertFalse(state.isLoading)
         assertEquals(EditorViewModel.NO_ID, state.noteId)
+    }
+
+    @Test
+    fun `new note opened with creation date keeps that date when saved`() = runTest {
+        val initialCreationDate = 123_456L
+        val vm = viewModel(creationDate = initialCreationDate)
+        runCurrent()
+
+        assertEquals(initialCreationDate, vm.uiState.value.creationDate)
+        assertFalse(vm.uiState.value.isDirty)
+
+        vm.onContentChange("Agenda note")
+        vm.flushPendingChanges()
+        advanceUntilIdle()
+
+        val savedNote = fakeNoteDao.getNoteById(vm.uiState.value.noteId)
+        assertEquals(initialCreationDate, savedNote?.creationDate)
     }
 
     @Test
@@ -85,6 +107,134 @@ class EditorViewModelTest : EditorViewModelTestBase() {
         val vm = viewModel(noteId = 999L)
         runCurrent()
         assertTrue(vm.uiState.value.errorMessage?.isNotBlank() == true)
+    }
+
+    @Test
+    fun `vault note mode loads note through vault repository as editable vault content`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                isInVault = true
+            )
+        )
+
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        val state = vm.uiState.value
+        assertEquals(77L, state.noteId)
+        assertEquals("Private title", state.title)
+        assertEquals("Private body", state.content)
+        assertTrue(state.isVaultNote)
+        assertFalse(state.isReadOnly)
+        assertFalse(state.isDirty)
+        assertFalse(state.isLoading)
+    }
+
+    @Test
+    fun `vault note mode saves edits through vault repository only`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                isInVault = true
+            )
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onTitleChange("Updated title")
+        vm.onContentChange("Updated body")
+        vm.onBackgroundColorChange(0x123456)
+        vm.flushPendingChanges()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals("Updated title", state.title)
+        assertEquals("Updated body", state.content)
+        assertFalse(state.isDirty)
+        assertEquals(0, fakeNoteDao.insertedCount)
+        assertEquals(0, fakeNoteDao.updatedCount)
+        assertEquals(1, vaultRepository.savedNotes.size)
+        assertEquals("Updated title", vaultRepository.savedNotes.single().title)
+        assertEquals("Updated body", vaultRepository.savedNotes.single().content)
+        assertTrue(vaultRepository.savedNotes.single().isInVault)
+    }
+
+    @Test
+    fun `new vault note mode saves new content through vault repository only`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val vm = viewModel(
+            mode = EditorMode.NewVaultNote,
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        assertTrue(vm.uiState.value.isVaultNote)
+        assertFalse(vm.uiState.value.isLoading)
+
+        vm.onTitleChange("Private draft")
+        vm.onContentChange("Encrypted later by repository")
+        vm.flushPendingChanges()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertNotEquals(EditorViewModel.NO_ID, state.noteId)
+        assertFalse(state.isDirty)
+        assertEquals(0, fakeNoteDao.insertedCount)
+        assertEquals(0, fakeNoteDao.updatedCount)
+        assertEquals(1, vaultRepository.savedNotes.size)
+        assertEquals("Private draft", vaultRepository.savedNotes.single().title)
+        assertEquals("Encrypted later by repository", vaultRepository.savedNotes.single().content)
+        assertTrue(vaultRepository.savedNotes.single().isInVault)
+    }
+
+    @Test
+    fun `vault editor clears decrypted state when vault locks`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val vaultStateRepository = FakeEditorVaultStateRepository(VaultState.UNLOCKED)
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                isInVault = true
+            )
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository),
+            observeVaultState = ObserveVaultStateUseCase(vaultStateRepository)
+        )
+        runCurrent()
+
+        vm.onTitleChange("Unsaved private title")
+        vm.onContentChange("Unsaved private body")
+        vaultStateRepository.setState(VaultState.LOCKED)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertTrue(state.isVaultNote)
+        assertTrue(state.isVaultLocked)
+        assertTrue(state.isReadOnly)
+        assertFalse(state.isDirty)
+        assertEquals("", state.title)
+        assertEquals("", state.content)
+        assertTrue(state.imagePaths.isEmpty())
+        assertTrue(vaultRepository.savedNotes.isEmpty())
     }
 
     @Test

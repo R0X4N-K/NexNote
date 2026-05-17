@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -164,6 +165,98 @@ class UserPreferencesRepositoryTest {
         ds.edit { it[ACCENT_COLOR_KEY] = "UNKNOWN_COLOR" }
         assertEquals(AccentColor.VIOLET, ds.accentColor.first())
     }
+
+    // ── Vault recent previews protection ─────────────────────────────────────
+
+    @Test
+    fun `protectVaultRecentPreviews defaults to true`() = testScope.runTest {
+        val ds = createTestDataStore()
+        assertTrue(ds.protectVaultRecentPreviews.first())
+    }
+
+    @Test
+    fun `setProtectVaultRecentPreviews persists false`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[VAULT_RECENT_PREVIEWS_PROTECTED_KEY] = false }
+        assertFalse(ds.protectVaultRecentPreviews.first())
+    }
+
+    @Test
+    fun `setProtectVaultRecentPreviews round-trips true after false`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[VAULT_RECENT_PREVIEWS_PROTECTED_KEY] = false }
+        ds.edit { it[VAULT_RECENT_PREVIEWS_PROTECTED_KEY] = true }
+        assertTrue(ds.protectVaultRecentPreviews.first())
+    }
+
+    // ── Vault auto-lock ──────────────────────────────────────────────────────
+
+    @Test
+    fun `lockVaultOnBackground defaults to true`() = testScope.runTest {
+        val ds = createTestDataStore()
+        assertTrue(ds.lockVaultOnBackground.first())
+    }
+
+    @Test
+    fun `setLockVaultOnBackground persists false`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[VAULT_LOCK_ON_BACKGROUND_KEY] = false }
+        assertFalse(ds.lockVaultOnBackground.first())
+    }
+
+    @Test
+    fun `setLockVaultOnBackground round-trips true after false`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[VAULT_LOCK_ON_BACKGROUND_KEY] = false }
+        ds.edit { it[VAULT_LOCK_ON_BACKGROUND_KEY] = true }
+        assertTrue(ds.lockVaultOnBackground.first())
+    }
+
+    @Test
+    fun `vaultAutoLockTimeout defaults to IMMEDIATELY`() = testScope.runTest {
+        val ds = createTestDataStore()
+        assertEquals(VaultAutoLockTimeout.IMMEDIATELY, ds.vaultAutoLockTimeout.first())
+    }
+
+    @Test
+    fun `setVaultAutoLockTimeout persists all values`() = testScope.runTest {
+        val ds = createTestDataStore()
+        VaultAutoLockTimeout.entries.forEach { timeout ->
+            ds.edit { it[VAULT_AUTO_LOCK_TIMEOUT_KEY] = timeout.name }
+            assertEquals(timeout, ds.vaultAutoLockTimeout.first())
+        }
+    }
+
+    @Test
+    fun `unknown vaultAutoLockTimeout falls back to IMMEDIATELY`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[VAULT_AUTO_LOCK_TIMEOUT_KEY] = "AFTER_99_MINUTES" }
+        assertEquals(VaultAutoLockTimeout.IMMEDIATELY, ds.vaultAutoLockTimeout.first())
+    }
+
+    // ── Vault Android credential unlock ─────────────────────────────────────
+
+    @Test
+    fun `unlockVaultWithAndroidCredential defaults to false`() = testScope.runTest {
+        val ds = createTestDataStore()
+        assertFalse(ds.unlockVaultWithAndroidCredential.first())
+    }
+
+    @Test
+    fun `setUnlockVaultWithAndroidCredential persists true`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] = true }
+        assertTrue(ds.unlockVaultWithAndroidCredential.first())
+    }
+
+    @Test
+    fun `setUnlockVaultWithAndroidCredential round-trips false after true`() =
+        testScope.runTest {
+            val ds = createTestDataStore()
+            ds.edit { it[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] = true }
+            ds.edit { it[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] = false }
+            assertFalse(ds.unlockVaultWithAndroidCredential.first())
+        }
 }
 
 // ── Helper extensions (mirror UserPreferencesRepository logic) ────────────────
@@ -173,6 +266,14 @@ private val FONT_SCALE_KEY   = stringPreferencesKey("font_scale")
 private val TIMEZONE_KEY     = stringPreferencesKey("timezone_id")
 private val LEFT_HANDED_KEY  = booleanPreferencesKey("is_left_handed")
 private val ACCENT_COLOR_KEY = stringPreferencesKey("accent_color")
+private val VAULT_RECENT_PREVIEWS_PROTECTED_KEY =
+    booleanPreferencesKey("vault_recent_previews_protected")
+private val VAULT_LOCK_ON_BACKGROUND_KEY =
+    booleanPreferencesKey("vault_lock_on_background")
+private val VAULT_AUTO_LOCK_TIMEOUT_KEY =
+    stringPreferencesKey("vault_auto_lock_timeout")
+private val VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY =
+    booleanPreferencesKey("vault_android_credential_unlock_enabled")
 
 private val DataStore<Preferences>.themeMode
     get() = data.map { prefs ->
@@ -196,4 +297,22 @@ private val DataStore<Preferences>.accentColor
     get() = data.map { prefs ->
         val name = prefs[ACCENT_COLOR_KEY] ?: AccentColor.VIOLET.name
         AccentColor.entries.firstOrNull { it.name == name } ?: AccentColor.VIOLET
+    }
+
+private val DataStore<Preferences>.protectVaultRecentPreviews
+    get() = data.map { prefs -> prefs[VAULT_RECENT_PREVIEWS_PROTECTED_KEY] ?: true }
+
+private val DataStore<Preferences>.lockVaultOnBackground
+    get() = data.map { prefs -> prefs[VAULT_LOCK_ON_BACKGROUND_KEY] ?: true }
+
+private val DataStore<Preferences>.vaultAutoLockTimeout
+    get() = data.map { prefs ->
+        val name = prefs[VAULT_AUTO_LOCK_TIMEOUT_KEY] ?: VaultAutoLockTimeout.IMMEDIATELY.name
+        VaultAutoLockTimeout.entries.firstOrNull { it.name == name } ?:
+            VaultAutoLockTimeout.IMMEDIATELY
+    }
+
+private val DataStore<Preferences>.unlockVaultWithAndroidCredential
+    get() = data.map { prefs ->
+        prefs[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] ?: false
     }

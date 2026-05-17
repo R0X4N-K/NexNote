@@ -9,19 +9,32 @@ import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
+import io.github.r0x4nk.nexnote.domain.model.VaultState
+import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
+import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
+import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
+import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
+import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
+import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
 import kotlinx.coroutines.Dispatchers
@@ -59,9 +72,13 @@ abstract class EditorViewModelTestBase {
         noteId: Long = 0L,
         templateId: Long = 0L,
         editTemplateId: Long = 0L,
-        mode: EditorMode = EditorMode.fromRoute(noteId, templateId, editTemplateId),
+        creationDate: Long = EditorMode.NO_CREATION_DATE,
+        mode: EditorMode = EditorMode.fromRoute(noteId, templateId, editTemplateId, creationDate),
         imageStorage: NoteImageStorage = FakeEditorNoteImageStorage(),
-        preferencesRepository: IUserPreferencesRepository = FakeEditorPreferencesRepository()
+        preferencesRepository: IUserPreferencesRepository = FakeEditorPreferencesRepository(),
+        getVaultNoteById: GetVaultNoteByIdUseCase? = null,
+        saveVaultNote: SaveVaultNoteUseCase? = null,
+        observeVaultState: ObserveVaultStateUseCase? = null
     ): EditorViewModel {
         val noteRepository = NoteRepositoryImpl(fakeNoteDao, imageStorage)
         val templateRepository = TemplateRepositoryImpl(fakeTemplateDao)
@@ -70,15 +87,93 @@ abstract class EditorViewModelTestBase {
             deleteNoteImage = DeleteNoteImageUseCase(imageStorage),
             getNoteImageFile = GetNoteImageFileUseCase(imageStorage),
             getNoteById = GetNoteByIdUseCase(noteRepository),
+            getVaultNoteById = getVaultNoteById,
             getTemplateById = GetTemplateByIdUseCase(templateRepository),
             saveNote = SaveNoteUseCase(noteRepository),
             saveTemplate = SaveTemplateUseCase(templateRepository),
+            saveVaultNote = saveVaultNote,
             setNotePreviewMode = SetNotePreviewModeUseCase(noteRepository),
             observeNoteLinkCandidates = ObserveNoteLinkCandidatesUseCase(noteRepository),
+            observeVaultState = observeVaultState,
             observeThemeMode = ObserveThemeModeUseCase(preferencesRepository),
             setThemeMode = SetThemeModeUseCase(preferencesRepository),
             initialMode = mode
         )
+    }
+}
+
+class FakeEditorVaultStateRepository(
+    initialState: VaultState = VaultState.UNLOCKED
+) : VaultRepository {
+    private val stateFlow = MutableStateFlow(initialState)
+    private val hasProtectedMaterial = MutableStateFlow(false)
+    override val state: Flow<VaultState> = stateFlow
+    override val hasAndroidCredentialProtectedUnlockMaterial: Flow<Boolean> =
+        hasProtectedMaterial
+
+    fun setState(state: VaultState) {
+        stateFlow.value = state
+    }
+
+    override suspend fun configurePin(pin: CharArray) {
+        stateFlow.value = VaultState.LOCKED
+    }
+
+    override suspend fun unlockWithPin(pin: CharArray): Boolean {
+        stateFlow.value = VaultState.UNLOCKED
+        return true
+    }
+
+    override suspend fun unlockWithAndroidCredential(): UnlockVaultWithAndroidCredentialResult =
+        UnlockVaultWithAndroidCredentialResult.Failed
+
+    override suspend fun refreshAndroidCredentialProtectedUnlockMaterial():
+        RefreshVaultAndroidCredentialProtectedMaterialResult =
+        RefreshVaultAndroidCredentialProtectedMaterialResult.Failed
+
+    override suspend fun clearAndroidCredentialProtectedUnlockMaterial() = Unit
+
+    override suspend fun changePin(
+        currentPin: CharArray,
+        newPin: CharArray
+    ): ChangeVaultPinResult = ChangeVaultPinResult.RewrapFailed
+
+    override suspend fun resetVault(): ResetVaultResult = ResetVaultResult.Failed
+
+    override fun lock() {
+        stateFlow.value = VaultState.LOCKED
+    }
+}
+
+class FakeEditorVaultNoteRepository : VaultNoteRepository {
+    private val notes = MutableStateFlow<List<Note>>(emptyList())
+    private var nextId = 1L
+    override val vaultNotes: Flow<List<Note>> = notes
+    val savedNotes = mutableListOf<Note>()
+
+    fun addNote(note: Note) {
+        notes.value = notes.value + note
+    }
+
+    override suspend fun getVaultNoteById(id: Long): Note? =
+        notes.value.firstOrNull { it.id == id && it.isInVault && !it.isDeleted }
+
+    override suspend fun saveVaultNote(note: Note): Long {
+        val id = if (note.id == 0L) nextId++ else note.id
+        val saved = note.copy(id = id, isInVault = true)
+        savedNotes += saved
+        notes.value = notes.value
+            .filterNot { it.id == saved.id }
+            .plus(saved)
+        return saved.id
+    }
+
+    override suspend fun moveNormalNoteToVault(id: Long): MoveNoteToVaultResult {
+        throw UnsupportedOperationException("Not needed for editor Vault read-only tests")
+    }
+
+    override suspend fun removeNoteFromVault(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for editor Vault tests")
     }
 }
 
@@ -110,6 +205,11 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
     private val _isLeftHanded = MutableStateFlow(false)
     private val _accentColor = MutableStateFlow(AccentColor.VIOLET)
     private val _noteCardStyle = MutableStateFlow(NoteCardStyle.TITLE_AND_PREVIEW)
+    private val _protectVaultRecentPreviews = MutableStateFlow(true)
+    private val _lockVaultOnBackground = MutableStateFlow(true)
+    private val _vaultAutoLockTimeout =
+        MutableStateFlow(VaultAutoLockTimeout.IMMEDIATELY)
+    private val _unlockVaultWithAndroidCredential = MutableStateFlow(false)
 
     var lastThemeMode: ThemeMode? = null
 
@@ -119,6 +219,11 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
     override val isLeftHanded: Flow<Boolean> = _isLeftHanded
     override val accentColor: Flow<AccentColor> = _accentColor
     override val noteCardStyle: Flow<NoteCardStyle> = _noteCardStyle
+    override val protectVaultRecentPreviews: Flow<Boolean> = _protectVaultRecentPreviews
+    override val lockVaultOnBackground: Flow<Boolean> = _lockVaultOnBackground
+    override val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout> = _vaultAutoLockTimeout
+    override val unlockVaultWithAndroidCredential: Flow<Boolean> =
+        _unlockVaultWithAndroidCredential
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         lastThemeMode = mode
@@ -143,6 +248,22 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
 
     override suspend fun setNoteCardStyle(style: NoteCardStyle) {
         _noteCardStyle.value = style
+    }
+
+    override suspend fun setProtectVaultRecentPreviews(value: Boolean) {
+        _protectVaultRecentPreviews.value = value
+    }
+
+    override suspend fun setLockVaultOnBackground(value: Boolean) {
+        _lockVaultOnBackground.value = value
+    }
+
+    override suspend fun setVaultAutoLockTimeout(timeout: VaultAutoLockTimeout) {
+        _vaultAutoLockTimeout.value = timeout
+    }
+
+    override suspend fun setUnlockVaultWithAndroidCredential(value: Boolean) {
+        _unlockVaultWithAndroidCredential.value = value
     }
 }
 
@@ -175,6 +296,24 @@ class FakeEditorNoteDao : NoteDao {
         )
 
     override suspend fun getNoteById(id: Long): NoteEntity? = notes[id]
+
+    override fun getAllVaultNotes(): Flow<List<NoteEntity>> =
+        MutableStateFlow(notes.values.filter { !it.isDeleted && it.isInVault }.toList())
+
+    override suspend fun getVaultNoteById(id: Long): NoteEntity? =
+        notes[id]?.takeIf { !it.isDeleted && it.isInVault }
+
+    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> =
+        notes.values.filter { !it.isDeleted && it.isInVault }.toList()
+
+    override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
+        notes.values.filter { it.isInVault }.toList()
+
+    override suspend fun deleteAllVaultNotes(): Int {
+        val toRemove = notes.values.filter { it.isInVault }.map { it.id }
+        toRemove.forEach { notes.remove(it) }
+        return toRemove.size
+    }
 
     override fun searchNotes(query: String): Flow<List<NoteEntity>> =
         MutableStateFlow(emptyList())

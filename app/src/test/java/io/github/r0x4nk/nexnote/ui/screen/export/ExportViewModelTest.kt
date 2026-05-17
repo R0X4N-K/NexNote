@@ -253,6 +253,24 @@ private class FakeNoteDao : NoteDao {
     override suspend fun getNoteById(id: Long): NoteEntity? =
         _notes.value.find { it.id == id && !it.isDeleted }
 
+    override fun getAllVaultNotes(): Flow<List<NoteEntity>> =
+        _notes.map { list -> list.filter { !it.isDeleted && it.isInVault } }
+
+    override suspend fun getVaultNoteById(id: Long): NoteEntity? =
+        _notes.value.find { it.id == id && !it.isDeleted && it.isInVault }
+
+    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> =
+        _notes.value.filter { !it.isDeleted && it.isInVault }
+
+    override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
+        _notes.value.filter { it.isInVault }
+
+    override suspend fun deleteAllVaultNotes(): Int {
+        val removed = _notes.value.count { it.isInVault }
+        _notes.value = _notes.value.filterNot { it.isInVault }
+        return removed
+    }
+
     override suspend fun insertNote(note: NoteEntity): Long         = 0L
     override suspend fun updateNote(note: NoteEntity)               = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long)   = Unit

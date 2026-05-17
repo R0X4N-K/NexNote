@@ -53,6 +53,11 @@ internal class FakeNoteDao(
 
     override suspend fun getNoteById(id: Long): NoteEntity? =
         (_allNotes.value + _deletedNotes.value).firstOrNull { it.id == id }
+    override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
+    override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
+    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> = emptyList()
+    override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
+    override suspend fun deleteAllVaultNotes(): Int = 0
     override fun searchNotes(query: String): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override fun getNotesByDateRange(
         startMs: Long,

@@ -61,6 +61,29 @@ class NoteRepositoryTest {
         assertEquals(2, notes.size)
     }
 
+    @Test
+    fun normalNoteSurfaces_excludeVaultNotes() = runTest {
+        val normalId = repository.saveNote(
+            Note(title = "Normal", content = "public alpha", creationDate = 1_000L)
+        )
+        val vaultId = repository.saveNote(
+            Note(
+                title = "Vault",
+                content = "private alpha",
+                creationDate = 2_000L,
+                isInVault = true
+            )
+        )
+
+        assertNotNull(repository.getNoteById(normalId))
+        assertNull(repository.getNoteById(vaultId))
+        assertEquals(listOf(normalId), repository.allNotes.first().map { it.id })
+        assertEquals(listOf(normalId), repository.searchNotes("alpha").first().map { it.id })
+        assertEquals(listOf(normalId), repository.noteLinkCandidates.first().map { it.id })
+        assertTrue(repository.getNotesByDateRange(2_000L, 3_000L).first().isEmpty())
+        assertEquals(setOf(0L), repository.distinctActiveDays.first())
+    }
+
     // ── Update ────────────────────────────────────────────────────────────────
 
     @Test

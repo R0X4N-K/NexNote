@@ -252,6 +252,11 @@ private class FakeNoteDao : NoteDao {
     override fun getAllCreationDates(): Flow<List<Long>> = MutableStateFlow(emptyList())
 
     override suspend fun getNoteById(id: Long): NoteEntity? = null
+    override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
+    override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
+    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> = emptyList()
+    override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
+    override suspend fun deleteAllVaultNotes(): Int = 0
     override fun searchNotes(query: String): Flow<List<NoteEntity>> = _searchNotes
     override fun getNotesByDateRange(startMs: Long, endMs: Long): Flow<List<NoteEntity>> =
         MutableStateFlow(emptyList())

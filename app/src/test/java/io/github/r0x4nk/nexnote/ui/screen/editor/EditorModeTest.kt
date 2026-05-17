@@ -7,7 +7,15 @@ class EditorModeTest {
 
     @Test
     fun `fromRoute returns new note when all route ids are unused`() {
-        assertEquals(EditorMode.NewNote, EditorMode.fromRoute())
+        assertEquals(EditorMode.NewNote(), EditorMode.fromRoute())
+    }
+
+    @Test
+    fun `fromRoute carries creation date for new note`() {
+        assertEquals(
+            EditorMode.NewNote(initialCreationDate = 123_456L),
+            EditorMode.fromRoute(creationDate = 123_456L)
+        )
     }
 
     @Test
@@ -39,6 +47,26 @@ class EditorModeTest {
         assertEquals(
             EditorMode.NewFromTemplate(7L),
             EditorMode.fromRoute(templateId = 7L)
+        )
+    }
+
+    @Test
+    fun `fromRoute maps vault note id to vault note mode`() {
+        assertEquals(
+            EditorMode.VaultNote(11L),
+            EditorMode.fromRoute(noteId = 4L, templateId = 7L, vaultNoteId = 11L)
+        )
+    }
+
+    @Test
+    fun `fromRoute maps vault note creation sentinel to new vault note mode`() {
+        assertEquals(
+            EditorMode.NewVaultNote,
+            EditorMode.fromRoute(
+                noteId = 4L,
+                templateId = 7L,
+                vaultNoteId = EditorMode.NEW_VAULT_NOTE_ID
+            )
         )
     }
 }
