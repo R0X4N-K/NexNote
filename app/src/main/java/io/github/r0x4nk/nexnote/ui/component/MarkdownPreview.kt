@@ -43,18 +43,20 @@ fun MarkdownPreview(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyLarge,
     imageFileProvider: ((String) -> File)? = null,
+    vaultImageByteProvider: (suspend (String) -> ByteArray?)? = null,
     highlightRanges: List<IntRange> = emptyList(),
     activeHighlightRange: IntRange? = null,
     onNoteLinkClick: (Long) -> Unit = {}
 ) {
     val contentState = rememberMarkdownPreviewContentState(markdown)
     val config = MarkdownPreviewContentConfig(
-        markdown             = markdown,
-        style                = style,
-        imageFileProvider    = imageFileProvider,
-        highlightRanges      = highlightRanges,
-        activeHighlightRange = activeHighlightRange,
-        onNoteLinkClick      = onNoteLinkClick
+        markdown               = markdown,
+        style                  = style,
+        imageFileProvider      = imageFileProvider,
+        vaultImageByteProvider = vaultImageByteProvider,
+        highlightRanges        = highlightRanges,
+        activeHighlightRange   = activeHighlightRange,
+        onNoteLinkClick        = onNoteLinkClick
     )
 
     MarkdownPreviewContent(
@@ -69,6 +71,7 @@ internal class MarkdownPreviewContentConfig(
     val markdown: String,
     val style: TextStyle,
     val imageFileProvider: ((String) -> File)?,
+    val vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     val highlightRanges: List<IntRange>,
     val activeHighlightRange: IntRange?,
     val onNoteLinkClick: (Long) -> Unit

@@ -59,6 +59,12 @@ private data class MarkdownImageLoadResult(
  * storage; when the provider is missing the component falls back to a text
  * placeholder so read-only previews can still render outside the editor.
  *
+ * When [vaultImageByteProvider] is non-null, the image is decoded from the
+ * decrypted byte array it returns instead of being read directly from disk:
+ * Vault images are encrypted at rest, so reading the underlying file would
+ * produce a binary envelope rather than image pixels. The bytes are decoded
+ * in memory and never written back to disk in plaintext.
+ *
  * The image frame uses a bounds-only decode first so loading, missing, and
  * decoded states keep the same aspect ratio and do not jump during async load.
  */
@@ -66,14 +72,25 @@ private data class MarkdownImageLoadResult(
 internal fun MarkdownImageBlock(
     imageFileProvider: ((String) -> File)?,
     relativePath: String,
-    altText: String
+    altText: String,
+    vaultImageByteProvider: (suspend (String) -> ByteArray?)? = null
 ) {
-    if (imageFileProvider == null) {
+    if (imageFileProvider == null && vaultImageByteProvider == null) {
         MarkdownImagePlaceholder(altText)
         return
     }
 
-    val file = remember(imageFileProvider, relativePath) { imageFileProvider(relativePath) }
+    if (vaultImageByteProvider != null) {
+        VaultMarkdownImageBlock(
+            relativePath = relativePath,
+            altText = altText,
+            vaultImageByteProvider = vaultImageByteProvider
+        )
+        return
+    }
+
+    val resolver = imageFileProvider!!
+    val file = remember(resolver, relativePath) { resolver(relativePath) }
     val initialImageSize = remember(file.absolutePath, file.lastModified()) {
         readMarkdownImageSize(file)
     }
@@ -87,6 +104,47 @@ internal fun MarkdownImageBlock(
         loadFailed = false
 
         val result = loadMarkdownBitmap(file, initialImageSize)
+        if (result != null) {
+            imageSize = result.size
+            imageBitmap = result.bitmap
+        } else {
+            loadFailed = true
+        }
+    }
+
+    MarkdownImageContent(imageBitmap, imageSize, loadFailed, altText)
+}
+
+/**
+ * Variant of [MarkdownImageBlock] that decodes the image from the decrypted
+ * byte array returned by [vaultImageByteProvider].
+ *
+ * The provider is expected to perform the actual decryption inside the Vault
+ * unlocked scope; this composable only consumes the bytes and decodes them
+ * into a bitmap. The byte array is never written to disk and is dropped from
+ * the heap as soon as the decode completes. If the provider returns `null`
+ * (Vault locked or file missing) or an exception escapes the decode pipeline,
+ * the missing-image placeholder is shown without leaking any details.
+ */
+@Composable
+private fun VaultMarkdownImageBlock(
+    relativePath: String,
+    altText: String,
+    vaultImageByteProvider: suspend (String) -> ByteArray?
+) {
+    var imageBitmap by remember(relativePath) { mutableStateOf<ImageBitmap?>(null) }
+    var imageSize by remember(relativePath) { mutableStateOf<MarkdownImageSize?>(null) }
+    var loadFailed by remember(relativePath) { mutableStateOf(false) }
+
+    LaunchedEffect(relativePath, vaultImageByteProvider) {
+        imageBitmap = null
+        imageSize = null
+        loadFailed = false
+
+        val result = loadMarkdownBitmapFromVaultBytes(
+            relativePath = relativePath,
+            vaultImageByteProvider = vaultImageByteProvider
+        )
         if (result != null) {
             imageSize = result.size
             imageBitmap = result.bitmap
@@ -212,6 +270,48 @@ private suspend fun loadMarkdownBitmap(
 
         val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
         val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
+            ?: return@withContext null
+
+        MarkdownImageLoadResult(
+            bitmap = bitmap.asImageBitmap(),
+            size = MarkdownImageSize(width = bitmap.width, height = bitmap.height)
+        )
+    }
+}
+
+/**
+ * Decodes a Markdown image from the decrypted bytes returned by
+ * [vaultImageByteProvider].
+ *
+ * Performs a bounds-only decode first to compute a safe sample size for the
+ * full decode, mirroring the behaviour of the on-disk variant. The byte
+ * array is held only inside this function and is dropped from scope as soon
+ * as the bitmap is produced. Any exception thrown by the provider (e.g. a
+ * crypto failure) is caught and mapped to a missing-image state so that no
+ * sensitive information bubbles up to the composition.
+ */
+private suspend fun loadMarkdownBitmapFromVaultBytes(
+    relativePath: String,
+    vaultImageByteProvider: suspend (String) -> ByteArray?
+): MarkdownImageLoadResult? {
+    return withContext(Dispatchers.IO) {
+        val bytes = runCatching { vaultImageByteProvider(relativePath) }
+            .getOrNull()
+            ?: return@withContext null
+        if (bytes.isEmpty()) return@withContext null
+
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, boundsOptions)
+
+        val sampleSize = markdownImageSizeOrNull(boundsOptions.outWidth, boundsOptions.outHeight)
+            ?.let { size ->
+                val longestSide = maxOf(size.width, size.height)
+                ImageFileManager.calculateSampleSize(longestSide)
+            }
+            ?: 1
+
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
             ?: return@withContext null
 
         MarkdownImageLoadResult(

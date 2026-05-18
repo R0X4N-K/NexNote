@@ -108,9 +108,10 @@ private fun RenderMarkdownImageBlock(
     config: MarkdownPreviewContentConfig
 ) {
     MarkdownImageBlock(
-        imageFileProvider = config.imageFileProvider,
-        relativePath      = block.path,
-        altText           = block.altText
+        imageFileProvider      = config.imageFileProvider,
+        relativePath           = block.path,
+        altText                = block.altText,
+        vaultImageByteProvider = config.vaultImageByteProvider
     )
 }
 
