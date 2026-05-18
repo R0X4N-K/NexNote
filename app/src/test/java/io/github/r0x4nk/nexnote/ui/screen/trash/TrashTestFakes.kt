@@ -67,6 +67,7 @@ internal class FakeNoteDao(
     override suspend fun insertNote(note: NoteEntity): Long = 0L
     override suspend fun updateNote(note: NoteEntity) = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
+    override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
     override suspend fun setPreviewMode(id: Long, isPreviewMode: Boolean) = Unit
     override suspend fun restoreFromTrash(id: Long) {

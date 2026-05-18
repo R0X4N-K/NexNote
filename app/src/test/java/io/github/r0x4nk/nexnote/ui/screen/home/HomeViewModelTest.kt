@@ -271,6 +271,7 @@ private class FakeNoteDao : NoteDao {
         _allNotes.value = _allNotes.value.filterNot { it.id == id }
         _deletedNotes.value = _deletedNotes.value + trashedNote
     }
+    override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) {
         lastRestoredId = id
         val restoredNote = _deletedNotes.value.find { it.id == id }

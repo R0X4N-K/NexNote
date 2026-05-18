@@ -274,6 +274,7 @@ private class FakeNoteDao : NoteDao {
     override suspend fun insertNote(note: NoteEntity): Long         = 0L
     override suspend fun updateNote(note: NoteEntity)               = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long)   = Unit
+    override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long)                 = Unit
     override suspend fun deleteNotePermanently(id: Long): Int       = 0
     override suspend fun emptyTrash(): Int                          = 0

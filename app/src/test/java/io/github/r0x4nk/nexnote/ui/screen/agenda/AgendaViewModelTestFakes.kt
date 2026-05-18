@@ -74,6 +74,7 @@ class AgendaFakeNoteDao : NoteDao {
             }
         }
     }
+    override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) {
         notes.value = notes.value.map { note ->
             if (note.id == id) {
