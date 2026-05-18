@@ -50,13 +50,13 @@ internal class EditorSaveDelegate(
         }
     }
 
-    suspend fun flushPendingChanges() {
+    suspend fun flushPendingChanges(): Boolean {
         NexNoteDebugLog.persistence(
             event = "flushPendingChanges",
             details = uiState.value.debugSaveSummary()
         )
         cancelPendingAutosave()
-        performSave()
+        return performSave()
     }
 
     /**
@@ -89,16 +89,17 @@ internal class EditorSaveDelegate(
 
         // Already has an id (note) or is editing a template — nothing to do.
         // Templates intentionally do not participate in the image flow.
-        if (snapshot.isVaultNote) {
-            return@withLock snapshot.noteId != EditorViewModel.NO_ID
-        }
         if (snapshot.isTemplateMode || snapshot.noteId != EditorViewModel.NO_ID) {
             return@withLock true
         }
 
         uiState.update { it.copy(isSaving = true, errorMessage = null, isDirty = true) }
         return@withLock try {
-            saveAsNote(snapshot)
+            if (snapshot.isVaultNote) {
+                saveAsVaultNote(snapshot)
+            } else {
+                saveAsNote(snapshot)
+            }
             NexNoteDebugLog.persistence(
                 event = "ensurePersistedSuccess",
                 details = uiState.value.debugSaveSummary()

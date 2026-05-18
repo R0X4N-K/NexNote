@@ -24,6 +24,7 @@ import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredenti
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
@@ -78,7 +79,8 @@ abstract class EditorViewModelTestBase {
         preferencesRepository: IUserPreferencesRepository = FakeEditorPreferencesRepository(),
         getVaultNoteById: GetVaultNoteByIdUseCase? = null,
         saveVaultNote: SaveVaultNoteUseCase? = null,
-        observeVaultState: ObserveVaultStateUseCase? = null
+        observeVaultState: ObserveVaultStateUseCase? = null,
+        decryptVaultImageBytes: DecryptVaultImageBytesUseCase? = null
     ): EditorViewModel {
         val noteRepository = NoteRepositoryImpl(fakeNoteDao, imageStorage)
         val templateRepository = TemplateRepositoryImpl(fakeTemplateDao)
@@ -97,6 +99,7 @@ abstract class EditorViewModelTestBase {
             observeVaultState = observeVaultState,
             observeThemeMode = ObserveThemeModeUseCase(preferencesRepository),
             setThemeMode = SetThemeModeUseCase(preferencesRepository),
+            decryptVaultImageBytesUseCase = decryptVaultImageBytes,
             initialMode = mode
         )
     }
@@ -150,6 +153,7 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
     private var nextId = 1L
     override val vaultNotes: Flow<List<Note>> = notes
     val savedNotes = mutableListOf<Note>()
+    var failOnSave = false
 
     fun addNote(note: Note) {
         notes.value = notes.value + note
@@ -159,6 +163,7 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
         notes.value.firstOrNull { it.id == id && it.isInVault && !it.isDeleted }
 
     override suspend fun saveVaultNote(note: Note): Long {
+        if (failOnSave) throw RuntimeException("Vault save failed")
         val id = if (note.id == 0L) nextId++ else note.id
         val saved = note.copy(id = id, isInVault = true)
         savedNotes += saved
@@ -175,10 +180,17 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
     override suspend fun removeNoteFromVault(id: Long): Boolean {
         throw UnsupportedOperationException("Not needed for editor Vault tests")
     }
+
+    override suspend fun moveVaultNoteToTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for editor Vault tests")
+    }
+
+    override suspend fun decryptVaultImageBytes(relativePath: String): ByteArray? = null
 }
 
 class FakeEditorNoteImageStorage : NoteImageStorage {
     val copiedNoteIds = mutableListOf<Long>()
+    val deletedPaths = mutableListOf<String>()
     var failOnCopy = false
     private var nextTimestamp = 100L
 
@@ -192,7 +204,10 @@ class FakeEditorNoteImageStorage : NoteImageStorage {
         return "images/note_${noteId}_img_${nextTimestamp++}.jpg"
     }
 
-    override suspend fun deleteImage(relativePath: String): Boolean = true
+    override suspend fun deleteImage(relativePath: String): Boolean {
+        deletedPaths += relativePath
+        return true
+    }
 
     override fun getImageFile(relativePath: String): File = File(relativePath)
 }
@@ -338,6 +353,7 @@ class FakeEditorNoteDao : NoteDao {
     }
 
     override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
+    override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) = Unit
     override suspend fun deleteNotePermanently(id: Long): Int = 0
     override suspend fun emptyTrash(): Int = 0

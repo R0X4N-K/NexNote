@@ -5,9 +5,14 @@ import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultState
+import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
+import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
@@ -15,9 +20,12 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -199,6 +207,158 @@ class EditorViewModelTest : EditorViewModelTestBase() {
         assertEquals("Private draft", vaultRepository.savedNotes.single().title)
         assertEquals("Encrypted later by repository", vaultRepository.savedNotes.single().content)
         assertTrue(vaultRepository.savedNotes.single().isInVault)
+    }
+
+    @Test
+    fun `decryptVaultImageBytes returns null for normal notes regardless of use case`() = runTest {
+        val recorder = RecordingDecryptVaultImageBytesRepository(returnedBytes = byteArrayOf(1, 2, 3))
+        val vm = viewModel(
+            decryptVaultImageBytes = DecryptVaultImageBytesUseCase(recorder)
+        )
+        runCurrent()
+
+        val result = vm.decryptVaultImageBytes("images/note_1_img_1.jpg")
+
+        assertNull(result)
+        assertTrue(recorder.invocations.isEmpty())
+    }
+
+    @Test
+    fun `decryptVaultImageBytes returns bytes from use case for unlocked vault note`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                imagePaths = listOf("images/note_77_img_1.jpg"),
+                isInVault = true
+            )
+        )
+        val recorder = RecordingDecryptVaultImageBytesRepository(returnedBytes = byteArrayOf(7, 8, 9))
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            decryptVaultImageBytes = DecryptVaultImageBytesUseCase(recorder)
+        )
+        runCurrent()
+
+        val result = vm.decryptVaultImageBytes("images/note_77_img_1.jpg")
+
+        assertNotNull(result)
+        assertArrayEquals(byteArrayOf(7, 8, 9), result)
+        assertEquals(listOf("images/note_77_img_1.jpg"), recorder.invocations)
+    }
+
+    @Test
+    fun `decryptVaultImageBytes returns null when vault note is locked`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val vaultStateRepository = FakeEditorVaultStateRepository(VaultState.UNLOCKED)
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                imagePaths = listOf("images/note_77_img_1.jpg"),
+                isInVault = true
+            )
+        )
+        val recorder = RecordingDecryptVaultImageBytesRepository(returnedBytes = byteArrayOf(1))
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            observeVaultState = ObserveVaultStateUseCase(vaultStateRepository),
+            decryptVaultImageBytes = DecryptVaultImageBytesUseCase(recorder)
+        )
+        runCurrent()
+        vaultStateRepository.setState(VaultState.LOCKED)
+        advanceUntilIdle()
+
+        val result = vm.decryptVaultImageBytes("images/note_77_img_1.jpg")
+
+        assertNull(result)
+        assertTrue(recorder.invocations.isEmpty())
+    }
+
+    @Test
+    fun `decryptVaultImageBytes returns null for path not referenced by current vault note`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                imagePaths = listOf("images/note_77_img_1.jpg"),
+                isInVault = true
+            )
+        )
+        val recorder = RecordingDecryptVaultImageBytesRepository(returnedBytes = byteArrayOf(1))
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            decryptVaultImageBytes = DecryptVaultImageBytesUseCase(recorder)
+        )
+        runCurrent()
+
+        val result = vm.decryptVaultImageBytes("images/other_note_img_1.jpg")
+
+        assertNull(result)
+        assertTrue(recorder.invocations.isEmpty())
+    }
+
+    @Test
+    fun `decryptVaultImageBytes returns null for blank path`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                imagePaths = listOf("images/note_77_img_1.jpg"),
+                isInVault = true
+            )
+        )
+        val recorder = RecordingDecryptVaultImageBytesRepository(returnedBytes = byteArrayOf(1))
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            decryptVaultImageBytes = DecryptVaultImageBytesUseCase(recorder)
+        )
+        runCurrent()
+
+        val result = vm.decryptVaultImageBytes("   ")
+
+        assertNull(result)
+        assertTrue(recorder.invocations.isEmpty())
+    }
+
+    @Test
+    fun `decryptVaultImageBytes swallows repository exceptions and returns null`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                imagePaths = listOf("images/note_77_img_1.jpg"),
+                isInVault = true
+            )
+        )
+        val recorder = RecordingDecryptVaultImageBytesRepository(
+            returnedBytes = byteArrayOf(1),
+            throwOnInvoke = true
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            decryptVaultImageBytes = DecryptVaultImageBytesUseCase(recorder)
+        )
+        runCurrent()
+
+        val result = vm.decryptVaultImageBytes("images/note_77_img_1.jpg")
+
+        assertNull(result)
+        assertEquals(1, recorder.invocations.size)
     }
 
     @Test
@@ -407,5 +567,45 @@ class EditorViewModelTest : EditorViewModelTestBase() {
     private fun kotlinx.coroutines.test.TestScope.advanceUndoHistoryDebounce() {
         advanceTimeBy(DEFAULT_UNDO_HISTORY_DEBOUNCE_MS)
         runCurrent()
+    }
+}
+
+/**
+ * Test-only [VaultNoteRepository] that records every call to
+ * [decryptVaultImageBytes] and returns a configured payload.
+ *
+ * The fake intentionally exposes only the surface required for the
+ * decryptVaultImageBytes tests; all other operations are unimplemented and
+ * throw to surface accidental usage from unrelated tests.
+ */
+private class RecordingDecryptVaultImageBytesRepository(
+    private val returnedBytes: ByteArray,
+    private val throwOnInvoke: Boolean = false
+) : VaultNoteRepository {
+    val invocations = mutableListOf<String>()
+    override val vaultNotes: Flow<List<Note>> = MutableStateFlow(emptyList())
+
+    override suspend fun getVaultNoteById(id: Long): Note? = null
+
+    override suspend fun saveVaultNote(note: Note): Long {
+        throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
+    }
+
+    override suspend fun moveNormalNoteToVault(id: Long): MoveNoteToVaultResult {
+        throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
+    }
+
+    override suspend fun removeNoteFromVault(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
+    }
+
+    override suspend fun moveVaultNoteToTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
+    }
+
+    override suspend fun decryptVaultImageBytes(relativePath: String): ByteArray? {
+        invocations += relativePath
+        if (throwOnInvoke) throw RuntimeException("decrypt failure")
+        return returnedBytes
     }
 }

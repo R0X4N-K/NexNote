@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val IMAGE_INSERT_ERROR = "Could not insert image"
+private const val IMAGE_REMOVE_ERROR = "Could not remove image"
 private const val MARKDOWN_IMAGE_ALT_TEXT = "image"
 
 internal class EditorImageActions(
@@ -60,19 +61,47 @@ internal class EditorImageActions(
     ) {
         val noteId = uiState.value.noteId
         uiState.update { it.copy(isSaving = true) }
+        var copiedRelativePath: String? = null
         try {
             val relativePath = copyNoteImageToInternal(noteId, openImageInputStream)
-            val before = uiState.value.toContentSnapshot()
+            copiedRelativePath = relativePath
+            val beforeState = uiState.value
+            val before = beforeState.toContentSnapshot()
             var after: EditorContentSnapshot? = null
             uiState.update { current ->
                 current.withInsertedImage(relativePath, insertionOffset).also { next ->
                     after = next.toContentSnapshot()
                 }
             }
+            val saved = saveAfterImageMutation()
+            if (!saved && beforeState.isVaultNote) {
+                rollbackFailedVaultImageInsert(relativePath, beforeState)
+                return
+            }
             after?.let { recordContentHistoryChange(before, it) }
-            saveDelegate.scheduleAutosave()
         } catch (e: Exception) {
+            copiedRelativePath
+                ?.takeIf { uiState.value.isVaultNote }
+                ?.let { runCatching { deleteNoteImage(it) } }
             uiState.update { it.copy(isSaving = false, errorMessage = IMAGE_INSERT_ERROR) }
+        }
+    }
+
+    private suspend fun rollbackFailedVaultImageInsert(
+        relativePath: String,
+        beforeState: EditorUiState
+    ) {
+        runCatching { deleteNoteImage(relativePath) }
+        uiState.update { current ->
+            current.copy(
+                content = beforeState.content,
+                imagePaths = beforeState.imagePaths,
+                isDirty = beforeState.isDirty,
+                isSaving = false,
+                errorMessage = IMAGE_INSERT_ERROR,
+                contentVersion = current.contentVersion + 1,
+                contentSelectionOffset = beforeState.contentSelectionOffset
+            )
         }
     }
 
@@ -97,23 +126,76 @@ internal class EditorImageActions(
 
     fun onRemoveImage(relativePath: String) {
         scope.launch {
-            deleteNoteImage(relativePath)
-            val tagRegex = Regex("""!\[[^\]]*]\(${Regex.escape(relativePath)}\)\n?""")
-            val before = uiState.value.toContentSnapshot()
-            var after: EditorContentSnapshot? = null
-            uiState.update { current ->
-                current.copy(
-                    content = tagRegex.replace(current.content, ""),
-                    imagePaths = current.imagePaths - relativePath,
-                    isDirty = true,
-                    contentVersion = current.contentVersion + 1,
-                    contentSelectionOffset = null
-                ).also { next ->
-                    after = next.toContentSnapshot()
-                }
+            if (uiState.value.isVaultNote) {
+                removeVaultImage(relativePath)
+            } else {
+                removeNormalImage(relativePath)
             }
-            after?.let { recordContentHistoryChange(before, it) }
+        }
+    }
+
+    private suspend fun removeNormalImage(relativePath: String) {
+        deleteNoteImage(relativePath)
+        val before = uiState.value.toContentSnapshot()
+        var after: EditorContentSnapshot? = null
+        uiState.update { current ->
+            current.withRemovedImage(relativePath).also { next ->
+                after = next.toContentSnapshot()
+            }
+        }
+        after?.let { recordContentHistoryChange(before, it) }
+        saveAfterImageMutation()
+    }
+
+    private suspend fun removeVaultImage(relativePath: String) {
+        val beforeState = uiState.value
+        val before = beforeState.toContentSnapshot()
+        var after: EditorContentSnapshot? = null
+        uiState.update { current ->
+            current.withRemovedImage(relativePath).also { next ->
+                after = next.toContentSnapshot()
+            }
+        }
+        val saved = saveAfterImageMutation()
+        if (!saved) {
+            rollbackFailedVaultImageRemoval(beforeState)
+            return
+        }
+        runCatching { deleteNoteImage(relativePath) }
+        after?.let { recordContentHistoryChange(before, it) }
+    }
+
+    private fun rollbackFailedVaultImageRemoval(beforeState: EditorUiState) {
+        uiState.update { current ->
+            current.copy(
+                content = beforeState.content,
+                imagePaths = beforeState.imagePaths,
+                isDirty = beforeState.isDirty,
+                isSaving = false,
+                errorMessage = IMAGE_REMOVE_ERROR,
+                contentVersion = current.contentVersion + 1,
+                contentSelectionOffset = beforeState.contentSelectionOffset
+            )
+        }
+    }
+
+    private fun EditorUiState.withRemovedImage(relativePath: String): EditorUiState {
+        val tagRegex = Regex("""!\[[^\]]*]\(${Regex.escape(relativePath)}\)\n?""")
+        return copy(
+            content = tagRegex.replace(content, ""),
+            imagePaths = imagePaths - relativePath,
+            isDirty = true,
+            contentVersion = contentVersion + 1,
+            contentSelectionOffset = null
+        )
+    }
+
+    private suspend fun saveAfterImageMutation(): Boolean {
+        if (uiState.value.isVaultNote) {
+            return saveDelegate.flushPendingChanges()
+        } else {
             saveDelegate.scheduleAutosave()
+            return true
         }
     }
 }

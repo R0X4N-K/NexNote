@@ -10,6 +10,7 @@ import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
@@ -57,6 +58,7 @@ class EditorViewModel(
     observeVaultState: ObserveVaultStateUseCase? = null,
     observeThemeMode: ObserveThemeModeUseCase? = null,
     private val setThemeMode: SetThemeModeUseCase? = null,
+    private val decryptVaultImageBytesUseCase: DecryptVaultImageBytesUseCase? = null,
     private val initialMode: EditorMode,
     undoHistoryDebounceMs: Long = DEFAULT_UNDO_HISTORY_DEBOUNCE_MS,
     undoHistoryMaxSnapshots: Int = DEFAULT_UNDO_HISTORY_MAX_SNAPSHOTS
@@ -303,16 +305,6 @@ class EditorViewModel(
         return true
     }
 
-    private fun ignoreVaultImageChange(event: String): Boolean {
-        if (!_uiState.value.isVaultNote) return false
-        NexNoteDebugLog.viewModel(
-            event = event,
-            details = "ignored=vaultImageEditingUnsupported noteId=${_uiState.value.noteId}"
-        )
-        _uiState.update { it.copy(errorMessage = "Vault images are not editable yet") }
-        return true
-    }
-
     fun onTagChipClick(tagName: String) {
         tagNavigator.onTagChipClick(tagName)
     }
@@ -338,7 +330,6 @@ class EditorViewModel(
         insertionOffset: Int? = null
     ) {
         if (ignoreReadOnlyChange("onImagePicked")) return
-        if (ignoreVaultImageChange("onImagePicked")) return
         imageActions.onImagePicked(openImageInputStream, insertionOffset)
     }
 
@@ -348,12 +339,33 @@ class EditorViewModel(
      */
     fun onRemoveImage(relativePath: String) {
         if (ignoreReadOnlyChange("onRemoveImage")) return
-        if (ignoreVaultImageChange("onRemoveImage")) return
         imageActions.onRemoveImage(relativePath)
     }
 
     fun getImageFile(relativePath: String): File {
         return getNoteImageFile(relativePath)
+    }
+
+    /**
+     * Returns the decrypted bytes of a Vault image referenced by the current
+     * note, or `null` when the note is not a Vault note, the Vault is locked,
+     * the relative path is blank or not referenced by the current note, the
+     * decryption use case is not wired, the file is missing on disk, or any
+     * other recoverable failure occurs.
+     *
+     * The bytes are never logged, persisted in plaintext or returned outside
+     * the unlocked Vault scope: this method is only invoked by the preview
+     * pipeline while the editor is in an unlocked Vault state and is dropped
+     * from the consumer as soon as the bitmap decode completes.
+     */
+    suspend fun decryptVaultImageBytes(relativePath: String): ByteArray? {
+        val normalizedPath = relativePath.trim()
+        if (normalizedPath.isBlank()) return null
+        val current = _uiState.value
+        if (!current.isVaultNote || current.isVaultLocked) return null
+        if (normalizedPath !in current.imagePaths) return null
+        val useCase = decryptVaultImageBytesUseCase ?: return null
+        return runCatching { useCase(normalizedPath) }.getOrNull()
     }
 
     // ── Preview toggle ────────────────────────────────────────────────────────
@@ -508,6 +520,7 @@ class EditorViewModel(
                     observeVaultState     = useCases.vault.observeVaultState,
                     observeThemeMode      = useCases.preferences.observeThemeMode,
                     setThemeMode          = useCases.preferences.setThemeMode,
+                    decryptVaultImageBytesUseCase = useCases.vault.decryptVaultImageBytes,
                     initialMode           = mode
                 )
             }

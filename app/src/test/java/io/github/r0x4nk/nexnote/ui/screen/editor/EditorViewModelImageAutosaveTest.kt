@@ -1,12 +1,16 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
+import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -86,6 +90,186 @@ class EditorViewModelImageAutosaveTest : EditorViewModelTestBase() {
 
         assertEquals("Could not insert image", vm.uiState.value.errorMessage)
         assertTrue(vm.uiState.value.imagePaths.isEmpty())
+    }
+
+    @Test
+    fun `onImagePicked in existing vault note saves immediately through vault repository`() = runTest {
+        val imageStorage = FakeEditorNoteImageStorage()
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body",
+                isInVault = true
+            )
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            imageStorage = imageStorage,
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onImagePicked(
+            openImageInputStream = { ByteArrayInputStream(byteArrayOf(1, 2, 3)) },
+            insertionOffset = 0
+        )
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        val expectedPath = "images/note_77_img_100.jpg"
+        assertEquals(listOf(77L), imageStorage.copiedNoteIds)
+        assertEquals(listOf(expectedPath), state.imagePaths)
+        assertTrue(state.content.contains("![image]($expectedPath)"))
+        assertTrue(vaultRepository.savedNotes.single().isInVault)
+        assertEquals(listOf(expectedPath), vaultRepository.savedNotes.single().imagePaths)
+        assertEquals(0, fakeNoteDao.insertedCount)
+        assertEquals(0, fakeNoteDao.updatedCount)
+        assertFalse(state.isDirty)
+    }
+
+    @Test
+    fun `onImagePicked in vault note rolls back copied image when immediate save fails`() = runTest {
+        val imageStorage = FakeEditorNoteImageStorage()
+        val vaultRepository = FakeEditorVaultNoteRepository().apply {
+            failOnSave = true
+            addNote(
+                Note(
+                    id = 77L,
+                    title = "Private title",
+                    content = "Private body",
+                    isInVault = true
+                )
+            )
+        }
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            imageStorage = imageStorage,
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onImagePicked(
+            openImageInputStream = { ByteArrayInputStream(byteArrayOf(1, 2, 3)) },
+            insertionOffset = 0
+        )
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        val copiedPath = "images/note_77_img_100.jpg"
+        assertEquals(listOf(77L), imageStorage.copiedNoteIds)
+        assertEquals(listOf(copiedPath), imageStorage.deletedPaths)
+        assertEquals("Private body", state.content)
+        assertTrue(state.imagePaths.isEmpty())
+        assertFalse(state.content.contains(copiedPath))
+        assertEquals("Could not insert image", state.errorMessage)
+        assertTrue(vaultRepository.savedNotes.isEmpty())
+        assertFalse(state.isDirty)
+        assertEquals(0, fakeNoteDao.insertedCount)
+        assertEquals(0, fakeNoteDao.updatedCount)
+    }
+
+    @Test
+    fun `onImagePicked in new vault note creates vault note before copying image`() = runTest {
+        val imageStorage = FakeEditorNoteImageStorage()
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val vm = viewModel(
+            mode = EditorMode.NewVaultNote,
+            imageStorage = imageStorage,
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onImagePicked(openImageInputStream = { ByteArrayInputStream(byteArrayOf(1)) })
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        val expectedPath = "images/note_${state.noteId}_img_100.jpg"
+        assertNotEquals(EditorViewModel.NO_ID, state.noteId)
+        assertEquals(listOf(state.noteId), imageStorage.copiedNoteIds)
+        assertEquals(listOf(expectedPath), state.imagePaths)
+        assertTrue(state.content.contains("![image]($expectedPath)"))
+        assertEquals(2, vaultRepository.savedNotes.size)
+        assertTrue(vaultRepository.savedNotes.first().imagePaths.isEmpty())
+        assertEquals(listOf(expectedPath), vaultRepository.savedNotes.last().imagePaths)
+        assertTrue(vaultRepository.savedNotes.all { it.isInVault })
+        assertEquals(0, fakeNoteDao.insertedCount)
+        assertFalse(state.isDirty)
+    }
+
+    @Test
+    fun `onRemoveImage in vault note saves updated image list immediately`() = runTest {
+        val imageStorage = FakeEditorNoteImageStorage()
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val imagePath = "images/note_77_img_100.jpg"
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private body\n\n![image]($imagePath)",
+                imagePaths = listOf(imagePath),
+                isInVault = true
+            )
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            imageStorage = imageStorage,
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onRemoveImage(imagePath)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(listOf(imagePath), imageStorage.deletedPaths)
+        assertTrue(state.imagePaths.isEmpty())
+        assertFalse(state.content.contains(imagePath))
+        assertTrue(vaultRepository.savedNotes.single().imagePaths.isEmpty())
+        assertTrue(vaultRepository.savedNotes.single().isInVault)
+        assertFalse(state.isDirty)
+    }
+
+    @Test
+    fun `onRemoveImage in vault note restores image when immediate save fails`() = runTest {
+        val imageStorage = FakeEditorNoteImageStorage()
+        val imagePath = "images/note_77_img_100.jpg"
+        val vaultRepository = FakeEditorVaultNoteRepository().apply {
+            failOnSave = true
+            addNote(
+                Note(
+                    id = 77L,
+                    title = "Private title",
+                    content = "Private body\n\n![image]($imagePath)",
+                    imagePaths = listOf(imagePath),
+                    isInVault = true
+                )
+            )
+        }
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            imageStorage = imageStorage,
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onRemoveImage(imagePath)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertTrue(imageStorage.deletedPaths.isEmpty())
+        assertEquals(listOf(imagePath), state.imagePaths)
+        assertTrue(state.content.contains(imagePath))
+        assertEquals("Could not remove image", state.errorMessage)
+        assertTrue(vaultRepository.savedNotes.isEmpty())
+        assertFalse(state.isDirty)
+        assertEquals(0, fakeNoteDao.insertedCount)
+        assertEquals(0, fakeNoteDao.updatedCount)
     }
 
     @Test

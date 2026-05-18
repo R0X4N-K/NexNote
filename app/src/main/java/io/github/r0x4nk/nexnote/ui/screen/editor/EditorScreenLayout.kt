@@ -59,6 +59,7 @@ internal data class EditorScreenScaffoldContent(
     val isDarkTheme: Boolean,
     val isKeyboardVisible: Boolean,
     val imageFileProvider: (String) -> File,
+    val vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     val noteLinkTargets: List<NoteLinkTarget>,
     val state: EditorScreenState
 )
@@ -229,6 +230,7 @@ private fun EditorScreenBody(
             EditorContentModeBox(
                 content.uiState,
                 content.imageFileProvider,
+                content.vaultImageByteProvider,
                 content.noteLinkTargets,
                 content.state,
                 toolbarVisible,
@@ -242,7 +244,7 @@ private fun EditorScreenBody(
         EditorKeyboardToolbar(
             visible = toolbarVisible,
             isTemplateMode = content.uiState.isTemplateMode,
-            canInsertImages = !content.uiState.isVaultNote,
+            canInsertImages = true,
             canUndo = content.undoRedoState.canUndo,
             canRedo = content.undoRedoState.canRedo,
             linkMenuExpanded = content.state.showLinkTypeMenu,

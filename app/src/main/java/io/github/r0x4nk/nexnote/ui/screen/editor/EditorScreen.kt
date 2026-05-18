@@ -47,6 +47,22 @@ fun EditorScreen(
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
     val imageFileProvider = remember(viewModel) { viewModel::getImageFile }
+    // Provider used by the Markdown preview to decode Vault images from their
+    // decrypted bytes; only wired when the current note is a Vault note so the
+    // normal-notes path keeps its on-disk fast path unchanged.
+    val vaultImageByteProvider: (suspend (String) -> ByteArray?)? = remember(
+        viewModel,
+        uiState.isVaultNote
+    ) {
+        if (uiState.isVaultNote) {
+            val provider: suspend (String) -> ByteArray? = { path ->
+                viewModel.decryptVaultImageBytes(path)
+            }
+            provider
+        } else {
+            null
+        }
+    }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val systemDark = isSystemInDarkTheme()
     val isDarkTheme = when (themeMode) {
@@ -256,6 +272,7 @@ fun EditorScreen(
             isDarkTheme = isDarkTheme,
             isKeyboardVisible = isKeyboardVisible,
             imageFileProvider = imageFileProvider,
+            vaultImageByteProvider = vaultImageByteProvider,
             noteLinkTargets = noteLinkTargets,
             state = state
         ),

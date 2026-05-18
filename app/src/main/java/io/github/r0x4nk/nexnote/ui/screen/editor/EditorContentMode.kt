@@ -44,6 +44,7 @@ private enum class EditorContentTarget {
 internal fun ColumnScope.EditorContentModeBox(
     uiState: EditorUiState,
     imageFileProvider: (String) -> File,
+    vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     noteLinkTargets: List<NoteLinkTarget>,
     state: EditorScreenState,
     keyboardToolbarVisible: Boolean,
@@ -99,7 +100,13 @@ internal fun ColumnScope.EditorContentModeBox(
                     EditorPreviewLoadingPlaceholder(modifier = Modifier.fillMaxWidth())
                 }
                 EditorContentTarget.Preview -> {
-                    EditorMarkdownPreview(uiState, imageFileProvider, state, onPreviewNoteLinkClick)
+                    EditorMarkdownPreview(
+                        uiState = uiState,
+                        imageFileProvider = imageFileProvider,
+                        vaultImageByteProvider = vaultImageByteProvider,
+                        state = state,
+                        onPreviewNoteLinkClick = onPreviewNoteLinkClick
+                    )
                 }
                 EditorContentTarget.Edit -> {
                     EditorContentField(
@@ -162,6 +169,7 @@ private fun editorContentTarget(
 private fun EditorMarkdownPreview(
     uiState: EditorUiState,
     imageFileProvider: (String) -> File,
+    vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     state: EditorScreenState,
     onPreviewNoteLinkClick: (Long) -> Unit
 ) {
@@ -175,6 +183,7 @@ private fun EditorMarkdownPreview(
                 vertical = EditorContentTopPadding
             ),
         imageFileProvider = imageFileProvider,
+        vaultImageByteProvider = vaultImageByteProvider,
         highlightRanges = state.visibleContentHighlightRanges(),
         activeHighlightRange = state.activeContentHighlightRange(),
         onNoteLinkClick = onPreviewNoteLinkClick
