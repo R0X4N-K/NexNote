@@ -12,6 +12,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ConfigureVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
@@ -27,6 +28,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToVaultUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.MoveVaultNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
@@ -209,7 +211,9 @@ internal class VaultUseCases internal constructor(
     val getVaultAndroidCredentialAvailability =
         GetVaultAndroidCredentialAvailabilityUseCase(vaultAndroidCredentialRepository)
     val lockVault = LockVaultUseCase(vaultRepository)
+    val decryptVaultImageBytes = DecryptVaultImageBytesUseCase(vaultNoteRepository)
     val moveNoteToVault = MoveNoteToVaultUseCase(vaultNoteRepository)
+    val moveVaultNoteToTrash = MoveVaultNoteToTrashUseCase(vaultNoteRepository)
     val observeVaultNotes = ObserveVaultNotesUseCase(vaultNoteRepository)
     val getVaultNoteById = GetVaultNoteByIdUseCase(vaultNoteRepository)
     val saveVaultNote = SaveVaultNoteUseCase(vaultNoteRepository)
