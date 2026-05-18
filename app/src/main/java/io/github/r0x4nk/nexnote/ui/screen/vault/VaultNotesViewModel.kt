@@ -218,8 +218,6 @@ class VaultNotesViewModel(
 private fun MoveNoteToVaultResult.toMessage(): String =
     when (this) {
         MoveNoteToVaultResult.Success -> "Note moved to Vault"
-        MoveNoteToVaultResult.ContainsImages ->
-            "Notes with images cannot be moved to Vault yet"
         MoveNoteToVaultResult.NotFound -> "Could not move note to Vault"
     }
 

@@ -58,6 +58,22 @@ class VaultImageFileStorageTest {
     }
 
     @Test
+    fun `decryptInPlace restores encrypted envelope to plaintext file bytes`() = runTest {
+        val imageStorage = TestNoteImageStorage(tempFolder.root)
+        val vaultImageStorage = VaultImageFileStorage(imageStorage, fileCipher)
+        val relativePath = "images/note_rollback_img_100.jpg"
+        val plainBytes = "ROLLBACK-IMAGE-BYTES".toByteArray(Charsets.UTF_8)
+        val file = writeImage(imageStorage, relativePath, plainBytes)
+        vaultImageStorage.encryptInPlace(relativePath, key)
+        assertTrue(fileCipher.isEncryptedPayload(file.readBytes()))
+
+        val result = vaultImageStorage.decryptInPlace(relativePath, key)
+
+        assertEquals(VaultImageFileRestoreResult.Restored, result)
+        assertArrayEquals(plainBytes, file.readBytes())
+    }
+
+    @Test
     fun `encryptInPlace is idempotent for already encrypted files`() = runTest {
         val imageStorage = TestNoteImageStorage(tempFolder.root)
         val vaultImageStorage = VaultImageFileStorage(imageStorage, fileCipher)

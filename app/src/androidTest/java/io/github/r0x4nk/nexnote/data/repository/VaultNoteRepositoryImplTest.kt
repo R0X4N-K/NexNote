@@ -8,9 +8,12 @@ import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
 import io.github.r0x4nk.nexnote.data.db.entity.TagEntity
 import io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage
+import io.github.r0x4nk.nexnote.data.local.VaultImageFileEncryptionResult
+import io.github.r0x4nk.nexnote.data.local.VaultImageFileStorage
 import io.github.r0x4nk.nexnote.data.security.VaultFieldCipher
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.VaultLockedException
 import io.github.r0x4nk.nexnote.testing.NoOpNoteImageStorage
 import kotlinx.coroutines.flow.first
@@ -25,6 +28,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.IOException
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 
@@ -145,32 +149,144 @@ class VaultNoteRepositoryImplTest {
     }
 
     @Test
-    fun moveNormalNoteToVault_rejectsNotesWithImagesUntilVaultImageEncryptionExists() = runTest {
-        val noteId = db.noteDao().insertNote(
-            NoteEntity(
-                title = "Visible image title",
-                content = "Body with #image",
-                imagePathsRaw = "images/plain.jpg",
-                creationDate = 1_000L,
-                lastModifiedDate = 1_000L
+    fun moveNormalNoteToVault_encryptsPhysicalImageFilesInPlaceAndMovesNote() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-move-auto-encrypt").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val relativePath = "images/note_1_img_150.jpg"
+            val plainBytes = byteArrayOf(42, 41, 40, 39, 38)
+            val imageFile = realImageStorage.getImageFile(relativePath)
+            imageFile.parentFile?.mkdirs()
+            imageFile.writeBytes(plainBytes)
+
+            val noteId = db.noteDao().insertNote(
+                NoteEntity(
+                    title = "Visible image title",
+                    content = "Body with #image",
+                    imagePathsRaw = relativePath,
+                    creationDate = 1_000L,
+                    lastModifiedDate = 1_000L
+                )
             )
-        )
-        db.tagDao().insertTag(TagEntity(name = "image", createdDate = 1_000L, lastUpdatedDate = 1_000L))
-        db.tagDao().insertCrossRef(NoteTagCrossRef(noteId = noteId, tagName = "image"))
+            db.tagDao().insertTag(
+                TagEntity(name = "image", createdDate = 1_000L, lastUpdatedDate = 1_000L)
+            )
+            db.tagDao().insertCrossRef(NoteTagCrossRef(noteId = noteId, tagName = "image"))
 
-        val moved = repository.moveNormalNoteToVault(noteId)
+            val moved = physicalRepository.moveNormalNoteToVault(noteId)
 
-        assertEquals(MoveNoteToVaultResult.ContainsImages, moved)
-        val normal = db.noteDao().getNoteById(noteId)
-        assertEquals("Visible image title", normal?.title)
-        assertEquals("Body with #image", normal?.content)
-        assertEquals("images/plain.jpg", normal?.imagePathsRaw)
-        assertFalse(normal?.isInVault == true)
-        assertEquals(
-            listOf("image"),
-            db.tagDao().getCrossRefsForNote(noteId).map { it.tagName }
+            assertEquals(MoveNoteToVaultResult.Success, moved)
+            assertNull(db.noteDao().getNoteById(noteId))
+            assertTrue(db.tagDao().getCrossRefsForNote(noteId).isEmpty())
+
+            val raw = db.noteDao().getVaultNoteById(noteId)
+            assertTrue(raw?.isInVault == true)
+            assertNotEquals("Visible image title", raw?.title)
+            assertNotEquals("Body with #image", raw?.content)
+            assertNotEquals(relativePath, raw?.imagePathsRaw)
+            assertTrue(cipher.isEncryptedPayload(raw?.title.orEmpty()))
+            assertTrue(cipher.isEncryptedPayload(raw?.content.orEmpty()))
+            assertTrue(cipher.isEncryptedPayload(raw?.imagePathsRaw.orEmpty()))
+
+            val protectedBytes = imageFile.readBytes()
+            assertFalse(protectedBytes.contentEquals(plainBytes))
+            assertTrue(
+                "Encrypted image bytes should match Vault file envelope.",
+                io.github.r0x4nk.nexnote.data.security.VaultEncryptedFile.isEncoded(protectedBytes)
+            )
+            assertTrue(
+                physicalRepository.decryptVaultImageBytes(relativePath)
+                    ?.contentEquals(plainBytes) == true
+            )
+
+            val decrypted = physicalRepository.getVaultNoteById(noteId)
+            assertEquals("Visible image title", decrypted?.title)
+            assertEquals("Body with #image", decrypted?.content)
+            assertEquals(listOf(relativePath), decrypted?.imagePaths)
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun moveNormalNoteToVault_rollsBackImageEncryptionWhenMoveFails() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-move-rollback").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val firstPath = "images/note_1_img_rollback_first.jpg"
+        val secondPath = "images/note_1_img_rollback_second.jpg"
+        val failingImageStorage = FailingVaultImageFileStorage(
+            imageStorage = realImageStorage,
+            failPath = secondPath
         )
-        assertNull(db.noteDao().getVaultNoteById(noteId))
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher,
+            vaultImageFileStorage = failingImageStorage
+        )
+
+        try {
+            val firstPlainBytes = byteArrayOf(1, 3, 5, 7)
+            val secondPlainBytes = byteArrayOf(2, 4, 6, 8)
+            val firstFile = realImageStorage.getImageFile(firstPath)
+            val secondFile = realImageStorage.getImageFile(secondPath)
+            firstFile.parentFile?.mkdirs()
+            secondFile.parentFile?.mkdirs()
+            firstFile.writeBytes(firstPlainBytes)
+            secondFile.writeBytes(secondPlainBytes)
+
+            val noteId = db.noteDao().insertNote(
+                NoteEntity(
+                    title = "Visible rollback title",
+                    content = "Body with #rollback",
+                    imagePathsRaw = listOf(firstPath, secondPath).joinToString("\n"),
+                    creationDate = 1_000L,
+                    lastModifiedDate = 1_000L
+                )
+            )
+            db.tagDao().insertTag(
+                TagEntity(name = "rollback", createdDate = 1_000L, lastUpdatedDate = 1_000L)
+            )
+            db.tagDao().insertCrossRef(NoteTagCrossRef(noteId = noteId, tagName = "rollback"))
+
+            val result = runCatching { physicalRepository.moveNormalNoteToVault(noteId) }
+
+            assertTrue(result.exceptionOrNull() is IOException)
+            val normal = db.noteDao().getNoteById(noteId)
+            assertEquals("Visible rollback title", normal?.title)
+            assertEquals("Body with #rollback", normal?.content)
+            assertEquals(listOf(firstPath, secondPath).joinToString("\n"), normal?.imagePathsRaw)
+            assertFalse(normal?.isInVault == true)
+            assertNull(db.noteDao().getVaultNoteById(noteId))
+            assertEquals(
+                listOf("rollback"),
+                db.tagDao().getCrossRefsForNote(noteId).map { it.tagName }
+            )
+            assertTrue(firstFile.readBytes().contentEquals(firstPlainBytes))
+            assertTrue(secondFile.readBytes().contentEquals(secondPlainBytes))
+        } finally {
+            imageRoot.deleteRecursively()
+        }
     }
 
     @Test
@@ -253,6 +369,70 @@ class VaultNoteRepositoryImplTest {
     }
 
     @Test
+    fun removeNoteFromVault_restoresPhysicalImageFilesToPlaintext() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-remove-restore").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val relativePath = "images/note_1_img_remove.jpg"
+            val plainBytes = byteArrayOf(90, 91, 92, 93)
+            val imageFile = realImageStorage.getImageFile(relativePath)
+            imageFile.parentFile?.mkdirs()
+            imageFile.writeBytes(plainBytes)
+
+            val noteId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Vault image title",
+                    content = "Body with #image",
+                    imagePaths = listOf(relativePath),
+                    creationDate = 1_000L
+                )
+            )
+            assertTrue(
+                "Vault save must encrypt the image file before removal.",
+                io.github.r0x4nk.nexnote.data.security.VaultEncryptedFile.isEncoded(
+                    imageFile.readBytes()
+                )
+            )
+
+            val removed = physicalRepository.removeNoteFromVault(noteId)
+
+            assertTrue(removed)
+            assertNull(db.noteDao().getVaultNoteById(noteId))
+            val normal = db.noteDao().getNoteById(noteId)
+            assertEquals("Vault image title", normal?.title)
+            assertEquals("Body with #image", normal?.content)
+            assertEquals(relativePath, normal?.imagePathsRaw)
+            assertFalse(normal?.isInVault == true)
+            assertTrue(imageFile.readBytes().contentEquals(plainBytes))
+            assertFalse(
+                "A normal note image file must not remain wrapped as a Vault file.",
+                io.github.r0x4nk.nexnote.data.security.VaultEncryptedFile.isEncoded(
+                    imageFile.readBytes()
+                )
+            )
+            assertEquals(
+                listOf("image"),
+                db.tagDao().getCrossRefsForNote(noteId).map { it.tagName }
+            )
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
     fun removeNoteFromVault_requiresUnlockedVault() = runTest {
         val noteId = repository.saveVaultNote(Note(title = "Locked", content = "Hidden"))
         val encryptedBefore = db.noteDao().getVaultNoteById(noteId)
@@ -267,6 +447,76 @@ class VaultNoteRepositoryImplTest {
         assertEquals(encryptedBefore?.content, encryptedAfter?.content)
         assertTrue(cipher.isEncryptedPayload(encryptedAfter?.title.orEmpty()))
         assertTrue(cipher.isEncryptedPayload(encryptedAfter?.content.orEmpty()))
+    }
+
+    @Test
+    fun moveVaultNoteToTrash_softDeletesVaultNoteWithoutExposingItInNormalTrash() = runTest {
+        val noteId = repository.saveVaultNote(
+            Note(
+                title = "Private trash title",
+                content = "Private trash body",
+                imagePaths = listOf("images/private-trash.jpg"),
+                creationDate = 1_000L
+            )
+        )
+        val encryptedBefore = db.noteDao().getVaultNoteById(noteId)!!
+
+        val moved = repository.moveVaultNoteToTrash(noteId)
+
+        assertTrue(moved)
+        assertNull(db.noteDao().getVaultNoteById(noteId))
+        assertTrue(repository.vaultNotes.first().isEmpty())
+        assertTrue(db.noteDao().getDeletedNotes().first().isEmpty())
+        assertNull(db.noteDao().getNoteById(noteId))
+
+        val trashedVault = db.noteDao().getAllVaultNotesForWipeOnce().single()
+        assertEquals(noteId, trashedVault.id)
+        assertTrue(trashedVault.isInVault)
+        assertTrue(trashedVault.isDeleted)
+        assertTrue(trashedVault.deletedDate != null)
+        assertEquals(encryptedBefore.title, trashedVault.title)
+        assertEquals(encryptedBefore.content, trashedVault.content)
+        assertEquals(encryptedBefore.imagePathsRaw, trashedVault.imagePathsRaw)
+        assertTrue(cipher.isEncryptedPayload(trashedVault.title))
+        assertTrue(cipher.isEncryptedPayload(trashedVault.content))
+        assertTrue(cipher.isEncryptedPayload(trashedVault.imagePathsRaw))
+        assertTrue(imageStorage.deletedPaths.isEmpty())
+    }
+
+    @Test
+    fun moveVaultNoteToTrash_requiresUnlockedVault() = runTest {
+        val noteId = repository.saveVaultNote(Note(title = "Locked trash", content = "Hidden"))
+        val encryptedBefore = db.noteDao().getVaultNoteById(noteId)
+        keyProvider.lock()
+
+        val result = runCatching { repository.moveVaultNoteToTrash(noteId) }
+
+        assertTrue(result.exceptionOrNull() is VaultLockedException)
+        val encryptedAfter = db.noteDao().getVaultNoteById(noteId)
+        assertEquals(encryptedBefore?.title, encryptedAfter?.title)
+        assertFalse(encryptedAfter?.isDeleted == true)
+        assertNull(encryptedAfter?.deletedDate)
+        assertTrue(db.noteDao().getDeletedNotes().first().isEmpty())
+    }
+
+    @Test
+    fun moveVaultNoteToTrash_ignoresNormalNotes() = runTest {
+        val normalId = db.noteDao().insertNote(
+            NoteEntity(
+                title = "Normal title",
+                content = "Normal body",
+                creationDate = 1_000L,
+                lastModifiedDate = 1_000L
+            )
+        )
+
+        val moved = repository.moveVaultNoteToTrash(normalId)
+
+        assertFalse(moved)
+        val normal = db.noteDao().getNoteById(normalId)
+        assertEquals("Normal title", normal?.title)
+        assertFalse(normal?.isDeleted == true)
+        assertTrue(db.noteDao().getAllVaultNotesForWipeOnce().isEmpty())
     }
 
     @Test
@@ -543,12 +793,329 @@ class VaultNoteRepositoryImplTest {
         assertEquals("Already normal", db.noteDao().getNoteById(noteId)?.title)
         assertNull(db.noteDao().getVaultNoteById(noteId))
     }
+
+    @Test
+    fun encryptImagesForVaultNote_encryptsPhysicalFilesInPlaceForActiveVaultNote() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-image-encrypt").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val relativePath = "images/note_1_img_200.jpg"
+            val plainBytes = byteArrayOf(9, 8, 7, 6, 5)
+            val imageFile = realImageStorage.getImageFile(relativePath)
+            imageFile.parentFile?.mkdirs()
+            imageFile.writeBytes(plainBytes)
+
+            val noteId = db.noteDao().insertNote(
+                NoteEntity(
+                    title = cipher.encryptToString("Vault with image", testVaultKey()),
+                    content = cipher.encryptToString("Body", testVaultKey()),
+                    imagePathsRaw = cipher.encryptToString(relativePath, testVaultKey()),
+                    isInVault = true,
+                    creationDate = 1_000L,
+                    lastModifiedDate = 1_000L
+                )
+            )
+
+            assertTrue(imageFile.readBytes().contentEquals(plainBytes))
+
+            val result = physicalRepository.encryptImagesForVaultNote(noteId)
+
+            assertEquals(VaultNoteImageEncryptionResult.Success, result)
+            val protectedBytes = imageFile.readBytes()
+            assertFalse(protectedBytes.contentEquals(plainBytes))
+            assertTrue(
+                "Encrypted image bytes should match Vault file envelope.",
+                io.github.r0x4nk.nexnote.data.security.VaultEncryptedFile.isEncoded(protectedBytes)
+            )
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun encryptImagesForVaultNote_isIdempotentOnAlreadyEncryptedFiles() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-image-encrypt-idempotent").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val relativePath = "images/note_1_img_300.jpg"
+            val imageFile = realImageStorage.getImageFile(relativePath)
+            imageFile.parentFile?.mkdirs()
+            imageFile.writeBytes(byteArrayOf(1, 2, 3, 4))
+
+            val noteId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Vault with image",
+                    content = "Body",
+                    imagePaths = listOf(relativePath),
+                    creationDate = 1_000L
+                )
+            )
+
+            val firstResult = physicalRepository.encryptImagesForVaultNote(noteId)
+            val protectedBytesAfterFirst = imageFile.readBytes()
+            assertEquals(VaultNoteImageEncryptionResult.Success, firstResult)
+
+            val secondResult = physicalRepository.encryptImagesForVaultNote(noteId)
+            val protectedBytesAfterSecond = imageFile.readBytes()
+            assertEquals(VaultNoteImageEncryptionResult.Success, secondResult)
+            assertTrue(
+                "Second pass must not re-encrypt an already encrypted file.",
+                protectedBytesAfterFirst.contentEquals(protectedBytesAfterSecond)
+            )
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun encryptImagesForVaultNote_returnsNoImagesForVaultNoteWithoutImages() = runTest {
+        val noteId = repository.saveVaultNote(
+            Note(title = "Only text", content = "No images", creationDate = 1_000L)
+        )
+
+        val result = repository.encryptImagesForVaultNote(noteId)
+
+        assertEquals(VaultNoteImageEncryptionResult.NoImages, result)
+    }
+
+    @Test
+    fun encryptImagesForVaultNote_returnsNoteNotFoundForUnknownId() = runTest {
+        val result = repository.encryptImagesForVaultNote(noteId = 999L)
+
+        assertEquals(VaultNoteImageEncryptionResult.NoteNotFound, result)
+    }
+
+    @Test
+    fun encryptImagesForVaultNote_doesNotMatchNormalNotes() = runTest {
+        val normalId = db.noteDao().insertNote(
+            NoteEntity(
+                title = "Normal title",
+                content = "Normal body",
+                imagePathsRaw = "images/visible.jpg",
+                creationDate = 1_000L,
+                lastModifiedDate = 1_000L
+            )
+        )
+
+        val result = repository.encryptImagesForVaultNote(normalId)
+
+        assertEquals(VaultNoteImageEncryptionResult.NoteNotFound, result)
+        // Normal note row must remain untouched.
+        val normal = db.noteDao().getNoteById(normalId)
+        assertEquals("Normal title", normal?.title)
+        assertEquals("images/visible.jpg", normal?.imagePathsRaw)
+    }
+
+    @Test
+    fun encryptImagesForVaultNote_requiresUnlockedVault() = runTest {
+        val noteId = repository.saveVaultNote(
+            Note(title = "Locked", content = "Hidden", creationDate = 1_000L)
+        )
+        keyProvider.lock()
+
+        val outcome = runCatching { repository.encryptImagesForVaultNote(noteId) }
+
+        assertTrue(outcome.exceptionOrNull() is VaultLockedException)
+    }
+
+    @Test
+    fun saveVaultNote_encryptsPhysicalImageFilesInPlaceForNewNote() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-save-auto-encrypt").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val relativePath = "images/note_1_img_400.jpg"
+            val plainBytes = byteArrayOf(11, 22, 33, 44, 55)
+            val imageFile = realImageStorage.getImageFile(relativePath)
+            imageFile.parentFile?.mkdirs()
+            imageFile.writeBytes(plainBytes)
+
+            val noteId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Auto-encrypt title",
+                    content = "Auto-encrypt body",
+                    imagePaths = listOf(relativePath),
+                    creationDate = 1_000L
+                )
+            )
+
+            val protectedBytes = imageFile.readBytes()
+            assertFalse(protectedBytes.contentEquals(plainBytes))
+            assertTrue(
+                "Encrypted image bytes should match Vault file envelope.",
+                io.github.r0x4nk.nexnote.data.security.VaultEncryptedFile.isEncoded(protectedBytes)
+            )
+            // The stored image-path list is still recoverable through the
+            // normal Vault decryption path and points to the same relative
+            // file location.
+            val decrypted = physicalRepository.getVaultNoteById(noteId)
+            assertEquals(listOf(relativePath), decrypted?.imagePaths)
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun saveVaultNote_isIdempotentOnAlreadyEncryptedImageFiles() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-save-idempotent").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val relativePath = "images/note_1_img_500.jpg"
+            val imageFile = realImageStorage.getImageFile(relativePath)
+            imageFile.parentFile?.mkdirs()
+            imageFile.writeBytes(byteArrayOf(7, 7, 7, 7))
+
+            val noteId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Editable",
+                    content = "First save",
+                    imagePaths = listOf(relativePath),
+                    creationDate = 1_000L
+                )
+            )
+            val encryptedAfterFirstSave = imageFile.readBytes()
+            assertTrue(
+                "First save must wrap the image file in a Vault envelope.",
+                io.github.r0x4nk.nexnote.data.security.VaultEncryptedFile.isEncoded(
+                    encryptedAfterFirstSave
+                )
+            )
+
+            // Simulate an editor update that re-saves the same note with the
+            // same image path: the file must not be re-encrypted.
+            physicalRepository.saveVaultNote(
+                Note(
+                    id = noteId,
+                    title = "Editable",
+                    content = "Second save",
+                    imagePaths = listOf(relativePath),
+                    creationDate = 1_000L
+                )
+            )
+
+            val encryptedAfterSecondSave = imageFile.readBytes()
+            assertTrue(
+                "Second save must keep the existing envelope bytes unchanged.",
+                encryptedAfterFirstSave.contentEquals(encryptedAfterSecondSave)
+            )
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun saveVaultNote_doesNotTouchFilesystemForNotesWithoutImages() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-note-repository-save-no-images").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+
+        try {
+            val noteId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "No images",
+                    content = "Body",
+                    creationDate = 1_000L
+                )
+            )
+
+            // Saving a Vault note without image paths must not produce any
+            // file under the image root.
+            val filesUnderRoot = imageRoot.walkTopDown().filter { it.isFile }.toList()
+            assertTrue(filesUnderRoot.isEmpty())
+            assertEquals(
+                "No images",
+                physicalRepository.getVaultNoteById(noteId)?.title
+            )
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+}
+
+private fun testVaultKey(): SecretKey =
+    SecretKeySpec(ByteArray(32) { index ->
+        (index + 1).toByte()
+    }, "AES")
+
+private class FailingVaultImageFileStorage(
+    imageStorage: NoteImageStorage,
+    private val failPath: String
+) : VaultImageFileStorage(imageStorage = imageStorage) {
+    override suspend fun encryptInPlace(
+        relativePath: String,
+        key: SecretKey
+    ): VaultImageFileEncryptionResult {
+        if (relativePath == failPath) {
+            throw IOException("Forced Vault image encryption failure.")
+        }
+        return super.encryptInPlace(relativePath, key)
+    }
 }
 
 private class TestVaultKeyProvider : VaultUnlockedKeyProvider {
-    private var key: SecretKey? = SecretKeySpec(ByteArray(32) { index ->
-        (index + 1).toByte()
-    }, "AES")
+    private var key: SecretKey? = testVaultKey()
 
     fun lock() {
         key = null

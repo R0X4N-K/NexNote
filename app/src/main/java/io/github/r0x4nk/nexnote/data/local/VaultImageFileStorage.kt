@@ -23,18 +23,24 @@ internal sealed interface VaultImageFileDecryptionResult {
     data object Missing : VaultImageFileDecryptionResult
 }
 
+internal sealed interface VaultImageFileRestoreResult {
+    data object Restored : VaultImageFileRestoreResult
+    data object AlreadyPlaintext : VaultImageFileRestoreResult
+    data object Missing : VaultImageFileRestoreResult
+}
+
 /**
  * File boundary for Vault image payloads stored through [NoteImageStorage].
  *
  * This component intentionally does not update note rows or UI state. It only
  * transforms the bytes of an already-known internal image path.
  */
-internal class VaultImageFileStorage(
+internal open class VaultImageFileStorage(
     private val imageStorage: NoteImageStorage,
     private val fileCipher: VaultFileCipher = VaultFileCipher(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    suspend fun encryptInPlace(
+    open suspend fun encryptInPlace(
         relativePath: String,
         key: SecretKey
     ): VaultImageFileEncryptionResult = withContext(ioDispatcher) {
@@ -58,7 +64,7 @@ internal class VaultImageFileStorage(
         }
     }
 
-    suspend fun decryptToByteArray(
+    open suspend fun decryptToByteArray(
         relativePath: String,
         key: SecretKey
     ): VaultImageFileDecryptionResult = withContext(ioDispatcher) {
@@ -72,6 +78,39 @@ internal class VaultImageFileStorage(
             )
         } finally {
             encryptedBytes.fill(0)
+        }
+    }
+
+    /**
+     * Restore an encrypted Vault image file to plaintext in place.
+     *
+     * This is intentionally narrow: it exists for rollback paths where a note
+     * move into the Vault failed before the database row was converted, and for
+     * controlled "remove from Vault" flows where the database row has already
+     * been converted back to a normal note. Normal Vault reads should use
+     * [decryptToByteArray] and keep plaintext in memory.
+     */
+    open suspend fun decryptInPlace(
+        relativePath: String,
+        key: SecretKey
+    ): VaultImageFileRestoreResult = withContext(ioDispatcher) {
+        val file = imageStorage.getImageFile(relativePath)
+        if (!file.isFile) return@withContext VaultImageFileRestoreResult.Missing
+
+        val encryptedOrPlainBytes = file.readBytes()
+        var plainBytes = ByteArray(0)
+
+        try {
+            if (!fileCipher.isEncryptedPayload(encryptedOrPlainBytes)) {
+                return@withContext VaultImageFileRestoreResult.AlreadyPlaintext
+            }
+
+            plainBytes = fileCipher.decryptToByteArray(encryptedOrPlainBytes, key)
+            replaceFileConservatively(file, plainBytes)
+            VaultImageFileRestoreResult.Restored
+        } finally {
+            encryptedOrPlainBytes.fill(0)
+            plainBytes.fill(0)
         }
     }
 

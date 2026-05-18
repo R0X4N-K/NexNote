@@ -301,14 +301,14 @@ class VaultNotesViewModelTest {
     }
 
     @Test
-    fun `move normal note with images shows unsupported message without exposing content`() =
+    fun `not found move result shows generic failure without exposing content`() =
         runViewModelTest {
             val messages = mutableListOf<String>()
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 viewModel.vaultActionMessages.collect { messages += it }
             }
             fakeVaultRepo.setState(VaultState.UNLOCKED)
-            fakeNotesRepo.nextMoveResult = MoveNoteToVaultResult.ContainsImages
+            fakeNotesRepo.nextMoveResult = MoveNoteToVaultResult.NotFound
             advanceUntilIdle()
 
             viewModel.moveNormalNoteToVault(10L)
@@ -316,7 +316,7 @@ class VaultNotesViewModelTest {
 
             assertEquals(listOf(10L), fakeNotesRepo.movedIds)
             assertTrue(viewModel.uiState.value.notes.isEmpty())
-            assertEquals(listOf("Notes with images cannot be moved to Vault yet"), messages)
+            assertEquals(listOf("Could not move note to Vault"), messages)
         }
 
     private fun noteFixture(
@@ -408,4 +408,10 @@ private class FakeVaultNoteRepository : VaultNoteRepository {
         notesFlow.value = notesFlow.value.filterNot { it.id == note.id }
         return true
     }
+
+    override suspend fun moveVaultNoteToTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for VaultNotesViewModelTest")
+    }
+
+    override suspend fun decryptVaultImageBytes(relativePath: String): ByteArray? = null
 }

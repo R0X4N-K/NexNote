@@ -187,6 +187,17 @@ interface NoteDao {
     @Query(
         """
         UPDATE notes
+        SET isDeleted = 1, deletedDate = :deletedDate
+        WHERE id = :id
+          AND isInVault = 1
+          AND isDeleted = 0
+    """
+    )
+    suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int
+
+    @Query(
+        """
+        UPDATE notes
         SET isDeleted = 0, deletedDate = NULL
         WHERE id = :id
           AND isInVault = 0
