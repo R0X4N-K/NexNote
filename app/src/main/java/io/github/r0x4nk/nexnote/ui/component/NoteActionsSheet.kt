@@ -145,7 +145,7 @@ internal fun NoteActionsSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 12.dp)
         ) {
-            NoteActionsHeader(
+            NoteActionsSheetHeader(
                 title = if (page == NoteActionsPage.Actions) "Note actions" else "Copy note",
                 noteLabel = note.displayLabel()
             )
@@ -185,7 +185,7 @@ internal fun NoteActionsSheet(
 }
 
 @Composable
-private fun NoteActionsHeader(
+internal fun NoteActionsSheetHeader(
     title: String,
     noteLabel: String
 ) {
@@ -212,24 +212,24 @@ private fun NoteActionsMainPage(
     onDuplicate: () -> Unit,
     onDelete: () -> Unit
 ) {
-    NoteActionRow(
+    NoteActionsSheetRow(
         text = "Copy",
         icon = Icons.Outlined.ContentCopy,
         onClick = onCopy
     )
-    NoteActionRow(
+    NoteActionsSheetRow(
         text = "Duplicate",
         icon = Icons.Outlined.FileCopy,
         onClick = onDuplicate
     )
     if (showMoveToVault) {
-        NoteActionRow(
+        NoteActionsSheetRow(
             text = "Move to Vault",
             icon = Icons.Outlined.Lock,
             onClick = onMoveToVault
         )
     }
-    NoteActionRow(
+    NoteActionsSheetRow(
         text = "Delete",
         icon = Icons.Outlined.Delete,
         destructive = true,
@@ -243,17 +243,17 @@ private fun NoteActionsCopyPage(
     onCopyPlainText: () -> Unit,
     onCopyMarkdown: () -> Unit
 ) {
-    NoteActionRow(
+    NoteActionsSheetRow(
         text = "Back",
         icon = Icons.AutoMirrored.Outlined.ArrowBack,
         onClick = onBack
     )
-    NoteActionRow(
+    NoteActionsSheetRow(
         text = "Copy as text",
         icon = Icons.AutoMirrored.Outlined.TextSnippet,
         onClick = onCopyPlainText
     )
-    NoteActionRow(
+    NoteActionsSheetRow(
         text = "Copy as Markdown",
         icon = Icons.Outlined.Code,
         onClick = onCopyMarkdown
@@ -261,10 +261,11 @@ private fun NoteActionsCopyPage(
 }
 
 @Composable
-private fun NoteActionRow(
+internal fun NoteActionsSheetRow(
     text: String,
     icon: ImageVector,
     destructive: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val contentColor = if (destructive) {
@@ -291,6 +292,6 @@ private fun NoteActionRow(
             containerColor = Color.Transparent,
             headlineColor = contentColor
         ),
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = modifier.clickable(onClick = onClick)
     )
 }

@@ -54,6 +54,7 @@ internal fun NoteCardContent(
     onClick: () -> Unit,
     onPin: () -> Unit,
     onLongPress: () -> Unit,
+    showPinAction: Boolean,
     noteCardStyle: NoteCardStyle,
     titleHighlightRanges: List<IntRange>,
     contentHighlightRanges: List<IntRange>
@@ -71,6 +72,7 @@ internal fun NoteCardContent(
         onClick = onClick,
         onPin = onPin,
         onLongPress = onLongPress,
+        showPinAction = showPinAction,
         noteCardStyle = noteCardStyle,
         visuals = visuals,
         textState = textState
@@ -166,6 +168,7 @@ private fun NoteCardSurface(
     onClick: () -> Unit,
     onPin: () -> Unit,
     onLongPress: () -> Unit,
+    showPinAction: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
@@ -190,6 +193,7 @@ private fun NoteCardSurface(
         NoteCardBody(
             note = note,
             onPin = onPin,
+            showPinAction = showPinAction,
             noteCardStyle = noteCardStyle,
             visuals = visuals,
             textState = textState
@@ -201,6 +205,7 @@ private fun NoteCardSurface(
 private fun NoteCardBody(
     note: Note,
     onPin: () -> Unit,
+    showPinAction: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
@@ -216,6 +221,7 @@ private fun NoteCardBody(
         NoteCardMainColumn(
             note = note,
             onPin = onPin,
+            showPinAction = showPinAction,
             noteCardStyle = noteCardStyle,
             visuals = visuals,
             textState = textState,
@@ -239,6 +245,7 @@ private fun NoteCardAccentStrip(primaryColor: Color, accentAlpha: Float) {
 private fun NoteCardMainColumn(
     note: Note,
     onPin: () -> Unit,
+    showPinAction: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState,
@@ -253,7 +260,13 @@ private fun NoteCardMainColumn(
             bottom = verticalPadding
         )
     ) {
-        NoteCardTitleRow(textState.title, note.isPinned, visuals.primaryColor, onPin)
+        NoteCardTitleRow(
+            title = textState.title,
+            isPinned = note.isPinned,
+            primaryColor = visuals.primaryColor,
+            onPin = onPin,
+            showPinAction = showPinAction
+        )
         if (showsContentPreview(note, noteCardStyle)) {
             Spacer(Modifier.height(4.dp))
             NoteCardPreview(textState.content)

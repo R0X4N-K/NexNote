@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * Tap → [onClick].
  * Pin button (top-right of card header) → [onPin] toggles the pinned state.
  * Long-press → [onLongPress].
+ * [showPinAction] can hide the pin affordance on surfaces that render note
+ * cards but do not yet support pin toggling.
  *
  * [noteCardStyle] controls how much information is shown:
  *   - TITLE_ONLY: title and date only (most compact).
@@ -51,7 +53,8 @@ fun NoteCard(
     titleHighlightRanges: List<IntRange> = emptyList(),
     contentHighlightRanges: List<IntRange> = emptyList(),
     onPin: () -> Unit = {},
-    onLongPress: () -> Unit = {}
+    onLongPress: () -> Unit = {},
+    showPinAction: Boolean = true
 ) {
     val collapsedState = remember { mutableStateOf(false) }
     val dismissState = rememberNoteCardDismissState()
@@ -77,6 +80,7 @@ fun NoteCard(
             onClick = { if (!collapsedState.value) onClick() },
             onPin = onPin,
             onLongPress = onLongPress,
+            showPinAction = showPinAction,
             noteCardStyle = noteCardStyle,
             titleHighlightRanges = titleHighlightRanges,
             contentHighlightRanges = contentHighlightRanges

@@ -20,6 +20,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsForNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
@@ -53,6 +54,7 @@ class EditorViewModel(
     private val saveVaultNote: SaveVaultNoteUseCase? = null,
     private val setNotePreviewMode: SetNotePreviewModeUseCase,
     observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase? = null,
+    observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase? = null,
     private val observeTagsForNote: ObserveTagsForNoteUseCase? = null,
     private val indexNoteTags: IndexNoteTagsUseCase? = null,
     observeVaultState: ObserveVaultStateUseCase? = null,
@@ -108,6 +110,7 @@ class EditorViewModel(
     internal val noteLinkTargets: StateFlow<List<NoteLinkTarget>> = buildNoteLinkTargetsFlow(
         uiState = _uiState,
         observeNoteLinkCandidates = observeNoteLinkCandidates,
+        observeVaultNoteLinkCandidates = observeVaultNoteLinkCandidates,
         scope = viewModelScope
     )
 
@@ -515,6 +518,8 @@ class EditorViewModel(
                     saveVaultNote         = useCases.vault.saveVaultNote,
                     setNotePreviewMode    = useCases.notes.setNotePreviewMode,
                     observeNoteLinkCandidates = useCases.notes.observeNoteLinkCandidates,
+                    observeVaultNoteLinkCandidates =
+                        useCases.vault.observeVaultNoteLinkCandidates,
                     observeTagsForNote    = useCases.tags.observeTagsForNote,
                     indexNoteTags         = useCases.tags.indexNoteTags,
                     observeVaultState     = useCases.vault.observeVaultState,

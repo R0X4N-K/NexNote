@@ -273,6 +273,7 @@ internal fun EditorInitialFocusEffect(
                 runCatching { state.titleFocusRequester.requestFocus() }
             }
             is EditorMode.NewFromTemplate,
+            is EditorMode.NewVaultFromTemplate,
             is EditorMode.NewNote,
             EditorMode.NewVaultNote -> {
                 runCatching { state.contentFocusRequester.requestFocus() }

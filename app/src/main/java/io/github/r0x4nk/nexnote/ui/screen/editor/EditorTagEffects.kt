@@ -19,6 +19,11 @@ internal fun EditorTagEffects(
 ) {
     EditorTagSearchCollectorEffect(viewModel, state)
     EditorPendingTagScrollEffect(uiState, state, density)
+    EditorSelectedTagAvailabilityEffect(
+        selectedTagsInEditor = selectedTagsInEditor,
+        tagsForCurrentNote = tagsForCurrentNote,
+        onClearTagSelection = viewModel::clearTagSelectionInEditor
+    )
     EditorSelectedTagClearEffect(selectedTagsInEditor, state)
     EditorTagsAppearVisibilityEffect(tagsForCurrentNote, state)
     EditorTagAutoHideEffect(uiState.showPreview, state)
@@ -108,6 +113,27 @@ private fun EditorSelectedTagClearEffect(
     LaunchedEffect(selectedTagsInEditor) {
         if (selectedTagsInEditor == null) state.highlightRange = null
     }
+}
+
+@Composable
+private fun EditorSelectedTagAvailabilityEffect(
+    selectedTagsInEditor: String?,
+    tagsForCurrentNote: List<Tag>,
+    onClearTagSelection: () -> Unit
+) {
+    LaunchedEffect(selectedTagsInEditor, tagsForCurrentNote) {
+        if (shouldClearUnavailableSelectedTag(selectedTagsInEditor, tagsForCurrentNote)) {
+            onClearTagSelection()
+        }
+    }
+}
+
+internal fun shouldClearUnavailableSelectedTag(
+    selectedTagsInEditor: String?,
+    tagsForCurrentNote: List<Tag>
+): Boolean {
+    val selectedTag = selectedTagsInEditor ?: return false
+    return tagsForCurrentNote.none { it.name == selectedTag }
 }
 
 @Composable

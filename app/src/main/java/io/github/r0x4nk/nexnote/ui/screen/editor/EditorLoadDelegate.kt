@@ -26,7 +26,9 @@ internal class EditorLoadDelegate(
             is EditorMode.ExistingNote -> loadNote(mode.noteId)
             EditorMode.NewVaultNote -> finishEmptyEditorLoad(null)
             is EditorMode.VaultNote -> loadVaultNote(mode.noteId)
-            is EditorMode.NewFromTemplate -> loadTemplate(mode.templateId)
+            is EditorMode.NewFromTemplate -> loadTemplate(mode.templateId, isVaultNote = false)
+            is EditorMode.NewVaultFromTemplate ->
+                loadTemplate(mode.templateId, isVaultNote = true)
             is EditorMode.NewNote -> finishEmptyEditorLoad(mode.initialCreationDate)
             EditorMode.NewTemplate -> startNewTemplate()
         }
@@ -70,7 +72,7 @@ internal class EditorLoadDelegate(
         resetContentHistory(loadedState.content, loadedState.contentSelectionOffset)
     }
 
-    private suspend fun loadTemplate(id: Long) {
+    private suspend fun loadTemplate(id: Long, isVaultNote: Boolean) {
         NexNoteDebugLog.viewModel(event = "loadTemplateStart", details = "templateId=$id")
         val template = getTemplateById(id)
         if (template == null) {
@@ -89,6 +91,7 @@ internal class EditorLoadDelegate(
             noteId = EditorViewModel.NO_ID,
             isLoading = false,
             content = template.content.replace("{{date}}", dateStr),
+            isVaultNote = isVaultNote,
             isDirty = true,
             contentVersion = 1
         )

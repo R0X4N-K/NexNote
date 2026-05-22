@@ -237,7 +237,12 @@ fun EditorScreen(
             else -> {
                 scope.launch {
                     viewModel.flushPendingChanges()
-                    navController.navigate(Screen.Editor.existingNoteRoute(targetNoteId))
+                    navController.navigate(
+                        previewNoteLinkEditorRoute(
+                            isVaultNote = uiState.isVaultNote,
+                            targetNoteId = targetNoteId
+                        )
+                    )
                 }
             }
         }
@@ -362,6 +367,16 @@ private fun EditorScreenState.openNoteLinkPickerDetachedFromEditor(focusManager:
     focusManager.clearFocus(force = true)
     showNoteLinkPicker = true
 }
+
+internal fun previewNoteLinkEditorRoute(
+    isVaultNote: Boolean,
+    targetNoteId: Long
+): String =
+    if (isVaultNote) {
+        Screen.Editor.vaultNoteRoute(targetNoteId)
+    } else {
+        Screen.Editor.existingNoteRoute(targetNoteId)
+    }
 
 private fun EditorUiState.debugEditorSummary(): String {
     return "noteId=$noteId templateId=$templateId templateMode=$isTemplateMode " +

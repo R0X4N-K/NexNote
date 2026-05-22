@@ -15,6 +15,7 @@ sealed class EditorMode {
     data class ExistingNote(val noteId: Long) : EditorMode()
     data class VaultNote(val noteId: Long) : EditorMode()
     data class NewFromTemplate(val templateId: Long) : EditorMode()
+    data class NewVaultFromTemplate(val templateId: Long) : EditorMode()
     data object NewTemplate : EditorMode()
     data class EditTemplate(val templateId: Long) : EditorMode()
 
@@ -28,13 +29,14 @@ sealed class EditorMode {
         get() = false
 
     internal val isVaultNote: Boolean
-        get() = this is VaultNote || this == NewVaultNote
+        get() = this is VaultNote || this == NewVaultNote || this is NewVaultFromTemplate
 
     internal val routeNoteId: Long
         get() = when (this) {
             is ExistingNote -> noteId
             is EditTemplate,
             is NewFromTemplate,
+            is NewVaultFromTemplate,
             is VaultNote,
             NewVaultNote,
             is NewNote,
@@ -44,6 +46,7 @@ sealed class EditorMode {
     internal val routeTemplateId: Long
         get() = when (this) {
             is NewFromTemplate -> templateId
+            is NewVaultFromTemplate -> templateId
             is EditTemplate,
             is ExistingNote,
             is VaultNote,
@@ -58,6 +61,7 @@ sealed class EditorMode {
             is EditTemplate -> templateId
             is ExistingNote,
             is NewFromTemplate,
+            is NewVaultFromTemplate,
             is VaultNote,
             NewVaultNote,
             is NewNote -> NO_ID
@@ -69,6 +73,7 @@ sealed class EditorMode {
             is EditTemplate,
             is ExistingNote,
             is NewFromTemplate,
+            is NewVaultFromTemplate,
             is VaultNote,
             NewVaultNote,
             NewTemplate -> NO_CREATION_DATE
@@ -99,6 +104,8 @@ sealed class EditorMode {
             creationDate: Long = NO_CREATION_DATE,
             vaultNoteId: Long = NO_ID
         ): EditorMode = when {
+            vaultNoteId == NEW_VAULT_NOTE_ID && templateId != NO_ID ->
+                NewVaultFromTemplate(templateId)
             vaultNoteId == NEW_VAULT_NOTE_ID -> NewVaultNote
             vaultNoteId != NO_ID -> VaultNote(vaultNoteId)
             editTemplateId == NEW_TEMPLATE_ID -> NewTemplate

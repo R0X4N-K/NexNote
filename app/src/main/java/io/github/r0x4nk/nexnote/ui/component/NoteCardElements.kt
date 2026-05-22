@@ -36,7 +36,8 @@ internal fun NoteCardTitleRow(
     title: AnnotatedString,
     isPinned: Boolean,
     primaryColor: Color,
-    onPin: () -> Unit
+    onPin: () -> Unit,
+    showPinAction: Boolean = true
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -46,7 +47,9 @@ internal fun NoteCardTitleRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        NoteCardPinButton(isPinned, primaryColor, onPin)
+        if (showPinAction) {
+            NoteCardPinButton(isPinned, primaryColor, onPin)
+        }
     }
 }
 

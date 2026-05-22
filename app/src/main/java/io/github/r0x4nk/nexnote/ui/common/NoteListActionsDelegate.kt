@@ -53,6 +53,10 @@ internal class NoteListActionsDelegate(
     }
 
     fun duplicateNote(note: Note) {
+        if (note.isInVault) {
+            noteActionMessages.trySend("Could not duplicate note")
+            return
+        }
         val duplicate = duplicateNoteUseCase ?: return
         val noteLabel = note.displayLabel()
         scope.launch {
