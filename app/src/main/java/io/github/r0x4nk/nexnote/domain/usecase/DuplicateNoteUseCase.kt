@@ -12,6 +12,10 @@ class DuplicateNoteUseCase(
     private val imageStorage: NoteImageStorage
 ) {
     suspend operator fun invoke(source: Note): Long {
+        require(!source.isInVault) {
+            "Vault notes must use the explicit Vault duplication path."
+        }
+
         val draft = source.copy(
             id = 0L,
             isDeleted = false,
