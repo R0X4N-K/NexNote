@@ -3,12 +3,16 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
+import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import kotlinx.coroutines.flow.Flow
@@ -99,6 +103,7 @@ class EditorViewModelTest : EditorViewModelTestBase() {
     fun `noteLinkTargets excludes current note and normalizes blank titles`() = runTest {
         fakeNoteDao.addNote(NoteEntity(id = 42L, title = "Current"))
         fakeNoteDao.addNote(NoteEntity(id = 7L, title = "   "))
+        fakeNoteDao.addNote(NoteEntity(id = 9L, title = "Private", isInVault = true))
 
         val vm = viewModel(noteId = 42L)
         val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -107,6 +112,42 @@ class EditorViewModelTest : EditorViewModelTestBase() {
         advanceUntilIdle()
 
         assertEquals(listOf(NoteLinkTarget(id = 7L, title = "Untitled note")), vm.noteLinkTargets.value)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `vault noteLinkTargets uses only unlocked vault candidates`() = runTest {
+        fakeNoteDao.addNote(NoteEntity(id = 5L, title = "Normal outside Vault"))
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 42L,
+                title = "Current private",
+                content = "Body",
+                isInVault = true
+            )
+        )
+        vaultRepository.addNote(
+            Note(
+                id = 7L,
+                title = "Linked private",
+                content = "Other body",
+                isInVault = true
+            )
+        )
+
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(42L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            observeVaultNoteLinkCandidates =
+                ObserveVaultNoteLinkCandidatesUseCase(vaultRepository)
+        )
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.noteLinkTargets.collect {}
+        }
+        advanceUntilIdle()
+
+        assertEquals(listOf(NoteLinkTarget(id = 7L, title = "Linked private")), vm.noteLinkTargets.value)
         collectJob.cancel()
     }
 
@@ -179,6 +220,66 @@ class EditorViewModelTest : EditorViewModelTestBase() {
         assertEquals("Updated title", vaultRepository.savedNotes.single().title)
         assertEquals("Updated body", vaultRepository.savedNotes.single().content)
         assertTrue(vaultRepository.savedNotes.single().isInVault)
+    }
+
+    @Test
+    fun `vault editor tags are derived from decrypted content and update with edits`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "#titleOnly",
+                content = "Private #Alpha and #beta #alpha",
+                isInVault = true
+            )
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository)
+        )
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.tagsForCurrentNote.collect {}
+        }
+        advanceUntilIdle()
+
+        assertEquals(listOf("alpha", "beta"), vm.tagsForCurrentNote.value.map { it.name })
+
+        vm.onContentChange("Private #gamma")
+        advanceUntilIdle()
+
+        assertEquals(listOf("gamma"), vm.tagsForCurrentNote.value.map { it.name })
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `vault editor clears derived tags when vault locks`() = runTest {
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val vaultStateRepository = FakeEditorVaultStateRepository(VaultState.UNLOCKED)
+        vaultRepository.addNote(
+            Note(
+                id = 77L,
+                title = "Private title",
+                content = "Private #secret",
+                isInVault = true
+            )
+        )
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            observeVaultState = ObserveVaultStateUseCase(vaultStateRepository)
+        )
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.tagsForCurrentNote.collect {}
+        }
+        advanceUntilIdle()
+
+        assertEquals(listOf("secret"), vm.tagsForCurrentNote.value.map { it.name })
+
+        vaultStateRepository.setState(VaultState.LOCKED)
+        advanceUntilIdle()
+
+        assertTrue(vm.tagsForCurrentNote.value.isEmpty())
+        collectJob.cancel()
     }
 
     @Test
@@ -584,12 +685,19 @@ private class RecordingDecryptVaultImageBytesRepository(
 ) : VaultNoteRepository {
     val invocations = mutableListOf<String>()
     override val vaultNotes: Flow<List<Note>> = MutableStateFlow(emptyList())
+    override val vaultTrashedNotes: Flow<List<Note>> = MutableStateFlow(emptyList())
+    override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> =
+        MutableStateFlow(emptyList())
+    override val vaultTags: Flow<List<Tag>> = MutableStateFlow(emptyList())
 
     override suspend fun getVaultNoteById(id: Long): Note? = null
 
     override suspend fun saveVaultNote(note: Note): Long {
         throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
     }
+
+    override suspend fun duplicateVaultNote(id: Long): DuplicateVaultNoteResult =
+        DuplicateVaultNoteResult.NotFound
 
     override suspend fun moveNormalNoteToVault(id: Long): MoveNoteToVaultResult {
         throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
@@ -600,6 +708,14 @@ private class RecordingDecryptVaultImageBytesRepository(
     }
 
     override suspend fun moveVaultNoteToTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
+    }
+
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
+    }
+
+    override suspend fun deleteVaultNotePermanently(id: Long): Boolean {
         throw UnsupportedOperationException("Not needed for decryptVaultImageBytes tests")
     }
 

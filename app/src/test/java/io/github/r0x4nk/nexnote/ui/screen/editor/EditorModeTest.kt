@@ -64,6 +64,17 @@ class EditorModeTest {
             EditorMode.NewVaultNote,
             EditorMode.fromRoute(
                 noteId = 4L,
+                vaultNoteId = EditorMode.NEW_VAULT_NOTE_ID
+            )
+        )
+    }
+
+    @Test
+    fun `fromRoute maps vault note creation sentinel with template id to vault template mode`() {
+        assertEquals(
+            EditorMode.NewVaultFromTemplate(7L),
+            EditorMode.fromRoute(
+                noteId = 4L,
                 templateId = 7L,
                 vaultNoteId = EditorMode.NEW_VAULT_NOTE_ID
             )

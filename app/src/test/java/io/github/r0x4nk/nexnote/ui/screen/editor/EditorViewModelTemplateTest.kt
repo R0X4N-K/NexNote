@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
+import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -58,6 +59,38 @@ class EditorViewModelTemplateTest : EditorViewModelTestBase() {
             1,
             fakeNoteDao.insertedCount
         )
+    }
+
+    @Test
+    fun `loadVaultTemplate schedules autosave through vault repository only`() = runTest {
+        fakeTemplateDao.addTemplate(
+            TemplateEntity(id = 5L, name = "Template", content = "Private pre-filled text")
+        )
+        val vaultRepository = FakeEditorVaultNoteRepository()
+        val vm = viewModel(
+            mode = EditorMode.NewVaultFromTemplate(5L),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        val loadedState = vm.uiState.value
+        assertTrue(loadedState.isVaultNote)
+        assertTrue(loadedState.isDirty)
+        assertEquals("Private pre-filled text", loadedState.content)
+        assertEquals(EditorViewModel.NO_ID, loadedState.noteId)
+        assertEquals(0, fakeNoteDao.insertedCount)
+
+        advanceTimeBy(2000L)
+
+        assertEquals(
+            "Vault template-created note must not touch the normal note repository",
+            0,
+            fakeNoteDao.insertedCount
+        )
+        assertEquals(1, vaultRepository.savedNotes.size)
+        assertEquals("Private pre-filled text", vaultRepository.savedNotes.single().content)
+        assertTrue(vaultRepository.savedNotes.single().isInVault)
+        assertNotEquals(EditorViewModel.NO_ID, vm.uiState.value.noteId)
     }
 
     @Test

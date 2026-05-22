@@ -104,6 +104,20 @@ class NoteListActionsDelegateTest {
         assertEquals("Could not duplicate \"Plan\"", fixture.noteActionMessages.receive())
     }
 
+    @Test
+    fun `duplicateNote rejects Vault note without exposing its label`() = runTest {
+        val fixture = newFixture(this)
+
+        fixture.delegate.duplicateNote(
+            Note(id = 2L, title = "Secret title", content = "Private body", isInVault = true)
+        )
+        advanceUntilIdle()
+
+        assertEquals("Could not duplicate note", fixture.noteActionMessages.receive())
+        assertEquals(emptyMap<Long, Note>(), fixture.repository.savedNotes)
+        assertEquals(emptyList<Pair<Long, String>>(), fixture.tagRepository.indexedNotes)
+    }
+
     private fun newFixture(
         scope: CoroutineScope,
         repository: FakeNoteListRepository = FakeNoteListRepository(),

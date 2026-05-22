@@ -11,10 +11,13 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
+import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
+import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
@@ -32,6 +35,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
@@ -42,6 +46,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -79,6 +84,7 @@ abstract class EditorViewModelTestBase {
         preferencesRepository: IUserPreferencesRepository = FakeEditorPreferencesRepository(),
         getVaultNoteById: GetVaultNoteByIdUseCase? = null,
         saveVaultNote: SaveVaultNoteUseCase? = null,
+        observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase? = null,
         observeVaultState: ObserveVaultStateUseCase? = null,
         decryptVaultImageBytes: DecryptVaultImageBytesUseCase? = null
     ): EditorViewModel {
@@ -96,6 +102,7 @@ abstract class EditorViewModelTestBase {
             saveVaultNote = saveVaultNote,
             setNotePreviewMode = SetNotePreviewModeUseCase(noteRepository),
             observeNoteLinkCandidates = ObserveNoteLinkCandidatesUseCase(noteRepository),
+            observeVaultNoteLinkCandidates = observeVaultNoteLinkCandidates,
             observeVaultState = observeVaultState,
             observeThemeMode = ObserveThemeModeUseCase(preferencesRepository),
             setThemeMode = SetThemeModeUseCase(preferencesRepository),
@@ -152,6 +159,13 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
     private val notes = MutableStateFlow<List<Note>>(emptyList())
     private var nextId = 1L
     override val vaultNotes: Flow<List<Note>> = notes
+    override val vaultTrashedNotes: Flow<List<Note>> = MutableStateFlow(emptyList())
+    override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> =
+        notes.map { list ->
+            list.filter { it.isInVault && !it.isDeleted }
+                .map { note -> NoteLinkCandidate(id = note.id, title = note.title) }
+        }
+    override val vaultTags: Flow<List<Tag>> = MutableStateFlow<List<Tag>>(emptyList())
     val savedNotes = mutableListOf<Note>()
     var failOnSave = false
 
@@ -173,6 +187,9 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
         return saved.id
     }
 
+    override suspend fun duplicateVaultNote(id: Long): DuplicateVaultNoteResult =
+        DuplicateVaultNoteResult.NotFound
+
     override suspend fun moveNormalNoteToVault(id: Long): MoveNoteToVaultResult {
         throw UnsupportedOperationException("Not needed for editor Vault read-only tests")
     }
@@ -182,6 +199,14 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
     }
 
     override suspend fun moveVaultNoteToTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for editor Vault tests")
+    }
+
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Boolean {
+        throw UnsupportedOperationException("Not needed for editor Vault tests")
+    }
+
+    override suspend fun deleteVaultNotePermanently(id: Long): Boolean {
         throw UnsupportedOperationException("Not needed for editor Vault tests")
     }
 
@@ -303,10 +328,20 @@ class FakeEditorNoteDao : NoteDao {
     override fun getDeletedNotes(): Flow<List<NoteEntity>> =
         MutableStateFlow(notes.values.filter { it.isDeleted }.toList())
 
+    override fun getDeletedVaultNotes(): Flow<List<NoteEntity>> =
+        MutableStateFlow(notes.values.filter { it.isDeleted && it.isInVault }.toList())
+
     override fun getNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
         MutableStateFlow(
             notes.values
-                .filter { !it.isDeleted }
+                .filter { !it.isDeleted && !it.isInVault }
+                .map { NoteLinkCandidateProjection(id = it.id, title = it.title) }
+        )
+
+    override fun getVaultNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
+        MutableStateFlow(
+            notes.values
+                .filter { !it.isDeleted && it.isInVault }
                 .map { NoteLinkCandidateProjection(id = it.id, title = it.title) }
         )
 
@@ -323,6 +358,9 @@ class FakeEditorNoteDao : NoteDao {
 
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         notes.values.filter { it.isInVault }.toList()
+
+    override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? =
+        notes[id]?.takeIf { it.isInVault && it.isDeleted }
 
     override suspend fun deleteAllVaultNotes(): Int {
         val toRemove = notes.values.filter { it.isInVault }.map { it.id }
@@ -354,8 +392,10 @@ class FakeEditorNoteDao : NoteDao {
 
     override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) = Unit
     override suspend fun deleteNotePermanently(id: Long): Int = 0
+    override suspend fun deleteVaultNotePermanently(id: Long): Int = 0
     override suspend fun emptyTrash(): Int = 0
     override suspend fun getDeletedImagePathsRaw(): List<String> = emptyList()
     override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit

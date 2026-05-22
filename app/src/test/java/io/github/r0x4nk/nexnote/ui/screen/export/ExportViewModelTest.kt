@@ -232,10 +232,20 @@ private class FakeNoteDao : NoteDao {
     override fun getDeletedNotes(): Flow<List<NoteEntity>> =
         _notes.map { list -> list.filter { it.isDeleted } }
 
+    override fun getDeletedVaultNotes(): Flow<List<NoteEntity>> =
+        _notes.map { list -> list.filter { it.isDeleted && it.isInVault } }
+
     override fun getNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
         _notes.map { list ->
             list
-                .filter { !it.isDeleted }
+                .filter { !it.isDeleted && !it.isInVault }
+                .map { NoteLinkCandidateProjection(id = it.id, title = it.title) }
+        }
+
+    override fun getVaultNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
+        _notes.map { list ->
+            list
+                .filter { !it.isDeleted && it.isInVault }
                 .map { NoteLinkCandidateProjection(id = it.id, title = it.title) }
         }
 
@@ -265,6 +275,9 @@ private class FakeNoteDao : NoteDao {
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         _notes.value.filter { it.isInVault }
 
+    override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? =
+        _notes.value.find { it.id == id && it.isInVault && it.isDeleted }
+
     override suspend fun deleteAllVaultNotes(): Int {
         val removed = _notes.value.count { it.isInVault }
         _notes.value = _notes.value.filterNot { it.isInVault }
@@ -275,8 +288,10 @@ private class FakeNoteDao : NoteDao {
     override suspend fun updateNote(note: NoteEntity)               = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long)   = Unit
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Int   = 0
     override suspend fun restoreFromTrash(id: Long)                 = Unit
     override suspend fun deleteNotePermanently(id: Long): Int       = 0
+    override suspend fun deleteVaultNotePermanently(id: Long): Int  = 0
     override suspend fun emptyTrash(): Int                          = 0
     override suspend fun getDeletedImagePathsRaw(): List<String>    = emptyList()
     override suspend fun setPinned(id: Long, isPinned: Boolean)     = Unit

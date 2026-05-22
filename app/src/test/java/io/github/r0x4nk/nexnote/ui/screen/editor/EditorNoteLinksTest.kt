@@ -2,6 +2,7 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import io.github.r0x4nk.nexnote.ui.navigation.Screen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -83,6 +84,18 @@ class EditorNoteLinksTest {
 
         assertEquals("[[note:7|A risky title]]", markdown)
         assertTrue(markdown.contains("note:7"))
+    }
+
+    @Test
+    fun previewNoteLinkEditorRoute_keepsVaultLinksInsideVaultEditorPath() {
+        assertEquals(
+            Screen.Editor.vaultNoteRoute(7L),
+            previewNoteLinkEditorRoute(isVaultNote = true, targetNoteId = 7L)
+        )
+        assertEquals(
+            Screen.Editor.existingNoteRoute(7L),
+            previewNoteLinkEditorRoute(isVaultNote = false, targetNoteId = 7L)
+        )
     }
 
     private class WindowOnlyCharSequence(

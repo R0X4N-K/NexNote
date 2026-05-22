@@ -1,6 +1,9 @@
 package io.github.r0x4nk.nexnote.domain.usecase
 
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
+import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import kotlinx.coroutines.flow.Flow
@@ -45,7 +48,7 @@ class DecryptVaultImageBytesUseCaseTest {
 
         val error = runCatching { useCase("images/vault_1.jpg") }.exceptionOrNull()
 
-        assertSame(repo.thrownException::class, error!!::class)
+        assertSame(repo.thrownException, error)
         assertEquals(1, repo.decryptCalls)
     }
 }
@@ -59,13 +62,20 @@ private class FakeDecryptRepository(
     val thrownException = RuntimeException("decrypt failed")
 
     override val vaultNotes: Flow<List<Note>> = flowOf(emptyList())
+    override val vaultTrashedNotes: Flow<List<Note>> = flowOf(emptyList())
+    override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> = flowOf(emptyList())
+    override val vaultTags: Flow<List<Tag>> = flowOf(emptyList())
 
     override suspend fun getVaultNoteById(id: Long): Note? = null
     override suspend fun saveVaultNote(note: Note): Long = 0L
+    override suspend fun duplicateVaultNote(id: Long): DuplicateVaultNoteResult =
+        DuplicateVaultNoteResult.NotFound
     override suspend fun moveNormalNoteToVault(id: Long): MoveNoteToVaultResult =
         MoveNoteToVaultResult.NotFound
     override suspend fun removeNoteFromVault(id: Long): Boolean = false
     override suspend fun moveVaultNoteToTrash(id: Long): Boolean = false
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Boolean = false
+    override suspend fun deleteVaultNotePermanently(id: Long): Boolean = false
 
     override suspend fun decryptVaultImageBytes(relativePath: String): ByteArray? {
         decryptCalls++

@@ -14,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -88,6 +89,28 @@ class DuplicateNoteUseCaseTest {
         assertEquals(listOf(duplicatePath), duplicate.imagePaths)
         assertEquals("image bytes", imageStorage.getImageFile(duplicatePath).readText())
         assertEquals(2, noteRepository.saveCount)
+    }
+
+    @Test
+    fun `duplicate rejects Vault notes before saving or indexing`() = runTest {
+        val noteRepository = FakeDuplicateNoteRepository(nextId = 300L)
+        val tagRepository = FakeDuplicateTagRepository()
+        val useCase = DuplicateNoteUseCase(
+            noteRepository = noteRepository,
+            tagRepository = tagRepository,
+            imageStorage = FakeDuplicateImageStorage(tempFolder.root)
+        )
+
+        try {
+            useCase(Note(id = 9L, title = "Secret", content = "Private", isInVault = true))
+            fail("Expected Vault notes to be rejected by the normal duplicate path.")
+        } catch (_: IllegalArgumentException) {
+            // Expected: Vault notes need a dedicated encrypted duplication flow.
+        }
+
+        assertTrue(noteRepository.savedNotes.isEmpty())
+        assertEquals(0, noteRepository.saveCount)
+        assertTrue(tagRepository.indexedNotes.isEmpty())
     }
 }
 

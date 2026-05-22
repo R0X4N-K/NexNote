@@ -1,6 +1,5 @@
 package io.github.r0x4nk.nexnote.ui.navigation
 
-import io.github.r0x4nk.nexnote.domain.model.VaultState
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,11 +7,10 @@ import org.junit.Test
 class VaultRecentPreviewProtectionPolicyTest {
 
     @Test
-    fun `protects unlocked Vault route when preference is enabled`() {
+    fun `protects Vault route when preference is enabled`() {
         assertTrue(
             shouldProtectVaultRecentPreviews(
                 protectVaultRecentPreviews = true,
-                vaultState = VaultState.UNLOCKED,
                 route = Screen.Vault.route,
                 vaultNoteId = null
             )
@@ -20,11 +18,10 @@ class VaultRecentPreviewProtectionPolicyTest {
     }
 
     @Test
-    fun `protects unlocked Vault editor route when preference is enabled`() {
+    fun `protects existing Vault editor route when preference is enabled`() {
         assertTrue(
             shouldProtectVaultRecentPreviews(
                 protectVaultRecentPreviews = true,
-                vaultState = VaultState.UNLOCKED,
                 route = Screen.Editor.route,
                 vaultNoteId = 42L
             )
@@ -32,11 +29,10 @@ class VaultRecentPreviewProtectionPolicyTest {
     }
 
     @Test
-    fun `protects unlocked new Vault editor route when preference is enabled`() {
+    fun `protects new Vault editor route when preference is enabled`() {
         assertTrue(
             shouldProtectVaultRecentPreviews(
                 protectVaultRecentPreviews = true,
-                vaultState = VaultState.UNLOCKED,
                 route = Screen.Editor.route,
                 vaultNoteId = Screen.Editor.NEW_VAULT_NOTE_ID
             )
@@ -44,12 +40,11 @@ class VaultRecentPreviewProtectionPolicyTest {
     }
 
     @Test
-    fun `does not protect Vault route when Vault is locked`() {
+    fun `does not protect unknown route`() {
         assertFalse(
             shouldProtectVaultRecentPreviews(
                 protectVaultRecentPreviews = true,
-                vaultState = VaultState.LOCKED,
-                route = Screen.Vault.route,
+                route = null,
                 vaultNoteId = null
             )
         )
@@ -60,7 +55,6 @@ class VaultRecentPreviewProtectionPolicyTest {
         assertFalse(
             shouldProtectVaultRecentPreviews(
                 protectVaultRecentPreviews = true,
-                vaultState = VaultState.UNLOCKED,
                 route = Screen.Editor.route,
                 vaultNoteId = Screen.NO_ID
             )
@@ -72,7 +66,6 @@ class VaultRecentPreviewProtectionPolicyTest {
         assertFalse(
             shouldProtectVaultRecentPreviews(
                 protectVaultRecentPreviews = false,
-                vaultState = VaultState.UNLOCKED,
                 route = Screen.Vault.route,
                 vaultNoteId = null
             )

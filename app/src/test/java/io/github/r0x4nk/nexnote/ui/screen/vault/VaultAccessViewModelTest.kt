@@ -378,10 +378,31 @@ class VaultAccessViewModelTest {
 
             assertEquals(VaultState.LOCKED, viewModel.uiState.value.vaultState)
             assertEquals(0, fakeRepo.androidCredentialUnlockCalls)
-            assertEquals(
-                VaultAccessError.ANDROID_CREDENTIAL_UNAVAILABLE,
-                viewModel.uiState.value.error
+            assertNull(viewModel.uiState.value.error)
+            assertFalse(viewModel.uiState.value.isAndroidCredentialPromptPending)
+            assertNull(viewModel.uiState.value.lastAndroidCredentialPromptResult)
+        }
+
+    @Test
+    fun `authenticated Android credential result without pending prompt is ignored`() =
+        runViewModelTest {
+            fakeRepo.configureStoredPin("1234".toCharArray())
+            fakePreferencesRepo.setUnlockVaultWithAndroidCredential(true)
+            fakeRepo.setHasAndroidCredentialProtectedUnlockMaterial(true)
+            fakeRepo.androidCredentialUnlockResult =
+                UnlockVaultWithAndroidCredentialResult.Success
+            advanceUntilIdle()
+
+            viewModel.onAndroidCredentialPromptResult(
+                VaultAndroidCredentialPromptResult.AUTHENTICATED
             )
+            advanceUntilIdle()
+
+            assertEquals(VaultState.LOCKED, viewModel.uiState.value.vaultState)
+            assertEquals(0, fakeRepo.androidCredentialUnlockCalls)
+            assertNull(viewModel.uiState.value.error)
+            assertFalse(viewModel.uiState.value.isAndroidCredentialPromptPending)
+            assertNull(viewModel.uiState.value.lastAndroidCredentialPromptResult)
         }
 
     @Test
@@ -467,10 +488,7 @@ class VaultAccessViewModelTest {
 
             assertEquals(VaultState.LOCKED, viewModel.uiState.value.vaultState)
             assertEquals(0, fakeRepo.androidCredentialUnlockCalls)
-            assertEquals(
-                VaultAccessError.ANDROID_CREDENTIAL_UNAVAILABLE,
-                viewModel.uiState.value.error
-            )
+            assertNull(viewModel.uiState.value.error)
         }
 
     @Test
@@ -485,7 +503,30 @@ class VaultAccessViewModelTest {
         assertEquals(1, fakeRepo.unlockCalls)
         assertEquals(VaultState.LOCKED, viewModel.uiState.value.vaultState)
         assertEquals(VaultAccessError.WRONG_PIN, viewModel.uiState.value.error)
+        assertEquals(1, viewModel.uiState.value.failedPinAttempts)
         assertCleared(pin)
+    }
+
+    @Test
+    fun `wrong pin attempts are counted until a successful unlock`() = runViewModelTest {
+        fakeRepo.configureStoredPin("1234".toCharArray())
+        advanceUntilIdle()
+
+        viewModel.unlockWithPin("0000".toCharArray())
+        advanceUntilIdle()
+        viewModel.unlockWithPin("1111".toCharArray())
+        advanceUntilIdle()
+
+        assertEquals(VaultState.LOCKED, viewModel.uiState.value.vaultState)
+        assertEquals(VaultAccessError.WRONG_PIN, viewModel.uiState.value.error)
+        assertEquals(2, viewModel.uiState.value.failedPinAttempts)
+
+        viewModel.unlockWithPin("1234".toCharArray())
+        advanceUntilIdle()
+
+        assertEquals(VaultState.UNLOCKED, viewModel.uiState.value.vaultState)
+        assertNull(viewModel.uiState.value.error)
+        assertEquals(0, viewModel.uiState.value.failedPinAttempts)
     }
 
     @Test
@@ -495,6 +536,7 @@ class VaultAccessViewModelTest {
         viewModel.unlockWithPin("0000".toCharArray())
         advanceUntilIdle()
         assertEquals(VaultAccessError.WRONG_PIN, viewModel.uiState.value.error)
+        assertEquals(1, viewModel.uiState.value.failedPinAttempts)
 
         viewModel.lock()
         advanceUntilIdle()
@@ -502,6 +544,7 @@ class VaultAccessViewModelTest {
         assertEquals(1, fakeRepo.lockCalls)
         assertEquals(VaultState.LOCKED, viewModel.uiState.value.vaultState)
         assertNull(viewModel.uiState.value.error)
+        assertEquals(0, viewModel.uiState.value.failedPinAttempts)
     }
 
     private fun assertCleared(pin: CharArray) {

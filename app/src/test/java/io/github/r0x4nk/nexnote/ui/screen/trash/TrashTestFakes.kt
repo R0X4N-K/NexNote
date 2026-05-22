@@ -47,7 +47,10 @@ internal class FakeNoteDao(
     override fun getAllNotes(): Flow<List<NoteEntity>> = _allNotes
     override fun getAllNotesSortedAsc(): Flow<List<NoteEntity>> = _allNotes
     override fun getDeletedNotes(): Flow<List<NoteEntity>> = _deletedNotes
+    override fun getDeletedVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override fun getNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
+        MutableStateFlow(emptyList())
+    override fun getVaultNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
         MutableStateFlow(emptyList())
     override fun getAllCreationDates(): Flow<List<Long>> = MutableStateFlow(emptyList())
 
@@ -57,6 +60,7 @@ internal class FakeNoteDao(
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun getAllVaultNotesOnce(): List<NoteEntity> = emptyList()
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
+    override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun deleteAllVaultNotes(): Int = 0
     override fun searchNotes(query: String): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override fun getNotesByDateRange(
@@ -68,6 +72,7 @@ internal class FakeNoteDao(
     override suspend fun updateNote(note: NoteEntity) = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
     override suspend fun setPreviewMode(id: Long, isPreviewMode: Boolean) = Unit
     override suspend fun restoreFromTrash(id: Long) {
@@ -83,6 +88,8 @@ internal class FakeNoteDao(
         events += "dao:delete:$id"
         return 1
     }
+
+    override suspend fun deleteVaultNotePermanently(id: Long): Int = 0
 
     override suspend fun emptyTrash(): Int {
         val deletedCount = _deletedNotes.value.count { it.isDeleted }

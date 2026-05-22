@@ -243,12 +243,15 @@ private class FakeNoteDao : NoteDao {
     override fun getAllNotes(): Flow<List<NoteEntity>> = _allNotes
     override fun getAllNotesSortedAsc(): Flow<List<NoteEntity>> = _allNotes
     override fun getDeletedNotes(): Flow<List<NoteEntity>> = _deletedNotes
+    override fun getDeletedVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override fun getNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
         _allNotes.map { list ->
             list
-                .filter { !it.isDeleted }
+                .filter { !it.isDeleted && !it.isInVault }
                 .map { NoteLinkCandidateProjection(id = it.id, title = it.title) }
         }
+    override fun getVaultNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>> =
+        MutableStateFlow(emptyList())
     override fun getAllCreationDates(): Flow<List<Long>> = MutableStateFlow(emptyList())
 
     override suspend fun getNoteById(id: Long): NoteEntity? = null
@@ -256,6 +259,7 @@ private class FakeNoteDao : NoteDao {
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun getAllVaultNotesOnce(): List<NoteEntity> = emptyList()
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
+    override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun deleteAllVaultNotes(): Int = 0
     override fun searchNotes(query: String): Flow<List<NoteEntity>> = _searchNotes
     override fun getNotesByDateRange(startMs: Long, endMs: Long): Flow<List<NoteEntity>> =
@@ -272,6 +276,7 @@ private class FakeNoteDao : NoteDao {
         _deletedNotes.value = _deletedNotes.value + trashedNote
     }
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) {
         lastRestoredId = id
         val restoredNote = _deletedNotes.value.find { it.id == id }
@@ -281,6 +286,7 @@ private class FakeNoteDao : NoteDao {
         _allNotes.value = _allNotes.value + restoredNote
     }
     override suspend fun deleteNotePermanently(id: Long): Int = 0
+    override suspend fun deleteVaultNotePermanently(id: Long): Int = 0
     override suspend fun emptyTrash(): Int = 0
     override suspend fun getDeletedImagePathsRaw(): List<String> = emptyList()
     override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
