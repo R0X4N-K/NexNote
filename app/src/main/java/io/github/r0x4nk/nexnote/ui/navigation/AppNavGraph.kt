@@ -38,7 +38,7 @@ internal fun AppNavHost(
         popExitTransition  = { tabExitTransition() }
     ) {
         bottomNavDestinations(navController, floatingBottomPadding)
-        backStackDestinations(navController)
+        backStackDestinations(navController, floatingBottomPadding)
     }
 }
 
@@ -53,9 +53,12 @@ private fun NavGraphBuilder.bottomNavDestinations(
     settingsDestination(navController)
 }
 
-private fun NavGraphBuilder.backStackDestinations(navController: NavHostController) {
+private fun NavGraphBuilder.backStackDestinations(
+    navController: NavHostController,
+    floatingBottomPadding: Dp
+) {
     trashDestination(navController)
-    vaultDestination(navController)
+    vaultDestination(navController, floatingBottomPadding)
     exportDestination(navController)
     editorDestination(navController)
 }
@@ -164,7 +167,10 @@ private fun NavGraphBuilder.trashDestination(navController: NavHostController) {
     }
 }
 
-private fun NavGraphBuilder.vaultDestination(navController: NavHostController) {
+private fun NavGraphBuilder.vaultDestination(
+    navController: NavHostController,
+    floatingBottomPadding: Dp
+) {
     composable(
         route              = Screen.Vault.route,
         enterTransition    = { forwardEnterTransition() },
@@ -179,9 +185,13 @@ private fun NavGraphBuilder.vaultDestination(navController: NavHostController) {
             onCreateVaultNote = {
                 navController.navigate(Screen.Editor.newVaultNoteRoute())
             },
+            onCreateVaultNoteFromTemplate = { templateId ->
+                navController.navigate(Screen.Editor.newVaultNoteFromTemplateRoute(templateId))
+            },
             onNoteClick = { noteId ->
                 navController.navigate(Screen.Editor.vaultNoteRoute(noteId))
-            }
+            },
+            floatingBottomPadding = floatingBottomPadding
         )
     }
 }
@@ -241,6 +251,7 @@ private fun editorExportAction(
         }
         is EditorMode.EditTemplate,
         is EditorMode.NewFromTemplate,
+        is EditorMode.NewVaultFromTemplate,
         EditorMode.NewVaultNote,
         is EditorMode.NewNote,
         is EditorMode.VaultNote,

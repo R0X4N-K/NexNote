@@ -54,6 +54,7 @@ data class VaultAccessUiState(
     val vaultState: VaultState = VaultState.NOT_CONFIGURED,
     val isBusy: Boolean = false,
     val error: VaultAccessError? = null,
+    val failedPinAttempts: Int = 0,
     val androidCredentialAvailability: VaultAndroidCredentialAvailability =
         VaultAndroidCredentialAvailability.UNAVAILABLE,
     val isAndroidCredentialUnlockEnabled: Boolean = false,
@@ -80,6 +81,7 @@ data class VaultAccessUiState(
 private data class VaultAccessOperationState(
     val isBusy: Boolean = false,
     val error: VaultAccessError? = null,
+    val failedPinAttempts: Int = 0,
     val androidCredentialPromptRequestId: Long = 0L,
     val isAndroidCredentialPromptPending: Boolean = false,
     val lastAndroidCredentialPromptResult: VaultAndroidCredentialPromptResult? = null
@@ -114,6 +116,7 @@ class VaultAccessViewModel(
                 vaultState = vaultState,
                 isBusy = operation.isBusy,
                 error = operation.error,
+                failedPinAttempts = operation.failedPinAttempts,
                 androidCredentialAvailability = androidCredentialAvailability,
                 isAndroidCredentialUnlockEnabled = androidUnlockEnabled,
                 hasAndroidCredentialProtectedUnlockMaterial = hasProtectedMaterial,
@@ -149,7 +152,9 @@ class VaultAccessViewModel(
 
         confirmationCopy.wipe()
         viewModelScope.launch {
-            operationState.update { it.copy(isBusy = true, error = null) }
+            operationState.update {
+                it.copy(isBusy = true, error = null, failedPinAttempts = 0)
+            }
             try {
                 configureVaultPin(pinCopy)
             } catch (e: Exception) {
@@ -186,7 +191,14 @@ class VaultAccessViewModel(
                 val unlocked = unlockVaultWithPin(pinCopy)
                 if (!unlocked) {
                     operationState.update {
-                        it.copy(error = VaultAccessError.WRONG_PIN)
+                        it.copy(
+                            error = VaultAccessError.WRONG_PIN,
+                            failedPinAttempts = it.failedPinAttempts + 1
+                        )
+                    }
+                } else {
+                    operationState.update {
+                        it.copy(error = null, failedPinAttempts = 0)
                     }
                 }
             } catch (e: Exception) {
@@ -233,6 +245,8 @@ class VaultAccessViewModel(
     }
 
     fun onAndroidCredentialPromptResult(result: VaultAndroidCredentialPromptResult) {
+        if (!operationState.value.isAndroidCredentialPromptPending) return
+
         if (result == VaultAndroidCredentialPromptResult.AUTHENTICATED) {
             if (!uiState.value.isAndroidCredentialUnlockEnabled) {
                 operationState.update {
@@ -289,7 +303,16 @@ class VaultAccessViewModel(
             try {
                 val result = unlockVaultWithAndroidCredential()
                 operationState.update {
-                    it.copy(error = result.toAccessError())
+                    it.copy(
+                        error = result.toAccessError(),
+                        failedPinAttempts = if (
+                            result == UnlockVaultWithAndroidCredentialResult.Success
+                        ) {
+                            0
+                        } else {
+                            it.failedPinAttempts
+                        }
+                    )
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -304,7 +327,9 @@ class VaultAccessViewModel(
 
     fun lock() {
         lockVault()
-        clearError()
+        operationState.update {
+            it.copy(error = null, failedPinAttempts = 0)
+        }
     }
 
     fun clearError() {

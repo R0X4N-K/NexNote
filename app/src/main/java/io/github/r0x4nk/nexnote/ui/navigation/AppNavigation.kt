@@ -96,7 +96,6 @@ fun AppNavigation(
     val vaultNoteId = backStackEntry?.arguments?.getLong(Screen.Editor.ARG_VAULT_NOTE_ID)
     val protectWindow = shouldProtectVaultRecentPreviews(
         protectVaultRecentPreviews = protectVaultRecentPreviews,
-        vaultState = vaultState,
         route = currentDestination?.route,
         vaultNoteId = vaultNoteId
     )

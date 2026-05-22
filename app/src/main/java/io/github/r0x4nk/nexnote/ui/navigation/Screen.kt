@@ -17,6 +17,7 @@ package io.github.r0x4nk.nexnote.ui.navigation
  *   editTemplateId  > 0   → open editor to edit an existing template
  *   creationDate    > 0   → initial creation date for a brand-new note
  *   vaultNoteId     = -1  → create a brand-new Vault note through the Vault-only path
+ *   vaultNoteId     = -1 and templateId > 0 → create a Vault note from a template
  *   vaultNoteId     > 0   → open an existing Vault note through the Vault-only path
  */
 sealed class Screen(val route: String) {
@@ -82,6 +83,9 @@ sealed class Screen(val route: String) {
         fun vaultNoteRoute(noteId: Long): String = route(vaultNoteId = noteId)
 
         fun newVaultNoteRoute(): String = route(vaultNoteId = NEW_VAULT_NOTE_ID)
+
+        fun newVaultNoteFromTemplateRoute(templateId: Long): String =
+            route(templateId = templateId, vaultNoteId = NEW_VAULT_NOTE_ID)
     }
 
     companion object {

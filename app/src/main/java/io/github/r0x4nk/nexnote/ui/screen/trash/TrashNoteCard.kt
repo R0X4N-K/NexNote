@@ -38,7 +38,7 @@ private data class TrashNoteCardTextState(
 internal fun TrashNoteCard(
     note: Note,
     onRestore: () -> Unit,
-    onDeletePermanently: () -> Unit
+    onDeletePermanently: (() -> Unit)? = null
 ) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
@@ -60,7 +60,7 @@ internal fun TrashNoteCard(
 private fun TrashNoteCardContent(
     note: Note,
     onRestore: () -> Unit,
-    onDeletePermanently: () -> Unit
+    onDeletePermanently: (() -> Unit)?
 ) {
     val textState = rememberTrashNoteCardTextState(note)
 
@@ -149,14 +149,16 @@ private fun TrashNoteDate(note: Note) {
 @Composable
 private fun TrashNoteActions(
     onRestore: () -> Unit,
-    onDeletePermanently: () -> Unit
+    onDeletePermanently: (() -> Unit)?
 ) {
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End
     ) {
         RestoreNoteButton(onRestore)
-        DeleteNoteButton(onDeletePermanently)
+        if (onDeletePermanently != null) {
+            DeleteNoteButton(onDeletePermanently)
+        }
     }
 }
 

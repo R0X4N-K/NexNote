@@ -2,7 +2,6 @@ package io.github.r0x4nk.nexnote.ui.screen.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
+import io.github.r0x4nk.nexnote.ui.common.NoteCollectionLayoutDefaults
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
@@ -247,14 +247,11 @@ private fun HomeNoteGrid(
         columns = StaggeredGridCells.Fixed(2),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            top = 8.dp,
-            end = 12.dp,
-            bottom = bottomContentPadding
+        contentPadding = NoteCollectionLayoutDefaults.gridContentPadding(
+            bottomPadding = bottomContentPadding
         ),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalItemSpacing = 8.dp
+        horizontalArrangement = Arrangement.spacedBy(NoteCollectionLayoutDefaults.itemSpacing),
+        verticalItemSpacing = NoteCollectionLayoutDefaults.itemSpacing
     ) {
         items(
             items = displayItems,
@@ -288,13 +285,10 @@ private fun HomeNoteList(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            top = 8.dp,
-            end = 16.dp,
-            bottom = bottomContentPadding
+        contentPadding = NoteCollectionLayoutDefaults.listContentPadding(
+            bottomPadding = bottomContentPadding
         ),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(NoteCollectionLayoutDefaults.itemSpacing)
     ) {
         items(
             items = displayItems,

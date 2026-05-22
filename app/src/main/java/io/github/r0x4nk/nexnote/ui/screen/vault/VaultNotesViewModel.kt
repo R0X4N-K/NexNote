@@ -8,14 +8,31 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.r0x4nk.nexnote.NexNoteApp
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.ScoredNote
+import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.VaultState
+import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.TagRepository
+import io.github.r0x4nk.nexnote.domain.usecase.DeleteVaultNotePermanentlyUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToVaultUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.MoveVaultNoteToTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTrashedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RemoveNoteFromVaultUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ToggleVaultNotePinUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
+import io.github.r0x4nk.nexnote.util.SearchUtils
+import io.github.r0x4nk.nexnote.util.TagParser
+import io.github.r0x4nk.nexnote.util.VaultTagAggregator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -24,9 +41,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -46,42 +63,132 @@ import kotlinx.coroutines.launch
 data class VaultNotesUiState(
     val isUnlocked: Boolean = false,
     val notes: List<Note> = emptyList(),
+    val scoredResults: List<ScoredNote> = emptyList(),
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val sortOrder: SortOrder = SortOrder.MODIFIED_DESC,
     val viewMode: NoteListViewMode = NoteListViewMode.LIST,
-    val totalNoteCount: Int = 0
+    val isTrashVisible: Boolean = false,
+    val notePendingPermanentDeleteId: Long? = null,
+    val totalNoteCount: Int = 0,
+    val selectedTagFilters: Set<String> = emptySet(),
+    val topTags: List<Tag> = emptyList(),
+    val showTemplatePicker: Boolean = false,
+    val templates: List<Template> = emptyList(),
+    /**
+     * Mirrors Home's `HomeUiState.isLoading` semantics: true while the Vault
+     * notes flow has not yet produced a first emission for the current
+     * unlocked session, so the UI can show a spinner instead of a transient
+     * "No Vault notes" empty state right after unlock. When the Vault is
+     * locked or not configured the access surface (unlock/setup form) is in
+     * charge of the visible state, so [isLoading] is reported as `false`
+     * outside the unlocked branch.
+     */
+    val isLoading: Boolean = true
 )
 
 class VaultNotesViewModel(
     observeVaultState: ObserveVaultStateUseCase,
     observeVaultNotes: ObserveVaultNotesUseCase,
+    observeVaultTrashedNotes: ObserveVaultTrashedNotesUseCase,
     private val moveNoteToVault: MoveNoteToVaultUseCase,
-    private val removeNoteFromVault: RemoveNoteFromVaultUseCase
+    private val moveVaultNoteToTrash: MoveVaultNoteToTrashUseCase,
+    private val restoreVaultNoteFromTrash: RestoreVaultNoteFromTrashUseCase,
+    private val deleteVaultNotePermanently: DeleteVaultNotePermanentlyUseCase,
+    private val toggleVaultNotePin: ToggleVaultNotePinUseCase,
+    private val duplicateVaultNote: DuplicateVaultNoteUseCase,
+    private val removeNoteFromVault: RemoveNoteFromVaultUseCase,
+    observeTemplates: ObserveTemplatesUseCase? = null,
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase? = null
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _isSearchActive = MutableStateFlow(false)
     private val _sortOrder = MutableStateFlow(SortOrder.MODIFIED_DESC)
     private val _viewMode = MutableStateFlow(NoteListViewMode.LIST)
+    private val _isTrashVisible = MutableStateFlow(false)
+    private val _selectedTagFilters = MutableStateFlow<Set<String>>(emptySet())
+    private val _showTemplatePicker = MutableStateFlow(false)
+    private val _notePendingPermanentDeleteId = MutableStateFlow<Long?>(null)
     private val _vaultActionMessages = Channel<String>(Channel.BUFFERED)
     val vaultActionMessages = _vaultActionMessages.receiveAsFlow()
+
+    /**
+     * Emits non-sensitive Vault trash snackbar events so the Vault screen can
+     * show an undo affordance for both soft-delete and manual restore.
+     *
+     * Only the [Note.id] and an event kind flow through this channel: no
+     * decrypted title, preview or path leaves the data layer through here, so
+     * a queued event cannot expose Vault content if it is observed while the
+     * Vault is locked. Matching undo actions are gated by the current unlocked
+     * UI state before they touch the data layer.
+     */
+    private val _vaultTrashEvents = Channel<VaultTrashSnackbarEvent>(Channel.BUFFERED)
+    internal val vaultTrashEvents = _vaultTrashEvents.receiveAsFlow()
+
+    val noteCardStyle: StateFlow<NoteCardStyle> = (
+        observeNoteCardStyle?.invoke() ?: flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = NoteCardStyle.TITLE_AND_PREVIEW
+    )
+
+    private val templates: StateFlow<List<Template>> = (
+        observeTemplates?.invoke() ?: flowOf(emptyList())
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<VaultNotesUiState> =
         observeVaultState()
             .onEach { state ->
                 if (state != VaultState.UNLOCKED) {
-                    clearSearchState()
+                    clearUnlockedUiState()
                 }
             }
             .flatMapLatest { state ->
                 if (state == VaultState.UNLOCKED) {
-                    observeVaultNotes().map { notes ->
-                        VaultNotesSource(isUnlocked = true, notes = notes)
+                    // Show a loading sentinel until the encrypted notes/trash
+                    // flows have produced a first joined emission. Without this
+                    // sentinel the Vault UI can render the "No Vault notes" empty
+                    // state for the few frames between unlock and the first Room
+                    // emission, which Home avoids via `HomeUiState.isLoading`.
+                    combine(
+                        observeVaultNotes(),
+                        observeVaultTrashedNotes()
+                    ) { activeNotes, trashedNotes ->
+                        VaultNotesSource(
+                            isUnlocked = true,
+                            isLoading = false,
+                            activeNotes = activeNotes,
+                            trashedNotes = trashedNotes,
+                            vaultTags = vaultTopTags(activeNotes)
+                        )
+                    }.onStart {
+                        emit(
+                            VaultNotesSource(
+                                isUnlocked = true,
+                                isLoading = true,
+                                activeNotes = emptyList(),
+                                trashedNotes = emptyList(),
+                                vaultTags = emptyList()
+                            )
+                        )
                     }
                 } else {
-                    flowOf(VaultNotesSource(isUnlocked = false, notes = emptyList()))
+                    flowOf(
+                        VaultNotesSource(
+                            isUnlocked = false,
+                            isLoading = false,
+                            activeNotes = emptyList(),
+                            trashedNotes = emptyList(),
+                            vaultTags = emptyList()
+                        )
+                    )
                 }
             }
             .combine(_searchQuery) { source, query -> source to query }
@@ -89,34 +196,99 @@ class VaultNotesViewModel(
                 VaultNotesFilterInput(
                     source = source,
                     query = query,
-                    isSearchActive = isSearchActive
+                    isSearchActive = isSearchActive,
+                    selectedTagFilters = emptySet()
                 )
+            }
+            .combine(_selectedTagFilters) { filterInput, selectedTagFilters ->
+                filterInput.copy(selectedTagFilters = selectedTagFilters)
             }
             .combine(_sortOrder) { filterInput, sortOrder ->
                 filterInput to sortOrder
             }
             .combine(_viewMode) { (filterInput, sortOrder), viewMode ->
+                Triple(filterInput, sortOrder, viewMode)
+            }
+            .combine(_isTrashVisible) { (filterInput, sortOrder, viewMode), isTrashVisible ->
                 val source = filterInput.source
                 if (!source.isUnlocked) {
+                    // Locked / not configured: the unlock or setup form is in
+                    // charge of the visible state, so report `isLoading = false`
+                    // here. The default `true` only applies to the very initial
+                    // StateFlow value before any upstream emission.
                     VaultNotesUiState(
                         sortOrder = sortOrder,
-                        viewMode = viewMode
+                        viewMode = viewMode,
+                        isLoading = false
+                    )
+                } else if (source.isLoading) {
+                    // Unlocked but the encrypted notes flow has not yet emitted.
+                    // Surface a loading state to the UI instead of a transient
+                    // empty list that would otherwise render the "No Vault
+                    // notes" empty state for a few frames.
+                    VaultNotesUiState(
+                        isUnlocked = true,
+                        isLoading = true,
+                        sortOrder = sortOrder,
+                        viewMode = viewMode,
+                        isTrashVisible = isTrashVisible
                     )
                 } else {
                     val effectiveQuery = if (filterInput.isSearchActive) filterInput.query else ""
+                    val effectiveTagFilters = if (isTrashVisible) {
+                        emptySet()
+                    } else {
+                        // Keep selected filters even if the current Vault tag
+                        // aggregate no longer contains them. This can happen
+                        // after editing/removing the last occurrence of a tag:
+                        // the filter chip must remain removable and the list
+                        // should show the tag-filter empty state instead of
+                        // silently showing every Vault note again. Lock/trash
+                        // transitions still clear filters via clearUnlockedUiState()
+                        // and toggleTrashVisibility().
+                        filterInput.selectedTagFilters
+                    }
+                    val sourceNotes = if (isTrashVisible) {
+                        source.trashedNotes
+                    } else {
+                        source.activeNotes
+                    }
+                    val filteredNotes = filterVaultNotes(
+                        notes = sourceNotes,
+                        query = effectiveQuery,
+                        selectedTagFilters = effectiveTagFilters
+                    )
                     VaultNotesUiState(
                         isUnlocked = true,
-                        notes = sortVaultNotes(
-                            notes = filterVaultNotes(source.notes, effectiveQuery),
-                            sortOrder = sortOrder
-                        ),
+                        isLoading = false,
+                        notes = filteredNotes.sortedForVault(sortOrder),
+                        scoredResults = filteredNotes.scoredResults,
                         searchQuery = effectiveQuery,
                         isSearchActive = filterInput.isSearchActive,
                         sortOrder = sortOrder,
                         viewMode = viewMode,
-                        totalNoteCount = source.notes.size
+                        isTrashVisible = isTrashVisible,
+                        totalNoteCount = sourceNotes.size,
+                        selectedTagFilters = effectiveTagFilters,
+                        topTags = if (isTrashVisible) emptyList() else source.vaultTags
                     )
                 }
+            }
+            .combine(_notePendingPermanentDeleteId) { state, noteId ->
+                state.copy(
+                    notePendingPermanentDeleteId = noteId.takeIf { state.isUnlocked }
+                )
+            }
+            .combine(_showTemplatePicker) { state, showTemplatePicker ->
+                val canShowTemplatePicker = state.isUnlocked && !state.isTrashVisible
+                state.copy(
+                    showTemplatePicker = showTemplatePicker && canShowTemplatePicker
+                )
+            }
+            .combine(templates) { state, templates ->
+                state.copy(
+                    templates = if (state.showTemplatePicker) templates else emptyList()
+                )
             }
             .stateIn(
                 scope = viewModelScope,
@@ -158,6 +330,49 @@ class VaultNotesViewModel(
         }
     }
 
+    fun showTemplatePicker() {
+        val state = uiState.value
+        if (!state.isUnlocked || state.isTrashVisible) return
+
+        _showTemplatePicker.update { true }
+    }
+
+    fun dismissTemplatePicker() {
+        _showTemplatePicker.update { false }
+    }
+
+    fun toggleTrashVisibility() {
+        if (!uiState.value.isUnlocked) return
+
+        clearSearchState()
+        clearTagFilters()
+        dismissTemplatePicker()
+        _notePendingPermanentDeleteId.update { null }
+        _isTrashVisible.update { !it }
+    }
+
+    fun toggleTagFilter(tagName: String) {
+        val state = uiState.value
+        if (!state.isUnlocked || state.isTrashVisible) return
+
+        val normalizedTag = tagName.trim().lowercase()
+        if (normalizedTag.isEmpty()) return
+
+        _selectedTagFilters.update { current ->
+            if (normalizedTag in current) current - normalizedTag else current + normalizedTag
+        }
+    }
+
+    fun removeTagFilter(tagName: String) {
+        if (!uiState.value.isUnlocked) return
+
+        _selectedTagFilters.update { current -> current - tagName.trim().lowercase() }
+    }
+
+    fun clearTagFilters() {
+        _selectedTagFilters.update { emptySet() }
+    }
+
     fun removeFromVault(note: Note) {
         if (!note.isInVault || !uiState.value.isUnlocked) return
 
@@ -175,6 +390,169 @@ class VaultNotesViewModel(
                 throw error
             } catch (_: Exception) {
                 _vaultActionMessages.trySend("Could not remove note from Vault")
+            }
+        }
+    }
+
+    fun moveToTrash(note: Note) {
+        if (!note.isInVault || !uiState.value.isUnlocked) return
+
+        viewModelScope.launch {
+            try {
+                val moved = moveVaultNoteToTrash(note.id)
+                if (moved) {
+                    // Match the Home behaviour: surface an undo snackbar instead of a
+                    // plain success message. Only the note id flows out — no Vault
+                    // title or preview is emitted through the event channel.
+                    _vaultTrashEvents.trySend(VaultTrashSnackbarEvent.MovedToTrash(note.id))
+                } else {
+                    _vaultActionMessages.trySend("Could not move note to trash")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not move note to trash")
+            }
+        }
+    }
+
+    /**
+     * Restores a Vault note that was just trashed through [moveToTrash]. Used
+     * by the undo affordance on the Vault trash snackbar.
+     *
+     * Mirrors Home's [NoteListActionsDelegate.undoPendingTrash] timing: the
+     * data write already happened eagerly, so undo simply calls the restore
+     * use case. The action is ignored if the Vault is not unlocked, so a
+     * stale event observed after the Vault locks cannot trigger restores
+     * against an in-memory key that is no longer present.
+     */
+    fun undoMoveToTrash(noteId: Long) {
+        if (noteId <= 0L || !uiState.value.isUnlocked) return
+
+        viewModelScope.launch {
+            try {
+                val restored = restoreVaultNoteFromTrash(noteId)
+                if (!restored) {
+                    _vaultActionMessages.trySend("Could not restore note")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not restore note")
+            }
+        }
+    }
+
+    internal fun undoTrashSnackbarEvent(event: VaultTrashSnackbarEvent) {
+        when (event) {
+            is VaultTrashSnackbarEvent.MovedToTrash -> undoMoveToTrash(event.noteId)
+            is VaultTrashSnackbarEvent.RestoredFromTrash -> undoRestoreFromTrash(event.noteId)
+        }
+    }
+
+    fun undoRestoreFromTrash(noteId: Long) {
+        val state = uiState.value
+        if (noteId <= 0L || !state.isUnlocked || !state.isTrashVisible) return
+
+        viewModelScope.launch {
+            try {
+                val moved = moveVaultNoteToTrash(noteId)
+                if (!moved) {
+                    _vaultActionMessages.trySend("Could not move note to trash")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not move note to trash")
+            }
+        }
+    }
+
+    fun togglePin(note: Note) {
+        if (!note.isInVault || note.isDeleted || !uiState.value.isUnlocked) return
+
+        viewModelScope.launch {
+            try {
+                val toggled = toggleVaultNotePin(note)
+                if (!toggled) {
+                    _vaultActionMessages.trySend("Could not update note pin")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not update note pin")
+            }
+        }
+    }
+
+    fun duplicate(note: Note) {
+        if (!note.isInVault || note.isDeleted || !uiState.value.isUnlocked) return
+
+        viewModelScope.launch {
+            try {
+                _vaultActionMessages.trySend(duplicateVaultNote(note.id).toMessage())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not duplicate note")
+            }
+        }
+    }
+
+    fun restoreFromTrash(note: Note) {
+        val state = uiState.value
+        if (!note.isInVault || !note.isDeleted || !state.isUnlocked || !state.isTrashVisible) {
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val restored = restoreVaultNoteFromTrash(note.id)
+                if (restored) {
+                    _vaultTrashEvents.trySend(VaultTrashSnackbarEvent.RestoredFromTrash(note.id))
+                } else {
+                    _vaultActionMessages.trySend("Could not restore note")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not restore note")
+            }
+        }
+    }
+
+    fun requestDeletePermanentlyFromTrash(note: Note) {
+        val state = uiState.value
+        if (!note.isInVault || !note.isDeleted || !state.isUnlocked || !state.isTrashVisible) {
+            return
+        }
+
+        _notePendingPermanentDeleteId.update { note.id }
+    }
+
+    fun cancelDeletePermanentlyFromTrash() {
+        _notePendingPermanentDeleteId.update { null }
+    }
+
+    fun confirmDeletePermanentlyFromTrash() {
+        val noteId = _notePendingPermanentDeleteId.value ?: return
+        _notePendingPermanentDeleteId.update { null }
+        if (!uiState.value.isUnlocked) return
+
+        viewModelScope.launch {
+            try {
+                val deleted = deleteVaultNotePermanently(noteId)
+                _vaultActionMessages.trySend(
+                    if (deleted) {
+                        "Note permanently deleted"
+                    } else {
+                        "Could not delete note"
+                    }
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend("Could not delete note")
             }
         }
     }
@@ -198,6 +576,14 @@ class VaultNotesViewModel(
         _isSearchActive.update { false }
     }
 
+    private fun clearUnlockedUiState() {
+        clearSearchState()
+        clearTagFilters()
+        dismissTemplatePicker()
+        _isTrashVisible.update { false }
+        _notePendingPermanentDeleteId.update { null }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -207,8 +593,16 @@ class VaultNotesViewModel(
                 VaultNotesViewModel(
                     observeVaultState = vault.observeVaultState,
                     observeVaultNotes = vault.observeVaultNotes,
+                    observeVaultTrashedNotes = vault.observeVaultTrashedNotes,
                     moveNoteToVault = vault.moveNoteToVault,
-                    removeNoteFromVault = vault.removeNoteFromVault
+                    moveVaultNoteToTrash = vault.moveVaultNoteToTrash,
+                    restoreVaultNoteFromTrash = vault.restoreVaultNoteFromTrash,
+                    deleteVaultNotePermanently = vault.deleteVaultNotePermanently,
+                    toggleVaultNotePin = vault.toggleVaultNotePin,
+                    duplicateVaultNote = vault.duplicateVaultNote,
+                    removeNoteFromVault = vault.removeNoteFromVault,
+                    observeTemplates = app.useCases.templates.observeTemplates,
+                    observeNoteCardStyle = app.useCases.preferences.observeNoteCardStyle
                 )
             }
         }
@@ -221,25 +615,67 @@ private fun MoveNoteToVaultResult.toMessage(): String =
         MoveNoteToVaultResult.NotFound -> "Could not move note to Vault"
     }
 
+private fun DuplicateVaultNoteResult.toMessage(): String =
+    when (this) {
+        is DuplicateVaultNoteResult.Success -> "Vault note duplicated"
+        DuplicateVaultNoteResult.NotFound,
+        DuplicateVaultNoteResult.Failed -> "Could not duplicate note"
+    }
+
 private data class VaultNotesSource(
     val isUnlocked: Boolean,
-    val notes: List<Note>
+    val isLoading: Boolean,
+    val activeNotes: List<Note>,
+    val trashedNotes: List<Note>,
+    val vaultTags: List<Tag>
 )
 
 private data class VaultNotesFilterInput(
     val source: VaultNotesSource,
     val query: String,
-    val isSearchActive: Boolean
+    val isSearchActive: Boolean,
+    val selectedTagFilters: Set<String>
 )
 
-private fun filterVaultNotes(notes: List<Note>, query: String): List<Note> {
-    val normalizedQuery = query.trim()
-    if (normalizedQuery.isEmpty()) return notes
+private data class VaultFilteredNotes(
+    val notes: List<Note>,
+    val scoredResults: List<ScoredNote>
+)
 
-    return notes.filter { note ->
-        note.title.contains(normalizedQuery, ignoreCase = true) ||
-            note.content.contains(normalizedQuery, ignoreCase = true)
+private fun filterVaultNotes(
+    notes: List<Note>,
+    query: String,
+    selectedTagFilters: Set<String>
+): VaultFilteredNotes {
+    val normalizedQuery = query.trim()
+    val tagFilteredNotes = if (selectedTagFilters.isEmpty()) {
+        notes
+    } else {
+        notes.filter { note -> noteContainsAllVaultTags(note, selectedTagFilters) }
     }
+    if (normalizedQuery.isEmpty()) {
+        return VaultFilteredNotes(notes = tagFilteredNotes, scoredResults = emptyList())
+    }
+
+    val scoredResults = SearchUtils.scoreAndRank(tagFilteredNotes, normalizedQuery)
+    return VaultFilteredNotes(
+        notes = scoredResults.map { it.note },
+        scoredResults = scoredResults
+    )
+}
+
+private fun noteContainsAllVaultTags(note: Note, selectedTagFilters: Set<String>): Boolean {
+    val noteTags = TagParser.extractTags(note.content)
+    return noteTags.containsAll(selectedTagFilters)
+}
+
+private fun vaultTopTags(notes: List<Note>): List<Tag> =
+    VaultTagAggregator.aggregate(notes)
+        .take(TagRepository.DEFAULT_TOP_TAGS_LIMIT)
+
+private fun VaultFilteredNotes.sortedForVault(sortOrder: SortOrder): List<Note> {
+    if (scoredResults.isNotEmpty()) return notes
+    return sortVaultNotes(notes = notes, sortOrder = sortOrder)
 }
 
 private fun sortVaultNotes(notes: List<Note>, sortOrder: SortOrder): List<Note> {
