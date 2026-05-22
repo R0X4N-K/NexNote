@@ -45,6 +45,17 @@ interface NoteDao {
     )
     fun getDeletedNotes(): Flow<List<NoteEntity>>
 
+    /** Trashed Vault notes. Callers must decrypt fields only after the Vault is unlocked. */
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE isDeleted = 1
+          AND isInVault = 1
+        ORDER BY deletedDate DESC
+    """
+    )
+    fun getDeletedVaultNotes(): Flow<List<NoteEntity>>
+
     /**
      * Active note-link targets without note bodies. The editor needs these for
      * autocomplete and validation, and loading full content here hurts startup.
@@ -58,6 +69,20 @@ interface NoteDao {
     """
     )
     fun getNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>>
+
+    /**
+     * Active Vault note-link targets without note bodies. Titles are encrypted
+     * at rest; callers must decrypt them only after the Vault is unlocked.
+     */
+    @Query(
+        """
+        SELECT id, title FROM notes
+        WHERE isDeleted = 0
+          AND isInVault = 1
+        ORDER BY id ASC
+    """
+    )
+    fun getVaultNoteLinkCandidates(): Flow<List<NoteLinkCandidateProjection>>
 
     /** Single normal-note lookup by id. Vault notes require an explicit unlocked Vault path. */
     @Query("SELECT * FROM notes WHERE id = :id AND isInVault = 0 LIMIT 1")
@@ -112,6 +137,21 @@ interface NoteDao {
     """
     )
     suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity>
+
+    /**
+     * One soft-deleted Vault note row for single permanent-delete cleanup.
+     * Callers must require an unlocked Vault before decrypting image paths.
+     */
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE id = :id
+          AND isInVault = 1
+          AND isDeleted = 1
+        LIMIT 1
+    """
+    )
+    suspend fun getDeletedVaultNoteById(id: Long): NoteEntity?
 
     /**
      * Hard-delete every Vault note row, whether currently active or already in
@@ -205,8 +245,22 @@ interface NoteDao {
     )
     suspend fun restoreFromTrash(id: Long)
 
+    @Query(
+        """
+        UPDATE notes
+        SET isDeleted = 0, deletedDate = NULL
+        WHERE id = :id
+          AND isInVault = 1
+          AND isDeleted = 1
+    """
+    )
+    suspend fun restoreVaultNoteFromTrash(id: Long): Int
+
     @Query("DELETE FROM notes WHERE id = :id AND isDeleted = 1 AND isInVault = 0")
     suspend fun deleteNotePermanently(id: Long): Int
+
+    @Query("DELETE FROM notes WHERE id = :id AND isDeleted = 1 AND isInVault = 1")
+    suspend fun deleteVaultNotePermanently(id: Long): Int
 
     @Query("DELETE FROM notes WHERE isDeleted = 1 AND isInVault = 0")
     suspend fun emptyTrash(): Int

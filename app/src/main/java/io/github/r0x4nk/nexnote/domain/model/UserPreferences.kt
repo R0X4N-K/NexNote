@@ -19,7 +19,7 @@ enum class NoteCardStyle {
     TITLE_DATE
 }
 
-/** Configurable timeout options for future Vault auto-lock behavior. */
+/** Configurable timeout options for Vault auto-lock on resume. */
 enum class VaultAutoLockTimeout(val durationMillis: Long?) {
     IMMEDIATELY(0L),
     AFTER_1_MINUTE(60_000L),

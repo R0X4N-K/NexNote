@@ -23,6 +23,8 @@ import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredenti
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -40,6 +42,8 @@ private val Flow<Preferences>.safeVaultPreferences: Flow<Preferences>
     get() = catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
 
 internal interface VaultUnlockedKeyProvider {
+    val unlockedVaultKey: StateFlow<SecretKey?>
+
     suspend fun <T> withUnlockedVaultKey(block: suspend (SecretKey) -> T): T?
 }
 
@@ -72,6 +76,7 @@ class VaultRepositoryImpl internal constructor(
     )
 
     private val unlockedKey = MutableStateFlow<SecretKey?>(null)
+    override val unlockedVaultKey: StateFlow<SecretKey?> = unlockedKey.asStateFlow()
 
     private val storedConfig: Flow<VaultStoredConfig?> =
         dataStore.data

@@ -114,9 +114,17 @@ class TagRepositoryImpl(
             return
         }
 
-        val newTags = TagParser.extractTags(content)
-
         database.withTransaction {
+            if (!tagDao.isNormalNote(noteId)) {
+                tagDao.deleteAllCrossRefsForNote(noteId)
+                tagDao.pruneOrphanTags()
+                NexNoteDebugLog.repositoryWarning(event = "indexNoteTagsSkipped") {
+                    "reason=notNormalNote noteId=$noteId"
+                }
+                return@withTransaction
+            }
+
+            val newTags = TagParser.extractTags(content)
             val existingTags = tagDao.getCrossRefsForNote(noteId).map { it.tagName }.toSet()
 
             val toAdd    = newTags - existingTags
@@ -160,7 +168,9 @@ class TagRepositoryImpl(
      * 1. Find all normal notes (active and trashed) that reference [tagName].
      * 2. Replace `#tagName` with `tagName` in each note's content.
      * 3. Update the note row with the new content (and a fresh lastModifiedDate).
-     * 4. Remove normal-note [NoteTagCrossRef] rows for this tag.
+     * 4. Remove every [NoteTagCrossRef] row for this tag. Vault notes should
+     *    not have rows here, but this also scrubs stale plaintext refs without
+     *    touching encrypted Vault note content.
      * 5. Prune the [TagEntity] row only when no cross-refs remain.
      *
      * The '#' replacement uses a word-boundary regex to avoid partial matches:
@@ -190,7 +200,7 @@ class TagRepositoryImpl(
                 }
             }
 
-            tagDao.deleteNonVaultCrossRefsForTag(tagName)
+            tagDao.deleteAllCrossRefsForTag(tagName)
             tagDao.pruneOrphanTags()
         }
     }

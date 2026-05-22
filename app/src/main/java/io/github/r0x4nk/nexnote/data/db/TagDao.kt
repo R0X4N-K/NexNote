@@ -150,6 +150,16 @@ interface TagDao {
     @Query("SELECT * FROM note_tag_cross_ref WHERE noteId = :noteId")
     suspend fun getCrossRefsForNote(noteId: Long): List<NoteTagCrossRef>
 
+    /** True only for persisted non-Vault notes. */
+    @Query("""
+        SELECT EXISTS(
+            SELECT 1 FROM notes
+            WHERE id = :noteId
+              AND isInVault = 0
+        )
+    """)
+    suspend fun isNormalNote(noteId: Long): Boolean
+
     // ── Tag mutations ─────────────────────────────────────────────────────────
 
     /** Inserts a new tag; silently ignored when the name already exists (IGNORE). */
@@ -192,13 +202,17 @@ interface TagDao {
     @Query("DELETE FROM note_tag_cross_ref WHERE noteId = :noteId")
     suspend fun deleteAllCrossRefsForNote(noteId: Long)
 
-    /** Removes cross-refs for a tag from normal notes; Vault refs are preserved. */
-    @Query("""
-        DELETE FROM note_tag_cross_ref
-        WHERE tagName = :tagName
-          AND noteId IN (SELECT id FROM notes WHERE isInVault = 0)
-    """)
-    suspend fun deleteNonVaultCrossRefsForTag(tagName: String)
+    /**
+     * Removes every cross-ref for a tag.
+     *
+     * Vault notes should never be indexed in this table, but deleting a tag is
+     * also a cleanup boundary for stale refs left behind by older builds or
+     * partial migrations. Removing the ref does not modify encrypted Vault note
+     * content; it only prevents plaintext tag names from lingering in the
+     * global tag index.
+     */
+    @Query("DELETE FROM note_tag_cross_ref WHERE tagName = :tagName")
+    suspend fun deleteAllCrossRefsForTag(tagName: String)
 }
 
 /**

@@ -17,7 +17,9 @@ import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DeleteVaultNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.EmptyTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
@@ -53,13 +55,17 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAndroidCredentialProt
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAndroidCredentialUnlockUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAutoLockTimeoutUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultLockOnBackgroundUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultRecentPreviewsProtectionUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTagsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTrashedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RemoveNoteFromVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
@@ -77,6 +83,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAutoLockTimeoutUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultLockOnBackgroundUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultRecentPreviewsProtectionUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ToggleVaultNotePinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.UnlockVaultWithAndroidCredentialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.UnlockVaultWithPinUseCase
 
@@ -214,8 +221,16 @@ internal class VaultUseCases internal constructor(
     val decryptVaultImageBytes = DecryptVaultImageBytesUseCase(vaultNoteRepository)
     val moveNoteToVault = MoveNoteToVaultUseCase(vaultNoteRepository)
     val moveVaultNoteToTrash = MoveVaultNoteToTrashUseCase(vaultNoteRepository)
+    val restoreVaultNoteFromTrash = RestoreVaultNoteFromTrashUseCase(vaultNoteRepository)
+    val deleteVaultNotePermanently = DeleteVaultNotePermanentlyUseCase(vaultNoteRepository)
     val observeVaultNotes = ObserveVaultNotesUseCase(vaultNoteRepository)
+    val observeVaultNoteLinkCandidates =
+        ObserveVaultNoteLinkCandidatesUseCase(vaultNoteRepository)
+    val observeVaultTrashedNotes = ObserveVaultTrashedNotesUseCase(vaultNoteRepository)
+    val observeVaultTags = ObserveVaultTagsUseCase(vaultNoteRepository)
     val getVaultNoteById = GetVaultNoteByIdUseCase(vaultNoteRepository)
     val saveVaultNote = SaveVaultNoteUseCase(vaultNoteRepository)
+    val duplicateVaultNote = DuplicateVaultNoteUseCase(vaultNoteRepository)
+    val toggleVaultNotePin = ToggleVaultNotePinUseCase(vaultNoteRepository)
     val removeNoteFromVault = RemoveNoteFromVaultUseCase(vaultNoteRepository)
 }
