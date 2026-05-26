@@ -26,6 +26,7 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.NoteCollectionLayoutDefaults
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
@@ -37,6 +38,7 @@ internal fun HomeContent(
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
@@ -44,6 +46,7 @@ internal fun HomeContent(
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     floatingBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
@@ -55,6 +58,7 @@ internal fun HomeContent(
             noteCardStyle = noteCardStyle,
             listState = listState,
             gridState = gridState,
+            selectionState = selectionState,
             onNoteClick = onNoteClick,
             onToggleTagFilter = onToggleTagFilter,
             onRemoveTagFilter = onRemoveTagFilter,
@@ -62,6 +66,7 @@ internal fun HomeContent(
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
             onRequestNoteActions = onRequestNoteActions,
+            onToggleNoteSelection = onToggleNoteSelection,
             floatingBottomPadding = floatingBottomPadding,
             modifier = modifier
         )
@@ -84,6 +89,7 @@ private fun HomeLoadedContent(
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
@@ -91,6 +97,7 @@ private fun HomeLoadedContent(
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     floatingBottomPadding: Dp,
     modifier: Modifier
 ) {
@@ -101,10 +108,12 @@ private fun HomeLoadedContent(
             noteCardStyle = noteCardStyle,
             listState = listState,
             gridState = gridState,
+            selectionState = selectionState,
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
             onRequestNoteActions = onRequestNoteActions,
+            onToggleNoteSelection = onToggleNoteSelection,
             bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
         )
     }
@@ -151,10 +160,12 @@ private fun HomeNotesBody(
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     if (uiState.notes.isEmpty()) {
@@ -169,10 +180,12 @@ private fun HomeNotesBody(
             noteCardStyle = noteCardStyle,
             listState = listState,
             gridState = gridState,
+            selectionState = selectionState,
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
             onRequestNoteActions = onRequestNoteActions,
+            onToggleNoteSelection = onToggleNoteSelection,
             bottomContentPadding = bottomContentPadding
         )
     }
@@ -184,10 +197,12 @@ private fun HomeNoteCollection(
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     val displayItems = rememberDisplayItems(uiState)
@@ -197,10 +212,12 @@ private fun HomeNoteCollection(
             displayItems,
             noteCardStyle,
             gridState,
+            selectionState,
             onNoteClick,
             onTogglePin,
             onRequestTrash,
             onRequestNoteActions,
+            onToggleNoteSelection,
             bottomContentPadding
         )
     } else {
@@ -208,10 +225,12 @@ private fun HomeNoteCollection(
             displayItems,
             noteCardStyle,
             listState,
+            selectionState,
             onNoteClick,
             onTogglePin,
             onRequestTrash,
             onRequestNoteActions,
+            onToggleNoteSelection,
             bottomContentPadding
         )
     }
@@ -237,10 +256,12 @@ private fun HomeNoteGrid(
     displayItems: List<ScoredNote>,
     noteCardStyle: NoteCardStyle,
     gridState: LazyStaggeredGridState,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     LazyVerticalStaggeredGrid(
@@ -261,10 +282,12 @@ private fun HomeNoteGrid(
             HomeNoteCard(
                 scored,
                 noteCardStyle,
+                selectionState,
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
                 onRequestNoteActions,
+                onToggleNoteSelection,
                 Modifier.animateItem()
             )
         }
@@ -276,10 +299,12 @@ private fun HomeNoteList(
     displayItems: List<ScoredNote>,
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     LazyColumn(
@@ -298,10 +323,12 @@ private fun HomeNoteList(
             HomeNoteCard(
                 scored,
                 noteCardStyle,
+                selectionState,
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
                 onRequestNoteActions,
+                onToggleNoteSelection,
                 Modifier.animateItem()
             )
         }
@@ -312,22 +339,41 @@ private fun HomeNoteList(
 private fun HomeNoteCard(
     scored: ScoredNote,
     noteCardStyle: NoteCardStyle,
+    selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val note = scored.note
     val noteId = note.id
     NoteCard(
         note = note,
-        onClick = remember(noteId, onNoteClick) { { onNoteClick(noteId) } },
+        onClick = remember(note, noteId, selectionState.isActive, onNoteClick, onToggleNoteSelection) {
+            {
+                if (selectionState.isActive) {
+                    onToggleNoteSelection(note)
+                } else {
+                    onNoteClick(noteId)
+                }
+            }
+        },
         noteCardStyle = noteCardStyle,
         titleHighlightRanges = scored.titleRanges,
         contentHighlightRanges = scored.contentRanges,
         onPin = remember(note, onTogglePin) { { onTogglePin(note) } },
-        onLongPress = remember(note, onRequestNoteActions) { { onRequestNoteActions(note) } },
+        onLongPress = remember(note, onToggleNoteSelection) { { onToggleNoteSelection(note) } },
+        onActions = remember(note, selectionState.isActive, onRequestNoteActions) {
+            if (selectionState.isActive) {
+                null
+            } else {
+                { onRequestNoteActions(note) }
+            }
+        },
+        selectionMode = selectionState.isActive,
+        selected = selectionState.isSelected(noteId),
         modifier = modifier,
         onTrash = remember(note, onRequestTrash) { { onRequestTrash(note) } }
     )

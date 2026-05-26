@@ -11,15 +11,24 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
@@ -39,7 +48,8 @@ internal fun HomeTopAppBar(
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
     onOpenTrash: () -> Unit,
-    onOpenVault: () -> Unit
+    onOpenVault: () -> Unit,
+    onStartSelection: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -56,7 +66,8 @@ internal fun HomeTopAppBar(
                 onSortToggle = onSortToggle,
                 onViewModeToggle = onViewModeToggle,
                 onOpenTrash = onOpenTrash,
-                onOpenVault = onOpenVault
+                onOpenVault = onOpenVault,
+                onStartSelection = onStartSelection
             )
         },
         colors = nexTopAppBarColors(),
@@ -119,7 +130,8 @@ private fun HomeTopAppBarActions(
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
     onOpenTrash: () -> Unit,
-    onOpenVault: () -> Unit
+    onOpenVault: () -> Unit,
+    onStartSelection: () -> Unit
 ) {
     if (uiState.isSearchActive) {
         NexIconButton(
@@ -134,7 +146,8 @@ private fun HomeTopAppBarActions(
             onSortToggle = onSortToggle,
             onViewModeToggle = onViewModeToggle,
             onOpenTrash = onOpenTrash,
-            onOpenVault = onOpenVault
+            onOpenVault = onOpenVault,
+            onStartSelection = onStartSelection
         )
     }
 }
@@ -146,7 +159,8 @@ private fun HomeBrowsingActions(
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
     onOpenTrash: () -> Unit,
-    onOpenVault: () -> Unit
+    onOpenVault: () -> Unit,
+    onStartSelection: () -> Unit
 ) {
     SortOrderButton(sortOrder = uiState.sortOrder, onClick = onSortToggle)
     ViewModeButton(viewMode = uiState.viewMode, onClick = onViewModeToggle)
@@ -155,16 +169,73 @@ private fun HomeBrowsingActions(
         contentDescription = "Search",
         onClick = { onSearchToggle(true) }
     )
-    NexIconButton(
-        imageVector = Icons.Default.Lock,
-        contentDescription = "Vault",
-        onClick = onOpenVault
+    HomeOverflowMenu(
+        onOpenVault = onOpenVault,
+        onOpenTrash = onOpenTrash,
+        onStartSelection = onStartSelection
     )
-    NexIconButton(
-        imageVector = Icons.Default.Delete,
-        contentDescription = "Trash",
-        onClick = onOpenTrash
-    )
+}
+
+@Composable
+private fun HomeOverflowMenu(
+    onOpenVault: () -> Unit,
+    onOpenTrash: () -> Unit,
+    onStartSelection: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        NexIconButton(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = "More options",
+            onClick = { expanded = true },
+            selected = expanded
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Select notes") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.SelectAll,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onStartSelection()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Access Vault") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onOpenVault()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Trash") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onOpenTrash()
+                }
+            )
+        }
+    }
 }
 
 @Composable
