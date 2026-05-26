@@ -39,18 +39,14 @@ class TemplateRepositoryImpl(
         }
     }
 
-    /**
-     * Deletes a custom template. Predefined templates cannot be deleted;
-     * attempting to do so throws IllegalArgumentException.
-     */
+    /** Deletes a template selected from the templates screen. */
     override suspend fun deleteTemplate(template: Template) {
-        require(!template.isPredefined) { "Predefined templates cannot be deleted." }
         dao.deleteTemplate(template.toEntity())
     }
 
     /**
      * Inserts predefined templates if they are not already in the database.
-     * Called from NexNoteApp.onCreate() on a background coroutine.
+     * Called once from NexNoteApp.onCreate() on a background coroutine.
      */
     suspend fun initializePredefinedTemplates() {
         if (dao.countPredefinedTemplates() == 0) {

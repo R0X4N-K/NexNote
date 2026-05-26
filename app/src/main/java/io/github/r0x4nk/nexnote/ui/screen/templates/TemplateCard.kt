@@ -1,6 +1,5 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,33 +19,97 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.NoteCollectionCardDefaults
+import io.github.r0x4nk.nexnote.ui.component.SelectionIndicator
+import io.github.r0x4nk.nexnote.ui.component.SwipeToDeleteContainer
+import io.github.r0x4nk.nexnote.ui.component.roundedCombinedClickableTarget
 
 @Composable
 internal fun TemplateCard(
     template: Template,
     onApply: () -> Unit,
     onEdit: (() -> Unit)?,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    onLongPress: () -> Unit = {},
+    selectionMode: Boolean = false,
+    selected: Boolean = false
 ) {
-    Card(
-        onClick = onApply,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        shape = MaterialTheme.shapes.large,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f)
+    if (onDelete != null) {
+        SwipeToDeleteContainer(
+            onDelete = onDelete,
+            contentDescription = "Delete template",
+            collapseBeforeDelete = false,
+            enabled = !selectionMode
+        ) {
+            TemplateCardSurface(
+                template = template,
+                onApply = onApply,
+                onEdit = onEdit,
+                onLongPress = onLongPress,
+                selectionMode = selectionMode,
+                selected = selected
+            )
+        }
+    } else {
+        TemplateCardSurface(
+            template = template,
+            onApply = onApply,
+            onEdit = onEdit,
+            onLongPress = onLongPress,
+            selectionMode = selectionMode,
+            selected = selected
         )
+    }
+}
+
+@Composable
+private fun TemplateCardSurface(
+    template: Template,
+    onApply: () -> Unit,
+    onEdit: (() -> Unit)?,
+    onLongPress: () -> Unit,
+    selectionMode: Boolean,
+    selected: Boolean
+) {
+    val shape = NoteCollectionCardDefaults.shape
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .roundedCombinedClickableTarget(
+                shape = shape,
+                onClick = onApply,
+                onLongClick = onLongPress
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+            } else {
+                NoteCollectionCardDefaults.containerColor()
+            }
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = NoteCollectionCardDefaults.defaultElevation
+        ),
+        shape = shape,
+        border = if (selected) {
+            NoteCollectionCardDefaults.border(
+                alpha = 1f,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            NoteCollectionCardDefaults.border()
+        }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TemplateCardText(template = template, modifier = Modifier.weight(1f))
-            TemplateCardActions(onEdit = onEdit, onDelete = onDelete)
+            if (selectionMode) {
+                SelectionIndicator(selected = selected)
+            } else {
+                TemplateCardActions(onEdit = onEdit)
+            }
         }
     }
 }
@@ -85,23 +147,12 @@ private fun TemplateCardText(
 }
 
 @Composable
-private fun TemplateCardActions(
-    onEdit: (() -> Unit)?,
-    onDelete: (() -> Unit)?
-) {
+private fun TemplateCardActions(onEdit: (() -> Unit)?) {
     if (onEdit != null) {
         NexIconButton(
             imageVector = Icons.Default.Edit,
             contentDescription = "Edit",
             onClick = onEdit
-        )
-    }
-    if (onDelete != null) {
-        NexIconButton(
-            imageVector = Icons.Default.Delete,
-            contentDescription = "Delete",
-            onClick = onDelete,
-            destructive = true
         )
     }
 }

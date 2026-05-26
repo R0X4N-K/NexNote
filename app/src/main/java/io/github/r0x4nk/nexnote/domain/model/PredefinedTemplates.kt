@@ -2,8 +2,8 @@ package io.github.r0x4nk.nexnote.domain.model
 
 /**
  * Built-in templates seeded on first app launch.
- * Not user-editable. The {{date}} placeholder is resolved in EditorViewModel
- * when a note is created from a template.
+ * The {{date}} placeholder is resolved in EditorViewModel when a note is
+ * created from a template.
  */
 object PredefinedTemplates {
 

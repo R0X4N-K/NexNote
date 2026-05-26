@@ -10,14 +10,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
@@ -35,7 +44,8 @@ internal fun TemplatesTopBar(
     onSearchQueryChange: (String) -> Unit,
     onSearchToggle: (Boolean) -> Unit,
     onToggleSortOrder: () -> Unit,
-    onToggleViewMode: () -> Unit
+    onToggleViewMode: () -> Unit,
+    onStartSelection: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -50,7 +60,8 @@ internal fun TemplatesTopBar(
                 uiState = uiState,
                 onSearchToggle = onSearchToggle,
                 onToggleSortOrder = onToggleSortOrder,
-                onToggleViewMode = onToggleViewMode
+                onToggleViewMode = onToggleViewMode,
+                onStartSelection = onStartSelection
             )
         },
         colors = nexTopAppBarColors(),
@@ -111,7 +122,8 @@ private fun TemplatesTopBarActions(
     uiState: TemplatesUiState,
     onSearchToggle: (Boolean) -> Unit,
     onToggleSortOrder: () -> Unit,
-    onToggleViewMode: () -> Unit
+    onToggleViewMode: () -> Unit,
+    onStartSelection: () -> Unit
 ) {
     if (uiState.isSearchActive) {
         NexIconButton(
@@ -124,7 +136,8 @@ private fun TemplatesTopBarActions(
             uiState = uiState,
             onSearchToggle = onSearchToggle,
             onToggleSortOrder = onToggleSortOrder,
-            onToggleViewMode = onToggleViewMode
+            onToggleViewMode = onToggleViewMode,
+            onStartSelection = onStartSelection
         )
     }
 }
@@ -134,7 +147,8 @@ private fun TemplatesDefaultActions(
     uiState: TemplatesUiState,
     onSearchToggle: (Boolean) -> Unit,
     onToggleSortOrder: () -> Unit,
-    onToggleViewMode: () -> Unit
+    onToggleViewMode: () -> Unit,
+    onStartSelection: () -> Unit
 ) {
     TemplatesSortButton(uiState.sortOrder, onToggleSortOrder)
     TemplatesViewModeButton(uiState.viewMode, onToggleViewMode)
@@ -143,6 +157,7 @@ private fun TemplatesDefaultActions(
         contentDescription = "Search",
         onClick = { onSearchToggle(true) }
     )
+    TemplatesOverflowMenu(onStartSelection)
 }
 
 @Composable
@@ -180,4 +195,36 @@ private fun TemplatesViewModeButton(
         },
         onClick = onToggleViewMode
     )
+}
+
+@Composable
+private fun TemplatesOverflowMenu(onStartSelection: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        NexIconButton(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = "More options",
+            onClick = { expanded = true },
+            selected = expanded
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Select templates") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.SelectAll,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onStartSelection()
+                }
+            )
+        }
+    }
 }

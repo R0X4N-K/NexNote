@@ -16,6 +16,7 @@ import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
@@ -49,6 +50,8 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
             stringPreferencesKey("vault_auto_lock_timeout")
         val VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY =
             booleanPreferencesKey("vault_android_credential_unlock_enabled")
+        val PREDEFINED_TEMPLATES_SEEDED_KEY =
+            booleanPreferencesKey("predefined_templates_seeded")
         // EDITOR_BACKGROUND_KEY removed — per-note color replaced the global background setting.
     }
 
@@ -129,6 +132,15 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
     override suspend fun setUnlockVaultWithAndroidCredential(value: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[VAULT_ANDROID_CREDENTIAL_UNLOCK_ENABLED_KEY] = value
+        }
+    }
+
+    suspend fun hasSeededPredefinedTemplates(): Boolean =
+        context.dataStore.data.safe.first()[PREDEFINED_TEMPLATES_SEEDED_KEY] ?: false
+
+    suspend fun setPredefinedTemplatesSeeded() {
+        context.dataStore.edit { prefs ->
+            prefs[PREDEFINED_TEMPLATES_SEEDED_KEY] = true
         }
     }
 

@@ -24,7 +24,7 @@ interface TemplateDao {
     @Query("SELECT * FROM templates WHERE id = :id LIMIT 1")
     suspend fun getTemplateById(id: Long): TemplateEntity?
 
-    /** Counts predefined templates — used to avoid re-inserting them on every app start. */
+    /** Counts predefined templates, used to seed the built-in set on first launch. */
     @Query("SELECT COUNT(*) FROM templates WHERE isPredefined = 1")
     suspend fun countPredefinedTemplates(): Int
 
@@ -34,7 +34,7 @@ interface TemplateDao {
     @Update
     suspend fun updateTemplate(template: TemplateEntity)
 
-    /** Deletes custom templates only (isPredefined = 0 is enforced by the repository). */
+    /** Deletes a template row selected by the user. */
     @Delete
     suspend fun deleteTemplate(template: TemplateEntity)
 }

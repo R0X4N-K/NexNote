@@ -126,7 +126,10 @@ class NexNoteApp : Application() {
     override fun onCreate() {
         super.onCreate()
         appScope.launch {
-            templateRepositoryImpl.initializePredefinedTemplates()
+            if (!userPreferencesRepository.hasSeededPredefinedTemplates()) {
+                templateRepositoryImpl.initializePredefinedTemplates()
+                userPreferencesRepository.setPredefinedTemplatesSeeded()
+            }
         }
     }
 }

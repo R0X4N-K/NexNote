@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.NexSectionLabel
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 
@@ -24,9 +25,11 @@ internal fun TemplatesCollection(
     uiState: TemplatesUiState,
     padding: PaddingValues,
     floatingBottomPadding: Dp,
+    selectionState: SelectionUiState,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
-    onDelete: (Template) -> Unit
+    onDelete: (Template) -> Unit,
+    onToggleSelection: (Template) -> Unit
 ) {
     val contentModifier = Modifier.fillMaxSize().padding(padding)
     val bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
@@ -36,9 +39,11 @@ internal fun TemplatesCollection(
             predefined = uiState.predefined,
             custom = uiState.custom,
             bottomContentPadding = bottomContentPadding,
+            selectionState = selectionState,
             onApply = onApply,
             onEdit = onEdit,
             onDelete = onDelete,
+            onToggleSelection = onToggleSelection,
             modifier = contentModifier
         )
     } else {
@@ -46,9 +51,11 @@ internal fun TemplatesCollection(
             predefined = uiState.predefined,
             custom = uiState.custom,
             bottomContentPadding = bottomContentPadding,
+            selectionState = selectionState,
             onApply = onApply,
             onEdit = onEdit,
             onDelete = onDelete,
+            onToggleSelection = onToggleSelection,
             modifier = contentModifier
         )
     }
@@ -59,9 +66,11 @@ private fun TemplatesList(
     predefined: List<Template>,
     custom: List<Template>,
     bottomContentPadding: Dp,
+    selectionState: SelectionUiState,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
     onDelete: (Template) -> Unit,
+    onToggleSelection: (Template) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -79,9 +88,18 @@ private fun TemplatesList(
             items(predefined, key = { it.id }) { template ->
                 TemplateCard(
                     template = template,
-                    onApply = { onApply(template.id) },
+                    onApply = {
+                        if (selectionState.isActive) {
+                            onToggleSelection(template)
+                        } else {
+                            onApply(template.id)
+                        }
+                    },
                     onEdit = null,
-                    onDelete = null
+                    onDelete = { onDelete(template) },
+                    onLongPress = { onToggleSelection(template) },
+                    selectionMode = selectionState.isActive,
+                    selected = selectionState.isSelected(template.id)
                 )
             }
         }
@@ -91,9 +109,18 @@ private fun TemplatesList(
             items(custom, key = { it.id }) { template ->
                 TemplateCard(
                     template = template,
-                    onApply = { onApply(template.id) },
+                    onApply = {
+                        if (selectionState.isActive) {
+                            onToggleSelection(template)
+                        } else {
+                            onApply(template.id)
+                        }
+                    },
                     onEdit = { onEdit(template.id) },
-                    onDelete = { onDelete(template) }
+                    onDelete = { onDelete(template) },
+                    onLongPress = { onToggleSelection(template) },
+                    selectionMode = selectionState.isActive,
+                    selected = selectionState.isSelected(template.id)
                 )
             }
         }
@@ -105,9 +132,11 @@ private fun TemplatesGrid(
     predefined: List<Template>,
     custom: List<Template>,
     bottomContentPadding: Dp,
+    selectionState: SelectionUiState,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
     onDelete: (Template) -> Unit,
+    onToggleSelection: (Template) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyVerticalStaggeredGrid(
@@ -129,9 +158,18 @@ private fun TemplatesGrid(
             items(predefined, key = { it.id }) { template ->
                 TemplateCard(
                     template = template,
-                    onApply = { onApply(template.id) },
+                    onApply = {
+                        if (selectionState.isActive) {
+                            onToggleSelection(template)
+                        } else {
+                            onApply(template.id)
+                        }
+                    },
                     onEdit = null,
-                    onDelete = null
+                    onDelete = { onDelete(template) },
+                    onLongPress = { onToggleSelection(template) },
+                    selectionMode = selectionState.isActive,
+                    selected = selectionState.isSelected(template.id)
                 )
             }
         }
@@ -143,9 +181,18 @@ private fun TemplatesGrid(
             items(custom, key = { it.id }) { template ->
                 TemplateCard(
                     template = template,
-                    onApply = { onApply(template.id) },
+                    onApply = {
+                        if (selectionState.isActive) {
+                            onToggleSelection(template)
+                        } else {
+                            onApply(template.id)
+                        }
+                    },
                     onEdit = { onEdit(template.id) },
-                    onDelete = { onDelete(template) }
+                    onDelete = { onDelete(template) },
+                    onLongPress = { onToggleSelection(template) },
+                    selectionMode = selectionState.isActive,
+                    selected = selectionState.isSelected(template.id)
                 )
             }
         }

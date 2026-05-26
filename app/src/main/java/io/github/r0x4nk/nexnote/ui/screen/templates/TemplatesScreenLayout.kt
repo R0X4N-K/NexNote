@@ -13,6 +13,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import io.github.r0x4nk.nexnote.domain.model.Template
+import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
+import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
 internal data class TemplatesLayoutActions(
@@ -22,7 +24,13 @@ internal data class TemplatesLayoutActions(
     val onSearchToggle: (Boolean) -> Unit,
     val onToggleSortOrder: () -> Unit,
     val onToggleViewMode: () -> Unit,
-    val onRequestDelete: (Template) -> Unit
+    val onRequestDelete: (Template) -> Unit,
+    val onStartSelection: () -> Unit,
+    val onExitSelection: () -> Unit,
+    val onSelectAll: () -> Unit,
+    val onDeselectAll: () -> Unit,
+    val onDeleteSelected: () -> Unit,
+    val onToggleSelection: (Template) -> Unit
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +39,8 @@ internal fun TemplatesScreenLayout(
     uiState: TemplatesUiState,
     snackbarHostState: SnackbarHostState,
     floatingBottomPadding: Dp,
+    selectionState: SelectionUiState,
+    selectableTemplateIds: List<Long>,
     actions: TemplatesLayoutActions
 ) {
     val searchFocusRequester = remember { FocusRequester() }
@@ -42,6 +52,8 @@ internal fun TemplatesScreenLayout(
         searchFocusRequester = searchFocusRequester,
         scrollBehavior = scrollBehavior,
         floatingBottomPadding = floatingBottomPadding,
+        selectionState = selectionState,
+        selectableTemplateIds = selectableTemplateIds,
         actions = actions
     )
 }
@@ -54,12 +66,27 @@ private fun TemplatesScreenScaffold(
     searchFocusRequester: FocusRequester,
     scrollBehavior: TopAppBarScrollBehavior,
     floatingBottomPadding: Dp,
+    selectionState: SelectionUiState,
+    selectableTemplateIds: List<Long>,
     actions: TemplatesLayoutActions
 ) {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TemplatesTopBarSlot(uiState, searchFocusRequester, scrollBehavior, actions)
+            if (selectionState.isActive) {
+                SelectionTopAppBar(
+                    selectedCount = selectionState.selectedCount,
+                    totalCount = selectableTemplateIds.size,
+                    scrollBehavior = scrollBehavior,
+                    onClose = actions.onExitSelection,
+                    onSelectAll = actions.onSelectAll,
+                    onDeselectAll = actions.onDeselectAll,
+                    onDeleteSelected = actions.onDeleteSelected,
+                    deleteContentDescription = "Delete selected templates"
+                )
+            } else {
+                TemplatesTopBarSlot(uiState, searchFocusRequester, scrollBehavior, actions)
+            }
         },
         // Material 3 "lift the FAB" snackbar host — see [RadialMenuSnackbarHost].
         snackbarHost = {
@@ -73,6 +100,7 @@ private fun TemplatesScreenScaffold(
             uiState = uiState,
             padding = padding,
             floatingBottomPadding = floatingBottomPadding,
+            selectionState = selectionState,
             actions = actions
         )
     }
@@ -93,7 +121,8 @@ private fun TemplatesTopBarSlot(
         onSearchQueryChange = actions.onSearchQueryChange,
         onSearchToggle = actions.onSearchToggle,
         onToggleSortOrder = actions.onToggleSortOrder,
-        onToggleViewMode = actions.onToggleViewMode
+        onToggleViewMode = actions.onToggleViewMode,
+        onStartSelection = actions.onStartSelection
     )
 }
 
@@ -102,6 +131,7 @@ private fun TemplatesScreenContent(
     uiState: TemplatesUiState,
     padding: PaddingValues,
     floatingBottomPadding: Dp,
+    selectionState: SelectionUiState,
     actions: TemplatesLayoutActions
 ) {
     when {
@@ -121,9 +151,11 @@ private fun TemplatesScreenContent(
                 uiState = uiState,
                 padding = padding,
                 floatingBottomPadding = floatingBottomPadding,
+                selectionState = selectionState,
                 onApply = actions.onNavigateToApplyTemplate,
                 onEdit = actions.onNavigateToEditTemplate,
-                onDelete = actions.onRequestDelete
+                onDelete = actions.onRequestDelete,
+                onToggleSelection = actions.onToggleSelection
             )
         }
     }

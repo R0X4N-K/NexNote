@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 /**
  * Room entity for templates.
  *
- * [isPredefined]: system template, not deletable by the user.
+ * [isPredefined]: built-in template seeded by the app.
  * [category]: "custom" | "productivity" | "work" | "personal" | "general"
  * [iconName]: Material icon name displayed in the list.
  */

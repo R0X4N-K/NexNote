@@ -33,6 +33,30 @@ internal fun TemplatesDeleteDialog(
             )
         }
 
+        is TemplatesDialog.ConfirmDeleteSelection -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Delete templates") },
+                text = {
+                    Text(
+                        "Delete ${dialog.templates.size} selected templates? " +
+                            "This cannot be undone."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = onConfirmDelete,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Delete") }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                }
+            )
+        }
+
         TemplatesDialog.None -> Unit
     }
 }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 sealed class TemplatesDialog {
     data object None : TemplatesDialog()
     data class ConfirmDelete(val template: Template) : TemplatesDialog()
+    data class ConfirmDeleteSelection(val templates: List<Template>) : TemplatesDialog()
 }
 
 // ── UiState ───────────────────────────────────────────────────────────────────
@@ -93,8 +94,14 @@ class TemplatesViewModel(
     // ── Delete ────────────────────────────────────────────────────────────────
 
     fun requestDelete(template: Template) {
-        if (template.isPredefined) return
         _extra.update { it.copy(activeDialog = TemplatesDialog.ConfirmDelete(template)) }
+    }
+
+    fun requestDeleteSelection(templates: List<Template>) {
+        if (templates.isEmpty()) return
+        _extra.update {
+            it.copy(activeDialog = TemplatesDialog.ConfirmDeleteSelection(templates))
+        }
     }
 
     fun closeDialog() {
@@ -102,21 +109,32 @@ class TemplatesViewModel(
     }
 
     /**
-     * Confirms and executes deletion of a custom template.
+     * Confirms and executes deletion of the selected template.
      * No-op if the active dialog is not ConfirmDelete (safe by construction).
      */
     fun confirmDelete() {
         val dialog = _extra.value.activeDialog
-        if (dialog !is TemplatesDialog.ConfirmDelete) return
         viewModelScope.launch {
             try {
-                deleteTemplate(dialog.template)
+                when (dialog) {
+                    is TemplatesDialog.ConfirmDelete -> deleteTemplate(dialog.template)
+                    is TemplatesDialog.ConfirmDeleteSelection -> {
+                        dialog.templates.forEach { template ->
+                            deleteTemplate(template)
+                        }
+                    }
+                    TemplatesDialog.None -> return@launch
+                }
                 closeDialog()
             } catch (e: Exception) {
                 _extra.update {
                     it.copy(
                         activeDialog = TemplatesDialog.None,
-                        errorMessage = "Could not delete template"
+                        errorMessage = if (dialog is TemplatesDialog.ConfirmDeleteSelection) {
+                            "Could not delete templates"
+                        } else {
+                            "Could not delete template"
+                        }
                     )
                 }
             }

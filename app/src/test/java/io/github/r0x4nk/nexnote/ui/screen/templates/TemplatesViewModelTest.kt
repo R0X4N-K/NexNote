@@ -77,10 +77,25 @@ class TemplatesViewModelTest {
     }
 
     @Test
-    fun `requestDelete is no-op for predefined templates`() = runViewModelTest {
-        viewModel.requestDelete(template(id = 2L, isPredefined = true))
+    fun `requestDelete sets ConfirmDelete dialog for predefined templates`() = runViewModelTest {
+        val t = template(id = 2L, isPredefined = true)
+        viewModel.requestDelete(t)
         advanceUntilIdle()
-        assertEquals(TemplatesDialog.None, viewModel.uiState.value.activeDialog)
+        val dialog = viewModel.uiState.value.activeDialog
+        assertTrue(dialog is TemplatesDialog.ConfirmDelete)
+        assertEquals(t, (dialog as TemplatesDialog.ConfirmDelete).template)
+    }
+
+    @Test
+    fun `requestDeleteSelection sets ConfirmDeleteSelection dialog`() = runViewModelTest {
+        val templates = listOf(template(id = 2L), template(id = 3L))
+
+        viewModel.requestDeleteSelection(templates)
+        advanceUntilIdle()
+
+        val dialog = viewModel.uiState.value.activeDialog
+        assertTrue(dialog is TemplatesDialog.ConfirmDeleteSelection)
+        assertEquals(templates, (dialog as TemplatesDialog.ConfirmDeleteSelection).templates)
     }
 
     // ── closeDialog ───────────────────────────────────────────────────────────
@@ -102,6 +117,17 @@ class TemplatesViewModelTest {
         advanceUntilIdle()
         assertEquals(TemplatesDialog.None, viewModel.uiState.value.activeDialog)
         assertEquals(1, fakeDao.deletedCount)
+    }
+
+    @Test
+    fun `confirmDelete deletes selected templates and closes dialog`() = runViewModelTest {
+        viewModel.requestDeleteSelection(listOf(template(id = 9L), template(id = 10L)))
+
+        viewModel.confirmDelete()
+        advanceUntilIdle()
+
+        assertEquals(TemplatesDialog.None, viewModel.uiState.value.activeDialog)
+        assertEquals(2, fakeDao.deletedCount)
     }
 
     // ── errorMessage ──────────────────────────────────────────────────────────
