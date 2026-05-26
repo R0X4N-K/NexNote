@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -21,6 +22,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
+import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
@@ -33,9 +36,12 @@ internal data class AgendaLayoutState(
     val isCalendarVisible: Boolean,
     val isToolbarSticky: Boolean,
     val floatingBottomPadding: Dp,
-    val searchFocusRequester: FocusRequester
+    val searchFocusRequester: FocusRequester,
+    val selectionState: SelectionUiState,
+    val selectableNoteIds: List<Long>
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AgendaScreenLayout(
     layoutState: AgendaLayoutState,
@@ -49,11 +55,22 @@ internal fun AgendaScreenLayout(
             )
         },
         topBar = {
-            AgendaTopBar(
-                displayedYear = layoutState.uiState.displayedYear,
-                displayedMonth = layoutState.uiState.displayedMonth,
-                actions = actions
-            )
+            if (layoutState.selectionState.isActive) {
+                SelectionTopAppBar(
+                    selectedCount = layoutState.selectionState.selectedCount,
+                    totalCount = layoutState.selectableNoteIds.size,
+                    onClose = actions.onExitNoteSelection,
+                    onSelectAll = actions.onSelectAllVisibleNotes,
+                    onDeselectAll = actions.onDeselectAllNotes,
+                    onDeleteSelected = actions.onDeleteSelectedNotes
+                )
+            } else {
+                AgendaTopBar(
+                    displayedYear = layoutState.uiState.displayedYear,
+                    displayedMonth = layoutState.uiState.displayedMonth,
+                    actions = actions
+                )
+            }
         }
     ) { padding ->
         AgendaBody(
@@ -91,6 +108,7 @@ private data class AgendaBodyParams(
     val isToolbarSticky: Boolean,
     val floatingBottomPadding: Dp,
     val searchFocusRequester: FocusRequester,
+    val selectionState: SelectionUiState,
     val actions: AgendaActions
 )
 
@@ -105,6 +123,7 @@ private fun AgendaLayoutState.toBodyParams(
         isToolbarSticky = isToolbarSticky,
         floatingBottomPadding = floatingBottomPadding,
         searchFocusRequester = searchFocusRequester,
+        selectionState = selectionState,
         actions = actions
     )
 }
@@ -137,6 +156,7 @@ private fun AgendaLazyColumn(params: AgendaBodyParams) {
             notes = params.uiState.notesForSelectedDate,
             viewMode = params.uiState.viewMode,
             noteCardStyle = params.noteCardStyle,
+            selectionState = params.selectionState,
             isSearchEmpty = params.uiState.isSearchActive && params.uiState.searchQuery.isNotBlank(),
             actions = params.actions
         )

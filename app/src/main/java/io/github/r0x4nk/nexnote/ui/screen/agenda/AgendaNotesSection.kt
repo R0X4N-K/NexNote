@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.MasonryGrid
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
@@ -30,21 +31,35 @@ internal fun LazyListScope.agendaNotesItems(
     notes: List<Note>,
     viewMode: NoteListViewMode,
     noteCardStyle: NoteCardStyle,
+    selectionState: SelectionUiState,
     isSearchEmpty: Boolean,
     actions: AgendaActions
 ) {
     if (notes.isEmpty()) {
         item { AgendaEmptyState(isSearchActive = isSearchEmpty) }
     } else if (viewMode == NoteListViewMode.GRID) {
-        item { AgendaNotesGrid(notes, noteCardStyle, actions) }
+        item { AgendaNotesGrid(notes, noteCardStyle, selectionState, actions) }
     } else {
         items(notes, key = { it.id }) { note ->
             NoteCard(
                 note = note,
-                onClick = { actions.onNoteClick(note.id) },
+                onClick = {
+                    if (selectionState.isActive) {
+                        actions.onToggleNoteSelection(note)
+                    } else {
+                        actions.onNoteClick(note.id)
+                    }
+                },
                 noteCardStyle = noteCardStyle,
                 onPin = { actions.onTogglePin(note) },
-                onLongPress = { actions.onRequestNoteActions(note) },
+                onLongPress = { actions.onToggleNoteSelection(note) },
+                onActions = if (selectionState.isActive) {
+                    null
+                } else {
+                    { actions.onRequestNoteActions(note) }
+                },
+                selectionMode = selectionState.isActive,
+                selected = selectionState.isSelected(note.id),
                 modifier = Modifier
                     .padding(horizontal = 16.dp, vertical = 4.dp)
                     .animateItem(),
@@ -74,6 +89,7 @@ internal fun NotesSectionHeader(year: Int, month: Int, day: Int) {
 private fun AgendaNotesGrid(
     notes: List<Note>,
     noteCardStyle: NoteCardStyle,
+    selectionState: SelectionUiState,
     actions: AgendaActions
 ) {
     MasonryGrid(
@@ -86,7 +102,7 @@ private fun AgendaNotesGrid(
     ) {
         notes.forEach { note ->
             key(note.id) {
-                AgendaGridNoteCard(note, noteCardStyle, actions)
+                AgendaGridNoteCard(note, noteCardStyle, selectionState, actions)
             }
         }
     }
@@ -96,14 +112,28 @@ private fun AgendaNotesGrid(
 private fun AgendaGridNoteCard(
     note: Note,
     noteCardStyle: NoteCardStyle,
+    selectionState: SelectionUiState,
     actions: AgendaActions
 ) {
     NoteCard(
         note = note,
-        onClick = { actions.onNoteClick(note.id) },
+        onClick = {
+            if (selectionState.isActive) {
+                actions.onToggleNoteSelection(note)
+            } else {
+                actions.onNoteClick(note.id)
+            }
+        },
         noteCardStyle = noteCardStyle,
         onPin = { actions.onTogglePin(note) },
-        onLongPress = { actions.onRequestNoteActions(note) },
+        onLongPress = { actions.onToggleNoteSelection(note) },
+        onActions = if (selectionState.isActive) {
+            null
+        } else {
+            { actions.onRequestNoteActions(note) }
+        },
+        selectionMode = selectionState.isActive,
+        selected = selectionState.isSelected(note.id),
         onTrash = { actions.onRequestTrash(note) }
     )
 }

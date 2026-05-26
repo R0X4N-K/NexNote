@@ -157,6 +157,10 @@ class AgendaViewModel(
         noteListActions.requestTrash(note)
     }
 
+    fun requestTrash(notes: Collection<Note>) {
+        noteListActions.requestTrash(notes)
+    }
+
     /**
      * Called when the undo snackbar is dismissed without pressing Undo.
      * The note is already in the database trash (written in [requestTrash]);

@@ -22,6 +22,12 @@ internal data class AgendaActions(
     val onDuplicateNote: (Note) -> Unit,
     val onRequestTrash: (Note) -> Unit,
     val onRequestNoteActions: (Note) -> Unit,
+    val onStartNoteSelection: () -> Unit,
+    val onExitNoteSelection: () -> Unit,
+    val onSelectAllVisibleNotes: () -> Unit,
+    val onDeselectAllNotes: () -> Unit,
+    val onDeleteSelectedNotes: () -> Unit,
+    val onToggleNoteSelection: (Note) -> Unit,
     val onUndoTrash: (Long) -> Unit,
     val onConfirmTrash: () -> Unit
 )
@@ -31,10 +37,38 @@ internal fun rememberAgendaActions(
     viewModel: AgendaViewModel,
     onNoteClick: (Long) -> Unit,
     onNewNote: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit
+    onRequestNoteActions: (Note) -> Unit,
+    onStartNoteSelection: () -> Unit,
+    onExitNoteSelection: () -> Unit,
+    onSelectAllVisibleNotes: () -> Unit,
+    onDeselectAllNotes: () -> Unit,
+    onDeleteSelectedNotes: () -> Unit,
+    onToggleNoteSelection: (Note) -> Unit
 ): AgendaActions {
-    return remember(viewModel, onNoteClick, onNewNote, onRequestNoteActions) {
-        buildAgendaActions(viewModel, onNoteClick, onNewNote, onRequestNoteActions)
+    return remember(
+        viewModel,
+        onNoteClick,
+        onNewNote,
+        onRequestNoteActions,
+        onStartNoteSelection,
+        onExitNoteSelection,
+        onSelectAllVisibleNotes,
+        onDeselectAllNotes,
+        onDeleteSelectedNotes,
+        onToggleNoteSelection
+    ) {
+        buildAgendaActions(
+            viewModel = viewModel,
+            onNoteClick = onNoteClick,
+            onNewNote = onNewNote,
+            onRequestNoteActions = onRequestNoteActions,
+            onStartNoteSelection = onStartNoteSelection,
+            onExitNoteSelection = onExitNoteSelection,
+            onSelectAllVisibleNotes = onSelectAllVisibleNotes,
+            onDeselectAllNotes = onDeselectAllNotes,
+            onDeleteSelectedNotes = onDeleteSelectedNotes,
+            onToggleNoteSelection = onToggleNoteSelection
+        )
     }
 }
 
@@ -42,7 +76,13 @@ private fun buildAgendaActions(
     viewModel: AgendaViewModel,
     onNoteClick: (Long) -> Unit,
     onNewNote: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit
+    onRequestNoteActions: (Note) -> Unit,
+    onStartNoteSelection: () -> Unit,
+    onExitNoteSelection: () -> Unit,
+    onSelectAllVisibleNotes: () -> Unit,
+    onDeselectAllNotes: () -> Unit,
+    onDeleteSelectedNotes: () -> Unit,
+    onToggleNoteSelection: (Note) -> Unit
 ): AgendaActions = AgendaActions(
     onPreviousMonth = viewModel::navigateToPreviousMonth,
     onNextMonth = viewModel::navigateToNextMonth,
@@ -60,6 +100,12 @@ private fun buildAgendaActions(
     onDuplicateNote = viewModel::duplicateNote,
     onRequestTrash = viewModel::requestTrash,
     onRequestNoteActions = onRequestNoteActions,
+    onStartNoteSelection = onStartNoteSelection,
+    onExitNoteSelection = onExitNoteSelection,
+    onSelectAllVisibleNotes = onSelectAllVisibleNotes,
+    onDeselectAllNotes = onDeselectAllNotes,
+    onDeleteSelectedNotes = onDeleteSelectedNotes,
+    onToggleNoteSelection = onToggleNoteSelection,
     onUndoTrash = viewModel::undoPendingTrash,
     onConfirmTrash = viewModel::confirmTrash
 )

@@ -9,10 +9,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -91,6 +101,7 @@ private fun RowScope.AgendaToolbarControls(
         contentDescription = "Search",
         onClick = { actions.onSearchToggle(true) }
     )
+    AgendaOverflowMenu(actions = actions)
 }
 
 @Composable
@@ -128,4 +139,36 @@ private fun AgendaViewModeButton(
         },
         onClick = onToggleView
     )
+}
+
+@Composable
+private fun AgendaOverflowMenu(actions: AgendaActions) {
+    var expanded by remember { mutableStateOf(false) }
+
+    androidx.compose.foundation.layout.Box {
+        NexIconButton(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = "More options",
+            onClick = { expanded = true },
+            selected = expanded
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Select notes") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.SelectAll,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    actions.onStartNoteSelection()
+                }
+            )
+        }
+    }
 }
