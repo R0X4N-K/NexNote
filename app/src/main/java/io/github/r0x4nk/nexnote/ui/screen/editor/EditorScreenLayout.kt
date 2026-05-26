@@ -178,14 +178,18 @@ private fun EditorScreenBody(
     // While the link-type or heading-level chooser is open, Material3's focusable
     // popup briefly hides the IME. We treat those flags as a soft "keyboard
     // intent" so the toolbar stays mounted and the dropdown can complete its
-    // interaction without flicker.
-    val keepOpenForToolbarMenu = content.state.showLinkTypeMenu || content.state.showHeadingMenu
-    val toolbarVisible = (content.isKeyboardVisible || keepOpenForToolbarMenu) &&
-        !content.uiState.showPreview &&
-        !content.uiState.isReadOnly &&
-        !content.state.noteSearch.isActive &&
-        !content.state.showNoteLinkPicker &&
-        !content.uiState.isLoading
+    // interaction without flicker. A non-collapsed content selection also keeps
+    // the formatting toolbar available when the keyboard is closed.
+    val toolbarVisible = shouldShowEditorKeyboardToolbar(
+        isKeyboardVisible = content.isKeyboardVisible,
+        keepOpenForToolbarMenu = content.state.showLinkTypeMenu || content.state.showHeadingMenu,
+        contentSelection = content.state.contentFieldValue.selection,
+        showPreview = content.uiState.showPreview,
+        isReadOnly = content.uiState.isReadOnly,
+        isNoteSearchActive = content.state.noteSearch.isActive,
+        showNoteLinkPicker = content.state.showNoteLinkPicker,
+        isLoading = content.uiState.isLoading
+    )
 
     Box(
         modifier = modifier
@@ -287,6 +291,27 @@ private fun EditorScreenBody(
                 .fillMaxWidth()
         )
     }
+}
+
+internal fun shouldShowEditorKeyboardToolbar(
+    isKeyboardVisible: Boolean,
+    keepOpenForToolbarMenu: Boolean,
+    contentSelection: TextRange,
+    showPreview: Boolean,
+    isReadOnly: Boolean,
+    isNoteSearchActive: Boolean,
+    showNoteLinkPicker: Boolean,
+    isLoading: Boolean
+): Boolean {
+    val hasSelectedContent = !contentSelection.collapsed
+    val toolbarRequested = isKeyboardVisible || keepOpenForToolbarMenu || hasSelectedContent
+
+    return toolbarRequested &&
+        !showPreview &&
+        !isReadOnly &&
+        !isNoteSearchActive &&
+        !showNoteLinkPicker &&
+        !isLoading
 }
 
 @Composable
