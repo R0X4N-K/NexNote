@@ -10,14 +10,33 @@ private val whitespaceRegex = Regex("\\s+")
 @Immutable
 data class TrashedNoteEvent(
     val noteId: Long,
-    val noteLabel: String
-)
+    val noteLabel: String,
+    val additionalNoteIds: List<Long> = emptyList()
+) {
+    val noteIds: List<Long>
+        get() = listOf(noteId) + additionalNoteIds
+}
 
 internal fun TrashedNoteEvent.snackbarMessage(): String =
-    "Moved \"$noteLabel\" to trash"
+    if (noteIds.size == 1) {
+        "Moved \"$noteLabel\" to trash"
+    } else {
+        "Moved ${noteIds.size} notes to trash"
+    }
 
 internal fun Note.toTrashedNoteEvent(): TrashedNoteEvent =
     TrashedNoteEvent(noteId = id, noteLabel = displayLabel())
+
+internal fun Collection<Note>.toTrashedNoteEvent(): TrashedNoteEvent? {
+    val notes = filter { it.id > 0L }
+    if (notes.isEmpty()) return null
+    val first = notes.first()
+    return TrashedNoteEvent(
+        noteId = first.id,
+        noteLabel = first.displayLabel(),
+        additionalNoteIds = notes.drop(1).map { it.id }
+    )
+}
 
 internal fun Note.displayLabel(maxLength: Int = NOTE_LABEL_MAX_LENGTH): String {
     val rawLabel = title.cleanOneLine().ifBlank {

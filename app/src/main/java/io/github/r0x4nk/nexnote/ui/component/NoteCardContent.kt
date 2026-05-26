@@ -1,7 +1,6 @@
 package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -20,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,12 +54,15 @@ internal fun NoteCardContent(
     onClick: () -> Unit,
     onPin: () -> Unit,
     onLongPress: () -> Unit,
+    onActions: (() -> Unit)?,
     showPinAction: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
     noteCardStyle: NoteCardStyle,
     titleHighlightRanges: List<IntRange>,
     contentHighlightRanges: List<IntRange>
 ) {
-    val visuals = rememberNoteCardVisuals(note)
+    val visuals = rememberNoteCardVisuals(note, selected)
     val textState = rememberNoteCardTextState(
         note = note,
         titleHighlightRanges = titleHighlightRanges,
@@ -72,7 +75,10 @@ internal fun NoteCardContent(
         onClick = onClick,
         onPin = onPin,
         onLongPress = onLongPress,
+        onActions = onActions,
         showPinAction = showPinAction,
+        selectionMode = selectionMode,
+        selected = selected,
         noteCardStyle = noteCardStyle,
         visuals = visuals,
         textState = textState
@@ -80,21 +86,35 @@ internal fun NoteCardContent(
 }
 
 @Composable
-private fun rememberNoteCardVisuals(note: Note): NoteCardVisuals {
+private fun rememberNoteCardVisuals(note: Note, selected: Boolean): NoteCardVisuals {
     val primaryColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
     val isDark = remember(surfaceColor) { surfaceColor.luminance() < 0.5f }
+    val baseContainerColor = note.backgroundColor?.let { adaptNoteColor(it, isDark) }
+        ?: if (note.isPinned) {
+            NoteCollectionCardDefaults.pinnedContainerColor()
+        } else {
+            NoteCollectionCardDefaults.containerColor()
+        }
 
     return NoteCardVisuals(
         primaryColor = primaryColor,
-        containerColor = note.backgroundColor?.let { adaptNoteColor(it, isDark) }
-            ?: if (note.isPinned) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-        cardElevation = if (note.isPinned) 2.dp else 0.dp,
-        accentAlpha = if (note.isPinned) 0.95f else 0.34f
+        containerColor = if (selected) {
+            lerp(baseContainerColor, selectedContainerColor, 0.46f)
+        } else {
+            baseContainerColor
+        },
+        cardElevation = if (selected || note.isPinned) {
+            NoteCollectionCardDefaults.pinnedElevation
+        } else {
+            NoteCollectionCardDefaults.defaultElevation
+        },
+        accentAlpha = when {
+            selected -> 1f
+            note.isPinned -> 0.95f
+            else -> 0.34f
+        }
     )
 }
 
@@ -168,12 +188,15 @@ private fun NoteCardSurface(
     onClick: () -> Unit,
     onPin: () -> Unit,
     onLongPress: () -> Unit,
+    onActions: (() -> Unit)?,
     showPinAction: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
 ) {
-    val shape = MaterialTheme.shapes.large
+    val shape = NoteCollectionCardDefaults.shape
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -185,15 +208,22 @@ private fun NoteCardSurface(
         elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
         colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
         shape = shape,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.36f)
-        )
+        border = if (selected) {
+            NoteCollectionCardDefaults.border(
+                color = visuals.primaryColor,
+                alpha = 1f
+            )
+        } else {
+            NoteCollectionCardDefaults.border(alpha = 0.30f)
+        }
     ) {
         NoteCardBody(
             note = note,
             onPin = onPin,
+            onActions = onActions,
             showPinAction = showPinAction,
+            selectionMode = selectionMode,
+            selected = selected,
             noteCardStyle = noteCardStyle,
             visuals = visuals,
             textState = textState
@@ -205,7 +235,10 @@ private fun NoteCardSurface(
 private fun NoteCardBody(
     note: Note,
     onPin: () -> Unit,
+    onActions: (() -> Unit)?,
     showPinAction: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
@@ -221,7 +254,10 @@ private fun NoteCardBody(
         NoteCardMainColumn(
             note = note,
             onPin = onPin,
+            onActions = onActions,
             showPinAction = showPinAction,
+            selectionMode = selectionMode,
+            selected = selected,
             noteCardStyle = noteCardStyle,
             visuals = visuals,
             textState = textState,
@@ -245,7 +281,10 @@ private fun NoteCardAccentStrip(primaryColor: Color, accentAlpha: Float) {
 private fun NoteCardMainColumn(
     note: Note,
     onPin: () -> Unit,
+    onActions: (() -> Unit)?,
     showPinAction: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState,
@@ -265,7 +304,10 @@ private fun NoteCardMainColumn(
             isPinned = note.isPinned,
             primaryColor = visuals.primaryColor,
             onPin = onPin,
-            showPinAction = showPinAction
+            onActions = onActions,
+            showPinAction = showPinAction,
+            selectionMode = selectionMode,
+            selected = selected
         )
         if (showsContentPreview(note, noteCardStyle)) {
             Spacer(Modifier.height(4.dp))

@@ -26,4 +26,14 @@ class NoteDisplayTextTest {
 
         assertEquals("Moved \"Release checklist\" to trash", event.snackbarMessage())
     }
+
+    @Test
+    fun `snackbarMessage summarizes multiple trashed notes without labels`() {
+        val event = listOf(
+            Note(id = 7L, title = "Private 1"),
+            Note(id = 8L, title = "Private 2")
+        ).toTrashedNoteEvent()
+
+        assertEquals("Moved 2 notes to trash", event?.snackbarMessage())
+    }
 }

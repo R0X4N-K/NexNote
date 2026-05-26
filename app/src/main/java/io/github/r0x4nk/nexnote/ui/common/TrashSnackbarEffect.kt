@@ -44,7 +44,7 @@ internal suspend fun handleTrashSnackbarEvent(
     onConfirmTrash: () -> Unit
 ) {
     when (showSnackbar(event)) {
-        SnackbarResult.ActionPerformed -> onUndoTrash(event.noteId)
+        SnackbarResult.ActionPerformed -> event.noteIds.forEach(onUndoTrash)
         SnackbarResult.Dismissed -> onConfirmTrash()
     }
 }

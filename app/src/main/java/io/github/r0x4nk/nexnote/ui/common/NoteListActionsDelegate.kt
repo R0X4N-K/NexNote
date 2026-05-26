@@ -33,9 +33,15 @@ internal class NoteListActionsDelegate(
 ) {
 
     fun requestTrash(note: Note) {
-        val event = note.toTrashedNoteEvent()
+        requestTrash(listOf(note))
+    }
+
+    fun requestTrash(notes: Collection<Note>) {
+        val event = notes.toTrashedNoteEvent() ?: return
         scope.launch {
-            moveNoteToTrash(note.id)
+            event.noteIds.forEach { noteId ->
+                moveNoteToTrash(noteId)
+            }
             trashEvents.trySend(event)
         }
     }

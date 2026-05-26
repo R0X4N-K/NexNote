@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileCopy
@@ -129,6 +130,7 @@ internal fun NoteActionsSheet(
     onDuplicate: (Note) -> Unit,
     onDelete: (Note) -> Unit,
     onMoveToVault: ((Note) -> Unit)? = null,
+    onSelect: ((Note) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     if (note == null) return
@@ -153,6 +155,11 @@ internal fun NoteActionsSheet(
             when (page) {
                 NoteActionsPage.Actions -> NoteActionsMainPage(
                     showMoveToVault = onMoveToVault != null && !note.isInVault,
+                    showSelect = onSelect != null,
+                    onSelect = {
+                        onSelect?.invoke(note)
+                        onDismiss()
+                    },
                     onCopy = { page = NoteActionsPage.Copy },
                     onMoveToVault = {
                         onMoveToVault?.invoke(note)
@@ -207,11 +214,20 @@ internal fun NoteActionsSheetHeader(
 @Composable
 private fun NoteActionsMainPage(
     showMoveToVault: Boolean,
+    showSelect: Boolean,
+    onSelect: () -> Unit,
     onCopy: () -> Unit,
     onMoveToVault: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit
 ) {
+    if (showSelect) {
+        NoteActionsSheetRow(
+            text = "Select",
+            icon = Icons.Outlined.CheckCircle,
+            onClick = onSelect
+        )
+    }
     NoteActionsSheetRow(
         text = "Copy",
         icon = Icons.Outlined.ContentCopy,

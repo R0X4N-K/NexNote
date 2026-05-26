@@ -23,16 +23,20 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
- * Draws the delete affordance revealed by a note card swipe.
+ * Draws the delete affordance revealed by a collection item swipe.
  *
- * Material 3's swipe samples use a full-size background whose color follows
- * swipe progress. The ramp is ordered by luminance so the first touch is always
- * the lighter red and a wider swipe always moves toward the darker red, in both
- * light and dark themes.
+ * The tint stays on Material 3's error-container role instead of the saturated
+ * error role, so a destructive gesture is clear without overpowering list rows.
  */
 @Composable
-internal fun NoteCardSwipeBackground(state: SwipeToDismissBoxState) {
-    val visualState = swipeDeleteVisualState(state)
+internal fun SwipeDeleteBackground(
+    state: SwipeToDismissBoxState,
+    contentDescription: String
+) {
+    val visualState = swipeDeleteVisualState(
+        state = state,
+        contentDescription = contentDescription
+    )
 
     Box(
         modifier = Modifier
@@ -48,7 +52,10 @@ internal fun NoteCardSwipeBackground(state: SwipeToDismissBoxState) {
 }
 
 @Composable
-private fun swipeDeleteVisualState(state: SwipeToDismissBoxState): SwipeDeleteVisualState {
+private fun swipeDeleteVisualState(
+    state: SwipeToDismissBoxState,
+    contentDescription: String
+): SwipeDeleteVisualState {
     val density = LocalDensity.current
     val swipeOffset = runCatching { state.requireOffset() }.getOrDefault(0f)
     val progress = with(density) {
@@ -59,7 +66,8 @@ private fun swipeDeleteVisualState(state: SwipeToDismissBoxState): SwipeDeleteVi
         progress = progress,
         thresholdReached = state.targetValue == SwipeToDismissBoxValue.EndToStart ||
             state.currentValue == SwipeToDismissBoxValue.EndToStart,
-        anchor = resolveSwipeDeleteAnchor(swipeOffset, state)
+        anchor = resolveSwipeDeleteAnchor(swipeOffset, state),
+        contentDescription = contentDescription
     )
 }
 
@@ -78,7 +86,7 @@ private fun resolveSwipeDeleteAnchor(
 private fun SwipeDeleteIcon(visualState: SwipeDeleteVisualState) {
     Icon(
         imageVector = Icons.Default.Delete,
-        contentDescription = "Move to trash",
+        contentDescription = visualState.contentDescription,
         tint = visualState.iconColor(),
         modifier = Modifier
             .size(SwipeDeleteTokens.IconSize)
@@ -94,7 +102,8 @@ private fun SwipeDeleteIcon(visualState: SwipeDeleteVisualState) {
 private data class SwipeDeleteVisualState(
     val progress: Float,
     val thresholdReached: Boolean,
-    val anchor: SwipeDeleteAnchor
+    val anchor: SwipeDeleteAnchor,
+    val contentDescription: String
 ) {
     val isVisible: Boolean
         get() = progress > SwipeDeleteTokens.MinVisibleProgress || thresholdReached
@@ -117,13 +126,15 @@ private data class SwipeDeleteVisualState(
     @Composable
     fun backgroundColor(): Color {
         if (!isVisible) return Color.Transparent
-        val lowEmphasisColor = lighterOf(
-            first = MaterialTheme.colorScheme.errorContainer,
-            second = MaterialTheme.colorScheme.error
+        val lowEmphasisColor = lerp(
+            start = MaterialTheme.colorScheme.surfaceContainerHighest,
+            stop = MaterialTheme.colorScheme.errorContainer,
+            fraction = 0.34f
         )
-        val highEmphasisColor = darkerOf(
-            first = MaterialTheme.colorScheme.errorContainer,
-            second = MaterialTheme.colorScheme.error
+        val highEmphasisColor = lerp(
+            start = MaterialTheme.colorScheme.surfaceContainerHigh,
+            stop = MaterialTheme.colorScheme.errorContainer,
+            fraction = 0.68f
         )
 
         return lerp(
@@ -136,17 +147,11 @@ private data class SwipeDeleteVisualState(
     @Composable
     fun iconColor(): Color =
         if (backgroundColor().luminance() > SwipeDeleteTokens.LightBackgroundThreshold) {
-            Color.Black
+            MaterialTheme.colorScheme.error
         } else {
-            Color.White
+            MaterialTheme.colorScheme.onErrorContainer
         }
 }
-
-private fun lighterOf(first: Color, second: Color): Color =
-    if (first.luminance() >= second.luminance()) first else second
-
-private fun darkerOf(first: Color, second: Color): Color =
-    if (first.luminance() < second.luminance()) first else second
 
 private enum class SwipeDeleteAnchor(
     val iconAlignment: Alignment

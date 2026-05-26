@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Icon
@@ -37,7 +38,10 @@ internal fun NoteCardTitleRow(
     isPinned: Boolean,
     primaryColor: Color,
     onPin: () -> Unit,
-    showPinAction: Boolean = true
+    onActions: (() -> Unit)? = null,
+    showPinAction: Boolean = true,
+    selectionMode: Boolean = false,
+    selected: Boolean = false
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -47,8 +51,13 @@ internal fun NoteCardTitleRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        if (showPinAction) {
+        if (selectionMode) {
+            SelectionIndicator(selected = selected)
+        } else if (showPinAction) {
             NoteCardPinButton(isPinned, primaryColor, onPin)
+        }
+        if (!selectionMode && onActions != null) {
+            NoteCardActionsButton(onActions)
         }
     }
 }
@@ -144,6 +153,25 @@ private fun NoteCardPinButton(
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
             },
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun NoteCardActionsButton(onActions: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .padding(start = 2.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onActions)
+            .padding(6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = "Note actions",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.70f),
             modifier = Modifier.size(16.dp)
         )
     }

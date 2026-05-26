@@ -25,6 +25,26 @@ class TrashSnackbarEffectTest {
     }
 
     @Test
+    fun `action performed dispatches undo for every trashed note id`() = runTest {
+        val undoIds = mutableListOf<Long>()
+        var confirmCount = 0
+
+        handleTrashSnackbarEvent(
+            event = TrashedNoteEvent(
+                noteId = 42L,
+                noteLabel = "Recover me",
+                additionalNoteIds = listOf(43L, 44L)
+            ),
+            showSnackbar = { SnackbarResult.ActionPerformed },
+            onUndoTrash = { undoIds += it },
+            onConfirmTrash = { confirmCount++ }
+        )
+
+        assertEquals(listOf(42L, 43L, 44L), undoIds)
+        assertEquals(0, confirmCount)
+    }
+
+    @Test
     fun `dismissed snackbar confirms the trashed note without note id`() = runTest {
         val undoIds = mutableListOf<Long>()
         var confirmCount = 0

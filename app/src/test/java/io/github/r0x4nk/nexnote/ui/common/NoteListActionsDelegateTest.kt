@@ -73,6 +73,23 @@ class NoteListActionsDelegateTest {
     }
 
     @Test
+    fun `bulk trash writes all notes and emits one undoable event`() = runTest {
+        val fixture = newFixture(this)
+        val notes = listOf(
+            Note(id = 7L, title = "First"),
+            Note(id = 8L, title = "Second")
+        )
+
+        fixture.delegate.requestTrash(notes)
+        advanceUntilIdle()
+
+        val trashEvent = fixture.trashEvents.receive()
+        assertEquals(listOf(7L, 8L), fixture.repository.trashedIds)
+        assertEquals(listOf(7L, 8L), trashEvent.noteIds)
+        assertEquals("Moved 2 notes to trash", trashEvent.snackbarMessage())
+    }
+
+    @Test
     fun `togglePin flips note pinned state through use case`() = runTest {
         val fixture = newFixture(this)
 

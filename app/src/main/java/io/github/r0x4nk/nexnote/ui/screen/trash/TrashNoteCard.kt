@@ -1,6 +1,5 @@
 package io.github.r0x4nk.nexnote.ui.screen.trash
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
+import io.github.r0x4nk.nexnote.ui.component.NoteCollectionCardDefaults
 import io.github.r0x4nk.nexnote.ui.component.buildNoteCardDisplayText
 import io.github.r0x4nk.nexnote.util.DateUtils
 import io.github.r0x4nk.nexnote.util.MarkdownColors
@@ -42,15 +42,14 @@ internal fun TrashNoteCard(
 ) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors    = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = NoteCollectionCardDefaults.defaultElevation
         ),
-        shape = MaterialTheme.shapes.large,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f)
-        )
+        colors    = CardDefaults.cardColors(
+            containerColor = NoteCollectionCardDefaults.containerColor()
+        ),
+        shape = NoteCollectionCardDefaults.shape,
+        border = NoteCollectionCardDefaults.border()
     ) {
         TrashNoteCardContent(note, onRestore, onDeletePermanently)
     }
