@@ -395,16 +395,33 @@ class VaultNotesViewModel(
     }
 
     fun moveToTrash(note: Note) {
-        if (!note.isInVault || !uiState.value.isUnlocked) return
+        moveToTrash(listOf(note))
+    }
+
+    fun moveToTrash(notes: Collection<Note>) {
+        val state = uiState.value
+        if (!state.isUnlocked || state.isTrashVisible) return
+
+        val movableNotes = notes.filter { note ->
+            note.isInVault && !note.isDeleted
+        }
+        if (movableNotes.isEmpty()) return
 
         viewModelScope.launch {
             try {
-                val moved = moveVaultNoteToTrash(note.id)
-                if (moved) {
-                    // Match the Home behaviour: surface an undo snackbar instead of a
-                    // plain success message. Only the note id flows out — no Vault
-                    // title or preview is emitted through the event channel.
-                    _vaultTrashEvents.trySend(VaultTrashSnackbarEvent.MovedToTrash(note.id))
+                val movedIds = mutableListOf<Long>()
+                movableNotes.forEach { note ->
+                    if (moveVaultNoteToTrash(note.id)) {
+                        movedIds += note.id
+                    }
+                }
+                if (movedIds.isNotEmpty()) {
+                    _vaultTrashEvents.trySend(
+                        VaultTrashSnackbarEvent.MovedToTrash(
+                            noteId = movedIds.first(),
+                            additionalNoteIds = movedIds.drop(1)
+                        )
+                    )
                 } else {
                     _vaultActionMessages.trySend("Could not move note to trash")
                 }
@@ -445,8 +462,12 @@ class VaultNotesViewModel(
 
     internal fun undoTrashSnackbarEvent(event: VaultTrashSnackbarEvent) {
         when (event) {
-            is VaultTrashSnackbarEvent.MovedToTrash -> undoMoveToTrash(event.noteId)
-            is VaultTrashSnackbarEvent.RestoredFromTrash -> undoRestoreFromTrash(event.noteId)
+            is VaultTrashSnackbarEvent.MovedToTrash -> {
+                event.noteIds.forEach(::undoMoveToTrash)
+            }
+            is VaultTrashSnackbarEvent.RestoredFromTrash -> {
+                event.noteIds.forEach(::undoRestoreFromTrash)
+            }
         }
     }
 

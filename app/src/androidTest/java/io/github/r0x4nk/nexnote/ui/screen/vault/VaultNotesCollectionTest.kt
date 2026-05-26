@@ -36,6 +36,7 @@ class VaultNotesCollectionTest {
     fun activeVaultList_usesNormalNoteCardWithPinAffordance() {
         var clickedNoteId: Long? = null
         var actionRequestedNoteId: Long? = null
+        var selectedNoteId: Long? = null
         var pinnedNoteId: Long? = null
         composeRule.setVaultNotesCollection(
             notes = listOf(
@@ -50,6 +51,7 @@ class VaultNotesCollectionTest {
             isTrashVisible = false,
             onNoteClick = { clickedNoteId = it },
             onRequestNoteActions = { actionRequestedNoteId = it.id },
+            onToggleNoteSelection = { selectedNoteId = it.id },
             onTogglePin = { pinnedNoteId = it.id }
         )
 
@@ -65,7 +67,29 @@ class VaultNotesCollectionTest {
 
         composeRule.onNodeWithText("Active Vault note")
             .performTouchInput { longClick() }
+        assertEquals(11L, selectedNoteId)
+
+        composeRule.onNodeWithContentDescription("Note actions").performClick()
         assertEquals(11L, actionRequestedNoteId)
+    }
+
+    @Test
+    fun activeVaultList_showsProtectedModeIndicator() {
+        composeRule.setVaultNotesCollection(
+            notes = listOf(
+                Note(
+                    id = 20L,
+                    title = "Protected Vault note",
+                    content = "Protected body preview",
+                    isInVault = true,
+                    isDeleted = false
+                )
+            ),
+            isTrashVisible = false
+        )
+
+        composeRule.onNodeWithText("Protected mode").assertIsDisplayed()
+        composeRule.onNodeWithText("Vault session active").assertIsDisplayed()
     }
 
     @Test
@@ -435,6 +459,7 @@ class VaultNotesCollectionTest {
         selectedTagFilters: Set<String> = emptySet(),
         onNoteClick: (Long) -> Unit = {},
         onRequestNoteActions: (Note) -> Unit = {},
+        onToggleNoteSelection: (Note) -> Unit = {},
         onMoveToTrash: (Note) -> Unit = {},
         onTogglePin: (Note) -> Unit = {},
         onToggleTagFilter: (String) -> Unit = {},
@@ -456,6 +481,7 @@ class VaultNotesCollectionTest {
                         selectedTagFilters = selectedTagFilters,
                         onNoteClick = onNoteClick,
                         onRequestNoteActions = onRequestNoteActions,
+                        onToggleNoteSelection = onToggleNoteSelection,
                         onMoveToTrash = onMoveToTrash,
                         onTogglePin = onTogglePin,
                         onToggleTagFilter = onToggleTagFilter,

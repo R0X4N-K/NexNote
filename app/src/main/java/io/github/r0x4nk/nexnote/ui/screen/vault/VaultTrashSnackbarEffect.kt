@@ -15,18 +15,37 @@ internal const val VAULT_TRASH_SNACKBAR_UNDO_LABEL = "Undo"
 
 internal sealed interface VaultTrashSnackbarEvent {
     val noteId: Long
+    val noteIds: List<Long>
     val message: String
 
     data class MovedToTrash(
-        override val noteId: Long
+        override val noteId: Long,
+        val additionalNoteIds: List<Long> = emptyList()
     ) : VaultTrashSnackbarEvent {
-        override val message: String = VAULT_TRASH_SNACKBAR_MESSAGE
+        override val noteIds: List<Long>
+            get() = listOf(noteId) + additionalNoteIds
+
+        override val message: String
+            get() = if (noteIds.size == 1) {
+                VAULT_TRASH_SNACKBAR_MESSAGE
+            } else {
+                "Moved ${noteIds.size} notes to Vault trash"
+            }
     }
 
     data class RestoredFromTrash(
-        override val noteId: Long
+        override val noteId: Long,
+        val additionalNoteIds: List<Long> = emptyList()
     ) : VaultTrashSnackbarEvent {
-        override val message: String = VAULT_RESTORE_SNACKBAR_MESSAGE
+        override val noteIds: List<Long>
+            get() = listOf(noteId) + additionalNoteIds
+
+        override val message: String
+            get() = if (noteIds.size == 1) {
+                VAULT_RESTORE_SNACKBAR_MESSAGE
+            } else {
+                "Restored ${noteIds.size} notes to Vault"
+            }
     }
 }
 

@@ -251,9 +251,7 @@ class VaultScreenTemplatePickerTest {
             .performTouchInput { longClick() }
         composeRule.onNodeWithText("Vault note actions").assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription("Lock Vault")
-            .assertIsDisplayed()
-            .performClick()
+        composeRule.lockVaultFromOverflowMenu()
         composeRule.waitUntil(timeoutMillis = 3_000) {
             harness.accessViewModel.uiState.value.vaultState == VaultState.LOCKED &&
                 !harness.notesViewModel.uiState.value.isUnlocked
@@ -368,9 +366,7 @@ class VaultScreenTemplatePickerTest {
         composeRule.waitUntilTextVisible(VAULT_TRASH_SNACKBAR_MESSAGE)
         assertEquals(listOf(13L), harness.vaultNoteRepository.trashedIds)
 
-        composeRule.onNodeWithContentDescription("Lock Vault")
-            .assertIsDisplayed()
-            .performClick()
+        composeRule.lockVaultFromOverflowMenu()
         composeRule.waitUntilLocked(harness)
 
         composeRule.onNodeWithText("Unlock Vault").assertIsDisplayed()
@@ -407,6 +403,15 @@ class VaultScreenTemplatePickerTest {
 
     private fun ComposeContentTestRule.openVaultCreationMenu() {
         onNodeWithContentDescription("Open Vault creation menu")
+            .assertIsDisplayed()
+            .performClick()
+    }
+
+    private fun ComposeContentTestRule.lockVaultFromOverflowMenu() {
+        onNodeWithContentDescription("Vault options")
+            .assertIsDisplayed()
+            .performClick()
+        onNodeWithText("Lock Vault")
             .assertIsDisplayed()
             .performClick()
     }
