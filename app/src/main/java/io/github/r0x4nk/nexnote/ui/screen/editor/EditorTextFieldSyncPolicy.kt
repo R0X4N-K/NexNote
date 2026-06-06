@@ -5,6 +5,36 @@ import androidx.compose.ui.text.input.TextFieldValue
 internal object EditorTextFieldSyncPolicy {
 
     /**
+     * Model-to-field sync is reserved for real content replacements: initial
+     * load, undo/redo, vault locking, or other paths that explicitly advance
+     * [EditorUiState.contentVersion].
+     *
+     * Persistence-only updates, such as assigning the database id after the
+     * first autosave of a new note, must not hydrate the editor again. Replaying
+     * the model at that point can overwrite still-pending keystrokes and move
+     * the cursor back to the beginning.
+     */
+    fun shouldApplyModelContentSync(
+        contentVersion: Int,
+        syncedContentVersion: Int
+    ): Boolean {
+        return contentVersion != syncedContentVersion
+    }
+
+    fun modelContentSyncCursor(
+        contentVersion: Int,
+        selectionOffset: Int?,
+        contentLength: Int
+    ): Int {
+        val cursor = if (contentVersion <= 1) {
+            0
+        } else {
+            selectionOffset ?: contentLength
+        }
+        return cursor.coerceIn(0, contentLength)
+    }
+
+    /**
      * Keeps recomposition from replaying stale text into the state-based editor.
      *
      * Loaded content and editor actions already update both the remembered

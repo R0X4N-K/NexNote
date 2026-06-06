@@ -36,8 +36,8 @@ internal fun EditorContentAnimationsReadyEffect(
  * new [EditorUiState.contentVersion] (e.g. on initial load, undo/redo, or
  * external content replacement).
  *
- * Re-keying on `noteId`, `templateId`, `isTemplateMode`, and `contentVersion`
- * keeps the editor immune to spurious recompositions: as long as the model has
+ * Re-keying on [EditorScreenState] and [EditorUiState.contentVersion] keeps
+ * the editor immune to persistence-only state changes: as long as the model has
  * not advanced its content version, the field state is left alone and typing
  * cannot be clobbered by a stale model snapshot.
  */
@@ -46,21 +46,25 @@ internal fun EditorContentSyncEffect(
     uiState: EditorUiState,
     state: EditorScreenState
 ) {
-    LaunchedEffect(
-        uiState.noteId,
-        uiState.templateId,
-        uiState.isTemplateMode,
-        uiState.contentVersion
-    ) {
+    LaunchedEffect(state, uiState.contentVersion) {
+        if (
+            !EditorTextFieldSyncPolicy.shouldApplyModelContentSync(
+                contentVersion = uiState.contentVersion,
+                syncedContentVersion = state.syncedContentVersion
+            )
+        ) {
+            return@LaunchedEffect
+        }
+
         if (uiState.shouldDeferInitialEditContentSync(state.syncedContentVersion)) {
             delay(DIRECT_EDIT_TEXT_FIELD_SYNC_DELAY_MS)
         }
 
-        val cursorPos = if (uiState.contentVersion <= 1) {
-            0
-        } else {
-            uiState.contentSelectionOffset ?: uiState.content.length
-        }.coerceIn(0, uiState.content.length)
+        val cursorPos = EditorTextFieldSyncPolicy.modelContentSyncCursor(
+            contentVersion = uiState.contentVersion,
+            selectionOffset = uiState.contentSelectionOffset,
+            contentLength = uiState.content.length
+        )
         val syncedValue = TextFieldValue(
             text = uiState.content,
             selection = TextRange(cursorPos)

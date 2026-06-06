@@ -2,11 +2,56 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EditorTextFieldSyncPolicyTest {
+
+    @Test
+    fun `shouldApplyModelContentSync applies initial unsynced model version`() {
+        assertTrue(
+            EditorTextFieldSyncPolicy.shouldApplyModelContentSync(
+                contentVersion = 0,
+                syncedContentVersion = -1
+            )
+        )
+    }
+
+    @Test
+    fun `shouldApplyModelContentSync skips persistence only updates`() {
+        assertFalse(
+            EditorTextFieldSyncPolicy.shouldApplyModelContentSync(
+                contentVersion = 0,
+                syncedContentVersion = 0
+            )
+        )
+    }
+
+    @Test
+    fun `modelContentSyncCursor starts initial content at beginning`() {
+        assertEquals(
+            0,
+            EditorTextFieldSyncPolicy.modelContentSyncCursor(
+                contentVersion = 1,
+                selectionOffset = 9,
+                contentLength = 12
+            )
+        )
+    }
+
+    @Test
+    fun `modelContentSyncCursor restores explicit selection after content replacement`() {
+        assertEquals(
+            7,
+            EditorTextFieldSyncPolicy.modelContentSyncCursor(
+                contentVersion = 2,
+                selectionOffset = 7,
+                contentLength = 12
+            )
+        )
+    }
 
     @Test
     fun `canApplyRecomposedValue skips stale empty text over loaded state`() {
