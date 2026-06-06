@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +41,9 @@ internal fun HomeContent(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    vaultPullEnabled: Boolean,
     onNoteClick: (Long) -> Unit,
+    onOpenVault: () -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
     onClearTagFilters: () -> Unit,
@@ -59,7 +63,9 @@ internal fun HomeContent(
             listState = listState,
             gridState = gridState,
             selectionState = selectionState,
+            vaultPullEnabled = vaultPullEnabled,
             onNoteClick = onNoteClick,
+            onOpenVault = onOpenVault,
             onToggleTagFilter = onToggleTagFilter,
             onRemoveTagFilter = onRemoveTagFilter,
             onClearTagFilters = onClearTagFilters,
@@ -90,7 +96,9 @@ private fun HomeLoadedContent(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    vaultPullEnabled: Boolean,
     onNoteClick: (Long) -> Unit,
+    onOpenVault: () -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
     onClearTagFilters: () -> Unit,
@@ -101,7 +109,17 @@ private fun HomeLoadedContent(
     floatingBottomPadding: Dp,
     modifier: Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    val vaultPullState = rememberHomeVaultPullGestureState(
+        enabled = vaultPullEnabled,
+        onOpenVault = onOpenVault
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .homeVaultPullAccess(vaultPullState)
+    ) {
+        HomeVaultPullAccessIndicator(vaultPullState)
         HomeFilterBars(uiState, onToggleTagFilter, onRemoveTagFilter, onClearTagFilters)
         HomeNotesBody(
             uiState = uiState,
@@ -172,7 +190,9 @@ private fun HomeNotesBody(
         EmptyState(
             isSearchActive = uiState.isSearchActive,
             hasTagFilter = uiState.selectedTagFilters.isNotEmpty(),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         )
     } else {
         HomeNoteCollection(
