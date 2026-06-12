@@ -37,6 +37,7 @@ import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
@@ -65,6 +66,7 @@ fun HomeScreen(
     val listState = rememberLazyListState()
     val gridState = rememberLazyStaggeredGridState()
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
+    val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
@@ -120,6 +122,21 @@ fun HomeScreen(
                     },
                     onDeselectAll = {
                         selectionState = selectionState.deselectAll()
+                    },
+                    onShareSelected = {
+                        shareCallbacks.onShareNotes(selectedNotes)
+                        selectionState = selectionState.exit()
+                        activeActionsNote = null
+                    },
+                    onCopySelectedAsText = {
+                        clipboardCallbacks.onCopyPlainTextNotes(selectedNotes)
+                        selectionState = selectionState.exit()
+                        activeActionsNote = null
+                    },
+                    onCopySelectedAsMarkdown = {
+                        clipboardCallbacks.onCopyMarkdownNotes(selectedNotes)
+                        selectionState = selectionState.exit()
+                        activeActionsNote = null
                     },
                     onDeleteSelected = {
                         viewModel.requestTrash(selectedNotes)
@@ -177,6 +194,7 @@ fun HomeScreen(
     NoteActionsSheet(
         note = activeActionsNote,
         clipboardCallbacks = clipboardCallbacks,
+        shareCallbacks = shareCallbacks,
         onDuplicate = viewModel::duplicateNote,
         onDelete = viewModel::requestTrash,
         onMoveToVault = { note -> onMoveNoteToVault(note.id) },

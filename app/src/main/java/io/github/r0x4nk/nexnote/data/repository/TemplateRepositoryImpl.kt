@@ -41,6 +41,7 @@ class TemplateRepositoryImpl(
 
     /** Deletes a template selected from the templates screen. */
     override suspend fun deleteTemplate(template: Template) {
+        require(!template.isPredefined) { "Predefined templates cannot be deleted." }
         dao.deleteTemplate(template.toEntity())
     }
 

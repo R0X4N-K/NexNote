@@ -23,6 +23,9 @@ import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.MasonryGrid
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolder
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderExpansionState
+import io.github.r0x4nk.nexnote.ui.component.noteTagFolderItems
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -33,38 +36,45 @@ internal fun LazyListScope.agendaNotesItems(
     noteCardStyle: NoteCardStyle,
     selectionState: SelectionUiState,
     isSearchEmpty: Boolean,
+    tagFolders: List<NoteTagFolder>,
+    tagFolderExpansionState: NoteTagFolderExpansionState,
     actions: AgendaActions
 ) {
     if (notes.isEmpty()) {
         item { AgendaEmptyState(isSearchActive = isSearchEmpty) }
-    } else if (viewMode == NoteListViewMode.GRID) {
-        item { AgendaNotesGrid(notes, noteCardStyle, selectionState, actions) }
     } else {
-        items(notes, key = { it.id }) { note ->
-            NoteCard(
-                note = note,
-                onClick = {
-                    if (selectionState.isActive) {
-                        actions.onToggleNoteSelection(note)
-                    } else {
-                        actions.onNoteClick(note.id)
-                    }
-                },
-                noteCardStyle = noteCardStyle,
-                onPin = { actions.onTogglePin(note) },
-                onLongPress = { actions.onToggleNoteSelection(note) },
-                onActions = if (selectionState.isActive) {
-                    null
-                } else {
-                    { actions.onRequestNoteActions(note) }
-                },
-                selectionMode = selectionState.isActive,
-                selected = selectionState.isSelected(note.id),
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .animateItem(),
-                onTrash = { actions.onRequestTrash(note) }
-            )
+        when (viewMode) {
+            NoteListViewMode.GRID -> {
+                item { AgendaNotesGrid(notes, noteCardStyle, selectionState, actions) }
+            }
+            NoteListViewMode.TAGS -> {
+                noteTagFolderItems(
+                    folders = tagFolders,
+                    expansionState = tagFolderExpansionState,
+                    horizontalPadding = 16.dp
+                ) { scored, modifier ->
+                    AgendaNoteCard(
+                        note = scored.note,
+                        noteCardStyle = noteCardStyle,
+                        selectionState = selectionState,
+                        actions = actions,
+                        modifier = modifier
+                    )
+                }
+            }
+            NoteListViewMode.LIST -> {
+                items(notes, key = { it.id }) { note ->
+                    AgendaNoteCard(
+                        note = note,
+                        noteCardStyle = noteCardStyle,
+                        selectionState = selectionState,
+                        actions = actions,
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .animateItem()
+                    )
+                }
+            }
         }
     }
 }
@@ -134,6 +144,38 @@ private fun AgendaGridNoteCard(
         },
         selectionMode = selectionState.isActive,
         selected = selectionState.isSelected(note.id),
+        onTrash = { actions.onRequestTrash(note) }
+    )
+}
+
+@Composable
+private fun AgendaNoteCard(
+    note: Note,
+    noteCardStyle: NoteCardStyle,
+    selectionState: SelectionUiState,
+    actions: AgendaActions,
+    modifier: Modifier = Modifier
+) {
+    NoteCard(
+        note = note,
+        onClick = {
+            if (selectionState.isActive) {
+                actions.onToggleNoteSelection(note)
+            } else {
+                actions.onNoteClick(note.id)
+            }
+        },
+        noteCardStyle = noteCardStyle,
+        onPin = { actions.onTogglePin(note) },
+        onLongPress = { actions.onToggleNoteSelection(note) },
+        onActions = if (selectionState.isActive) {
+            null
+        } else {
+            { actions.onRequestNoteActions(note) }
+        },
+        selectionMode = selectionState.isActive,
+        selected = selectionState.isSelected(note.id),
+        modifier = modifier,
         onTrash = { actions.onRequestTrash(note) }
     )
 }

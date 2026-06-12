@@ -17,14 +17,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
+import io.github.r0x4nk.nexnote.ui.component.buildNoteTagFolders
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteTagFolderExpansionState
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
@@ -62,6 +66,9 @@ internal fun AgendaScreenLayout(
                     onClose = actions.onExitNoteSelection,
                     onSelectAll = actions.onSelectAllVisibleNotes,
                     onDeselectAll = actions.onDeselectAllNotes,
+                    onShareSelected = actions.onShareSelectedNotes,
+                    onCopySelectedAsText = actions.onCopySelectedNotesAsText,
+                    onCopySelectedAsMarkdown = actions.onCopySelectedNotesAsMarkdown,
                     onDeleteSelected = actions.onDeleteSelectedNotes
                 )
             } else {
@@ -144,6 +151,14 @@ private fun AgendaBody(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgendaLazyColumn(params: AgendaBodyParams) {
+    val tagDisplayItems = remember(params.uiState.notesForSelectedDate) {
+        params.uiState.notesForSelectedDate.map { note ->
+            ScoredNote(note, score = 0, titleRanges = emptyList(), contentRanges = emptyList())
+        }
+    }
+    val tagFolders = remember(tagDisplayItems) { buildNoteTagFolders(tagDisplayItems) }
+    val tagFolderExpansionState = rememberNoteTagFolderExpansionState(tagFolders)
+
     LazyColumn(
         state = params.listState,
         modifier = Modifier.fillMaxSize(),
@@ -158,6 +173,8 @@ private fun AgendaLazyColumn(params: AgendaBodyParams) {
             noteCardStyle = params.noteCardStyle,
             selectionState = params.selectionState,
             isSearchEmpty = params.uiState.isSearchActive && params.uiState.searchQuery.isNotBlank(),
+            tagFolders = tagFolders,
+            tagFolderExpansionState = tagFolderExpansionState,
             actions = params.actions
         )
         // Reserve enough room at the end of the list so the FAB never covers

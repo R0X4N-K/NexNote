@@ -6,23 +6,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -31,6 +22,7 @@ import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
+import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
 
 @Composable
 internal fun AgendaControlsRow(
@@ -93,82 +85,43 @@ private fun RowScope.AgendaToolbarControls(
     viewMode: NoteListViewMode,
     actions: AgendaActions
 ) {
-    AgendaSortButton(sortOrder = sortOrder, onToggleSort = actions.onToggleSort)
-    AgendaViewModeButton(viewMode = viewMode, onToggleView = actions.onToggleView)
     Spacer(Modifier.weight(1f))
     NexIconButton(
         imageVector = Icons.Default.Search,
         contentDescription = "Search",
         onClick = { actions.onSearchToggle(true) }
     )
-    AgendaOverflowMenu(actions = actions)
+    AgendaOverflowMenu(
+        sortOrder = sortOrder,
+        viewMode = viewMode,
+        actions = actions
+    )
 }
 
 @Composable
-private fun AgendaSortButton(
+private fun AgendaOverflowMenu(
     sortOrder: SortOrder,
-    onToggleSort: () -> Unit
-) {
-    NexIconButton(
-        imageVector = Icons.Default.SwapVert,
-        contentDescription = if (sortOrder == SortOrder.MODIFIED_DESC) {
-            "Sort: newest first"
-        } else {
-            "Sort: oldest first"
-        },
-        onClick = onToggleSort,
-        selected = sortOrder == SortOrder.MODIFIED_ASC
-    )
-}
-
-@Composable
-private fun AgendaViewModeButton(
     viewMode: NoteListViewMode,
-    onToggleView: () -> Unit
+    actions: AgendaActions
 ) {
-    NexIconButton(
-        imageVector = if (viewMode == NoteListViewMode.LIST) {
-            Icons.Default.GridView
-        } else {
-            Icons.AutoMirrored.Filled.ViewList
-        },
-        contentDescription = if (viewMode == NoteListViewMode.LIST) {
-            "Grid view"
-        } else {
-            "List view"
-        },
-        onClick = onToggleView
-    )
-}
-
-@Composable
-private fun AgendaOverflowMenu(actions: AgendaActions) {
-    var expanded by remember { mutableStateOf(false) }
-
-    androidx.compose.foundation.layout.Box {
-        NexIconButton(
-            imageVector = Icons.Default.MoreVert,
-            contentDescription = "More options",
-            onClick = { expanded = true },
-            selected = expanded
+    NoteListOverflowMenu(
+        sortOrder = sortOrder,
+        viewMode = viewMode,
+        onToggleSortOrder = actions.onToggleSort,
+        onToggleViewMode = actions.onToggleView
+    ) { dismiss ->
+        DropdownMenuItem(
+            text = { Text("Select notes") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.SelectAll,
+                    contentDescription = null
+                )
+            },
+            onClick = {
+                dismiss()
+                actions.onStartNoteSelection()
+            }
         )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Select notes") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.SelectAll,
-                        contentDescription = null
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    actions.onStartNoteSelection()
-                }
-            )
-        }
     }
 }

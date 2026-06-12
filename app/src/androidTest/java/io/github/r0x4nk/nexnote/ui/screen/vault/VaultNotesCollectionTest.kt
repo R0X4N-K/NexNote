@@ -290,6 +290,41 @@ class VaultNotesCollectionTest {
     }
 
     @Test
+    fun activeVaultTagFolders_groupsTaggedAndUntaggedNotes() {
+        composeRule.setVaultNotesCollection(
+            notes = listOf(
+                Note(
+                    id = 21L,
+                    title = "Tagged folder note",
+                    content = "Body with #alpha",
+                    isInVault = true,
+                    isDeleted = false
+                ),
+                Note(
+                    id = 22L,
+                    title = "Plain folder note",
+                    content = "Body without tags",
+                    isInVault = true,
+                    isDeleted = false
+                )
+            ),
+            viewMode = NoteListViewMode.TAGS,
+            isTrashVisible = false
+        )
+
+        composeRule.onNodeWithText("#alpha").assertIsDisplayed()
+        composeRule.onNodeWithText("Untagged").assertIsDisplayed()
+        composeRule.onNodeWithText("Tagged folder note").assertIsDisplayed()
+        composeRule.onNodeWithText("Plain folder note").assertIsDisplayed()
+
+        composeRule.onNodeWithText("#alpha").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onAllNodesWithText("Tagged folder note").assertCountEquals(0)
+        composeRule.onNodeWithText("Plain folder note").assertIsDisplayed()
+    }
+
+    @Test
     fun vaultTrashList_showsDeletedVaultNoteWithRestoreAndDeleteActions() {
         var restoredNoteId: Long? = null
         var deleteRequestedNoteId: Long? = null

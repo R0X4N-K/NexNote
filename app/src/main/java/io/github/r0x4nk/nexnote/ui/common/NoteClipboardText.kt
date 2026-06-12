@@ -11,6 +11,12 @@ internal fun Note.copyAsPlainText(): String {
 internal fun Note.copyAsMarkdown(): String =
     joinTitleAndBody(content)
 
+internal fun Collection<Note>.copyAsPlainText(): String =
+    joinToString(separator = "\n\n") { note -> note.copyAsPlainText() }
+
+internal fun Collection<Note>.copyAsMarkdown(): String =
+    joinToString(separator = "\n\n") { note -> note.copyAsMarkdown() }
+
 private fun Note.joinTitleAndBody(body: String): String {
     val cleanTitle = title.trim()
     return when {

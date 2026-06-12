@@ -84,9 +84,7 @@ internal class NoteListActionsDelegate(
     }
 
     fun toggleViewMode() {
-        viewMode.update { current ->
-            if (current == NoteListViewMode.LIST) NoteListViewMode.GRID else NoteListViewMode.LIST
-        }
+        viewMode.update { current -> current.nextIn() }
     }
 
     fun toggleTagFilter(tagName: String) {

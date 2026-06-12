@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -59,7 +60,13 @@ private enum class NoteActionsPage { Actions, Copy }
 @Immutable
 internal data class NoteClipboardCallbacks(
     val onCopyPlainText: (Note) -> Unit,
-    val onCopyMarkdown: (Note) -> Unit
+    val onCopyMarkdown: (Note) -> Unit,
+    val onCopyPlainTextNotes: (Collection<Note>) -> Unit = { notes ->
+        notes.singleOrNull()?.let(onCopyPlainText)
+    },
+    val onCopyMarkdownNotes: (Collection<Note>) -> Unit = { notes ->
+        notes.singleOrNull()?.let(onCopyMarkdown)
+    }
 )
 
 /**
@@ -97,12 +104,59 @@ internal fun rememberNoteClipboardCallbacks(
                         snackbarMessage = "Copied as Markdown"
                     )
                 }
+            },
+            onCopyPlainTextNotes = { notes ->
+                scope.launch {
+                    copyNotesToClipboard(
+                        clipboard = clipboard,
+                        snackbarHostState = snackbarHostState,
+                        notes = notes,
+                        asMarkdown = false
+                    )
+                }
+            },
+            onCopyMarkdownNotes = { notes ->
+                scope.launch {
+                    copyNotesToClipboard(
+                        clipboard = clipboard,
+                        snackbarHostState = snackbarHostState,
+                        notes = notes,
+                        asMarkdown = true
+                    )
+                }
             }
         )
     }
 }
 
-private suspend fun copyTextToClipboard(
+private suspend fun copyNotesToClipboard(
+    clipboard: Clipboard,
+    snackbarHostState: SnackbarHostState,
+    notes: Collection<Note>,
+    asMarkdown: Boolean
+) {
+    if (notes.isEmpty()) return
+
+    val text = if (asMarkdown) {
+        notes.copyAsMarkdown()
+    } else {
+        notes.copyAsPlainText()
+    }
+    val count = notes.size
+    val format = if (asMarkdown) "Markdown" else "text"
+    copyTextToClipboard(
+        clipboard = clipboard,
+        snackbarHostState = snackbarHostState,
+        text = text,
+        snackbarMessage = if (count == 1) {
+            "Copied as $format"
+        } else {
+            "Copied $count notes as $format"
+        }
+    )
+}
+
+internal suspend fun copyTextToClipboard(
     clipboard: Clipboard,
     snackbarHostState: SnackbarHostState,
     text: String,
@@ -127,6 +181,7 @@ private suspend fun copyTextToClipboard(
 internal fun NoteActionsSheet(
     note: Note?,
     clipboardCallbacks: NoteClipboardCallbacks,
+    shareCallbacks: NoteShareCallbacks? = null,
     onDuplicate: (Note) -> Unit,
     onDelete: (Note) -> Unit,
     onMoveToVault: ((Note) -> Unit)? = null,
@@ -156,8 +211,13 @@ internal fun NoteActionsSheet(
                 NoteActionsPage.Actions -> NoteActionsMainPage(
                     showMoveToVault = onMoveToVault != null && !note.isInVault,
                     showSelect = onSelect != null,
+                    showShare = shareCallbacks != null,
                     onSelect = {
                         onSelect?.invoke(note)
+                        onDismiss()
+                    },
+                    onShare = {
+                        shareCallbacks?.onShareNote(note)
                         onDismiss()
                     },
                     onCopy = { page = NoteActionsPage.Copy },
@@ -215,7 +275,9 @@ internal fun NoteActionsSheetHeader(
 private fun NoteActionsMainPage(
     showMoveToVault: Boolean,
     showSelect: Boolean,
+    showShare: Boolean,
     onSelect: () -> Unit,
+    onShare: () -> Unit,
     onCopy: () -> Unit,
     onMoveToVault: () -> Unit,
     onDuplicate: () -> Unit,
@@ -226,6 +288,13 @@ private fun NoteActionsMainPage(
             text = "Select",
             icon = Icons.Outlined.CheckCircle,
             onClick = onSelect
+        )
+    }
+    if (showShare) {
+        NoteActionsSheetRow(
+            text = "Share",
+            icon = Icons.Default.IosShare,
+            onClick = onShare
         )
     }
     NoteActionsSheetRow(

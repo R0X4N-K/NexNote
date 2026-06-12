@@ -27,6 +27,7 @@ import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.util.DateUtils
 
@@ -43,6 +44,7 @@ fun AgendaScreen(
     val listState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
+    val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
@@ -74,6 +76,21 @@ fun AgendaScreen(
         },
         onDeselectAllNotes = {
             selectionState = selectionState.deselectAll()
+        },
+        onShareSelectedNotes = {
+            shareCallbacks.onShareNotes(selectedNotes)
+            selectionState = selectionState.exit()
+            activeActionsNote = null
+        },
+        onCopySelectedNotesAsText = {
+            clipboardCallbacks.onCopyPlainTextNotes(selectedNotes)
+            selectionState = selectionState.exit()
+            activeActionsNote = null
+        },
+        onCopySelectedNotesAsMarkdown = {
+            clipboardCallbacks.onCopyMarkdownNotes(selectedNotes)
+            selectionState = selectionState.exit()
+            activeActionsNote = null
         },
         onDeleteSelectedNotes = {
             viewModel.requestTrash(selectedNotes)
@@ -153,6 +170,7 @@ fun AgendaScreen(
     NoteActionsSheet(
         note = activeActionsNote,
         clipboardCallbacks = clipboardCallbacks,
+        shareCallbacks = shareCallbacks,
         onDuplicate = actions.onDuplicateNote,
         onDelete = actions.onRequestTrash,
         onSelect = actions.onToggleNoteSelection,

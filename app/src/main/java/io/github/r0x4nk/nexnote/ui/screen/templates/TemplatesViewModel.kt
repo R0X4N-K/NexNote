@@ -12,6 +12,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
+import io.github.r0x4nk.nexnote.ui.common.nextIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -86,9 +87,7 @@ class TemplatesViewModel(
     }
 
     fun toggleViewMode() {
-        _viewMode.update { current ->
-            if (current == NoteListViewMode.LIST) NoteListViewMode.GRID else NoteListViewMode.LIST
-        }
+        _viewMode.update { current -> current.nextIn(NoteListViewMode.listGridModes) }
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────

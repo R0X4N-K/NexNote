@@ -18,6 +18,7 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 
 /**
@@ -38,6 +39,7 @@ fun TagsScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
+    val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     val searchFocusRequester = remember { FocusRequester() }
     var showSortMenu by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
@@ -76,6 +78,7 @@ fun TagsScreen(
     NoteActionsSheet(
         note = activeActionsNote,
         clipboardCallbacks = clipboardCallbacks,
+        shareCallbacks = shareCallbacks,
         onDuplicate = viewModel::duplicateNote,
         onDelete = viewModel::requestTrash,
         onDismiss = { activeActionsNote = null }

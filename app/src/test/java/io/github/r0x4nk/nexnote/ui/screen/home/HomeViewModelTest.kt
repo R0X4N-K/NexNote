@@ -141,11 +141,17 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `toggleViewMode switches back from GRID to LIST`() = runViewModelTest {
+    fun `toggleViewMode cycles from GRID to TAGS to LIST`() = runViewModelTest {
         advanceUntilIdle()
         viewModel.toggleViewMode()
         viewModel.toggleViewMode()
         advanceUntilIdle()
+
+        assertEquals(NoteListViewMode.TAGS, viewModel.uiState.value.viewMode)
+
+        viewModel.toggleViewMode()
+        advanceUntilIdle()
+
         assertEquals(NoteListViewMode.LIST, viewModel.uiState.value.viewMode)
     }
 

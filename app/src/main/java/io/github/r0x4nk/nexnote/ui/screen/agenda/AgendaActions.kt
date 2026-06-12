@@ -26,6 +26,9 @@ internal data class AgendaActions(
     val onExitNoteSelection: () -> Unit,
     val onSelectAllVisibleNotes: () -> Unit,
     val onDeselectAllNotes: () -> Unit,
+    val onShareSelectedNotes: () -> Unit,
+    val onCopySelectedNotesAsText: () -> Unit,
+    val onCopySelectedNotesAsMarkdown: () -> Unit,
     val onDeleteSelectedNotes: () -> Unit,
     val onToggleNoteSelection: (Note) -> Unit,
     val onUndoTrash: (Long) -> Unit,
@@ -42,6 +45,9 @@ internal fun rememberAgendaActions(
     onExitNoteSelection: () -> Unit,
     onSelectAllVisibleNotes: () -> Unit,
     onDeselectAllNotes: () -> Unit,
+    onShareSelectedNotes: () -> Unit,
+    onCopySelectedNotesAsText: () -> Unit,
+    onCopySelectedNotesAsMarkdown: () -> Unit,
     onDeleteSelectedNotes: () -> Unit,
     onToggleNoteSelection: (Note) -> Unit
 ): AgendaActions {
@@ -54,6 +60,9 @@ internal fun rememberAgendaActions(
         onExitNoteSelection,
         onSelectAllVisibleNotes,
         onDeselectAllNotes,
+        onShareSelectedNotes,
+        onCopySelectedNotesAsText,
+        onCopySelectedNotesAsMarkdown,
         onDeleteSelectedNotes,
         onToggleNoteSelection
     ) {
@@ -66,6 +75,9 @@ internal fun rememberAgendaActions(
             onExitNoteSelection = onExitNoteSelection,
             onSelectAllVisibleNotes = onSelectAllVisibleNotes,
             onDeselectAllNotes = onDeselectAllNotes,
+            onShareSelectedNotes = onShareSelectedNotes,
+            onCopySelectedNotesAsText = onCopySelectedNotesAsText,
+            onCopySelectedNotesAsMarkdown = onCopySelectedNotesAsMarkdown,
             onDeleteSelectedNotes = onDeleteSelectedNotes,
             onToggleNoteSelection = onToggleNoteSelection
         )
@@ -81,6 +93,9 @@ private fun buildAgendaActions(
     onExitNoteSelection: () -> Unit,
     onSelectAllVisibleNotes: () -> Unit,
     onDeselectAllNotes: () -> Unit,
+    onShareSelectedNotes: () -> Unit,
+    onCopySelectedNotesAsText: () -> Unit,
+    onCopySelectedNotesAsMarkdown: () -> Unit,
     onDeleteSelectedNotes: () -> Unit,
     onToggleNoteSelection: (Note) -> Unit
 ): AgendaActions = AgendaActions(
@@ -104,6 +119,9 @@ private fun buildAgendaActions(
     onExitNoteSelection = onExitNoteSelection,
     onSelectAllVisibleNotes = onSelectAllVisibleNotes,
     onDeselectAllNotes = onDeselectAllNotes,
+    onShareSelectedNotes = onShareSelectedNotes,
+    onCopySelectedNotesAsText = onCopySelectedNotesAsText,
+    onCopySelectedNotesAsMarkdown = onCopySelectedNotesAsMarkdown,
     onDeleteSelectedNotes = onDeleteSelectedNotes,
     onToggleNoteSelection = onToggleNoteSelection,
     onUndoTrash = viewModel::undoPendingTrash,

@@ -38,10 +38,11 @@ private data class TrashNoteCardTextState(
 internal fun TrashNoteCard(
     note: Note,
     onRestore: () -> Unit,
-    onDeletePermanently: (() -> Unit)? = null
+    onDeletePermanently: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier  = Modifier.fillMaxWidth(),
+        modifier  = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(
             defaultElevation = NoteCollectionCardDefaults.defaultElevation
         ),

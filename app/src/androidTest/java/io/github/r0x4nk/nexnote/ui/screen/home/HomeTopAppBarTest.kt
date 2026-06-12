@@ -45,6 +45,8 @@ class HomeTopAppBarTest {
         composeRule.onNodeWithContentDescription("More options")
             .assertIsDisplayed()
             .performClick()
+        composeRule.onNodeWithText("Oldest first").assertIsDisplayed()
+        composeRule.onNodeWithText("Grid view").assertIsDisplayed()
         composeRule.onNodeWithText("Access Vault")
             .assertIsDisplayed()
             .performClick()

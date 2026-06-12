@@ -2,8 +2,8 @@ package io.github.r0x4nk.nexnote.ui.screen.tags
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,8 +38,8 @@ internal fun TagsTopBar(
                 )
             }
             Box {
-                TagsSortButton(
-                    sortOrder = uiState.sortOrder,
+                TagsOverflowButton(
+                    expanded = showSortMenu,
                     onClick = actions.onSortMenuOpen
                 )
                 SortDropdownMenu(
@@ -56,11 +56,14 @@ internal fun TagsTopBar(
 }
 
 @Composable
-private fun TagsSortButton(sortOrder: TagSortOrder, onClick: () -> Unit) {
+private fun TagsOverflowButton(
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
     NexIconButton(
-        imageVector = Icons.Default.Tag,
-        contentDescription = "Sort tags",
+        imageVector = Icons.Default.MoreVert,
+        contentDescription = "More options",
         onClick = onClick,
-        selected = sortOrder != TagSortOrder.USAGE_DESC
+        selected = expanded
     )
 }

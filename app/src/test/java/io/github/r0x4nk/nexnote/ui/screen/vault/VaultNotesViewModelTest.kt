@@ -270,12 +270,18 @@ class VaultNotesViewModelTest {
             assertEquals(NoteListViewMode.GRID, viewModel.uiState.value.viewMode)
             assertEquals(listOf(secret), viewModel.uiState.value.notes)
 
+            viewModel.toggleViewMode()
+            advanceUntilIdle()
+
+            assertEquals(NoteListViewMode.TAGS, viewModel.uiState.value.viewMode)
+            assertEquals(listOf(secret), viewModel.uiState.value.notes)
+
             fakeVaultRepo.setState(VaultState.LOCKED)
             advanceUntilIdle()
 
             assertFalse(viewModel.uiState.value.isUnlocked)
             assertTrue(viewModel.uiState.value.notes.isEmpty())
-            assertEquals(NoteListViewMode.GRID, viewModel.uiState.value.viewMode)
+            assertEquals(NoteListViewMode.TAGS, viewModel.uiState.value.viewMode)
         }
 
     @Test

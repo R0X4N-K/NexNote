@@ -30,6 +30,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleVaultNotePinUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
+import io.github.r0x4nk.nexnote.ui.common.nextIn
 import io.github.r0x4nk.nexnote.util.SearchUtils
 import io.github.r0x4nk.nexnote.util.TagParser
 import io.github.r0x4nk.nexnote.util.VaultTagAggregator
@@ -321,13 +322,7 @@ class VaultNotesViewModel(
     }
 
     fun toggleViewMode() {
-        _viewMode.update { current ->
-            if (current == NoteListViewMode.LIST) {
-                NoteListViewMode.GRID
-            } else {
-                NoteListViewMode.LIST
-            }
-        }
+        _viewMode.update { current -> current.nextIn() }
     }
 
     fun showTemplatePicker() {

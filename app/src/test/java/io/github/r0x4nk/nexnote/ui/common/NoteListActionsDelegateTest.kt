@@ -38,6 +38,12 @@ class NoteListActionsDelegateTest {
         fixture.delegate.toggleViewMode()
         assertEquals(NoteListViewMode.GRID, fixture.viewMode.value)
 
+        fixture.delegate.toggleViewMode()
+        assertEquals(NoteListViewMode.TAGS, fixture.viewMode.value)
+
+        fixture.delegate.toggleViewMode()
+        assertEquals(NoteListViewMode.LIST, fixture.viewMode.value)
+
         fixture.delegate.toggleTagFilter("kotlin")
         assertEquals(setOf("kotlin"), fixture.selectedTagFilters.value)
 

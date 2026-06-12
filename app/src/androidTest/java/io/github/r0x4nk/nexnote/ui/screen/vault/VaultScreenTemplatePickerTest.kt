@@ -161,7 +161,7 @@ class VaultScreenTemplatePickerTest {
         composeRule.setVaultScreen(harness = harness)
         composeRule.waitUntilUnlocked(harness)
 
-        composeRule.onNodeWithContentDescription("Vault trash")
+        composeRule.onNodeWithContentDescription("Show Vault trash")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 3_000) {
@@ -205,7 +205,7 @@ class VaultScreenTemplatePickerTest {
         }
         assertEquals(0, backCount)
 
-        composeRule.onNodeWithContentDescription("Vault trash")
+        composeRule.onNodeWithContentDescription("Show Vault trash")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 3_000) {
@@ -309,7 +309,7 @@ class VaultScreenTemplatePickerTest {
         composeRule.setVaultScreen(harness = harness)
         composeRule.waitUntilUnlocked(harness)
 
-        composeRule.onNodeWithContentDescription("Vault trash")
+        composeRule.onNodeWithContentDescription("Show Vault trash")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 3_000) {

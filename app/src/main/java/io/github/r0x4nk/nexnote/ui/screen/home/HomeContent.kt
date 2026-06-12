@@ -31,6 +31,7 @@ import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderCollection
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 
@@ -227,32 +228,49 @@ private fun HomeNoteCollection(
 ) {
     val displayItems = rememberDisplayItems(uiState)
 
-    if (uiState.viewMode == NoteListViewMode.GRID) {
-        HomeNoteGrid(
-            displayItems,
-            noteCardStyle,
-            gridState,
-            selectionState,
-            onNoteClick,
-            onTogglePin,
-            onRequestTrash,
-            onRequestNoteActions,
-            onToggleNoteSelection,
-            bottomContentPadding
-        )
-    } else {
-        HomeNoteList(
-            displayItems,
-            noteCardStyle,
-            listState,
-            selectionState,
-            onNoteClick,
-            onTogglePin,
-            onRequestTrash,
-            onRequestNoteActions,
-            onToggleNoteSelection,
-            bottomContentPadding
-        )
+    when (uiState.viewMode) {
+        NoteListViewMode.GRID -> {
+            HomeNoteGrid(
+                displayItems,
+                noteCardStyle,
+                gridState,
+                selectionState,
+                onNoteClick,
+                onTogglePin,
+                onRequestTrash,
+                onRequestNoteActions,
+                onToggleNoteSelection,
+                bottomContentPadding
+            )
+        }
+        NoteListViewMode.TAGS -> {
+            HomeNoteTagFolders(
+                displayItems,
+                noteCardStyle,
+                listState,
+                selectionState,
+                onNoteClick,
+                onTogglePin,
+                onRequestTrash,
+                onRequestNoteActions,
+                onToggleNoteSelection,
+                bottomContentPadding
+            )
+        }
+        NoteListViewMode.LIST -> {
+            HomeNoteList(
+                displayItems,
+                noteCardStyle,
+                listState,
+                selectionState,
+                onNoteClick,
+                onTogglePin,
+                onRequestTrash,
+                onRequestNoteActions,
+                onToggleNoteSelection,
+                bottomContentPadding
+            )
+        }
     }
 }
 
@@ -352,6 +370,38 @@ private fun HomeNoteList(
                 Modifier.animateItem()
             )
         }
+    }
+}
+
+@Composable
+private fun HomeNoteTagFolders(
+    displayItems: List<ScoredNote>,
+    noteCardStyle: NoteCardStyle,
+    listState: LazyListState,
+    selectionState: SelectionUiState,
+    onNoteClick: (Long) -> Unit,
+    onTogglePin: (Note) -> Unit,
+    onRequestTrash: (Note) -> Unit,
+    onRequestNoteActions: (Note) -> Unit,
+    onToggleNoteSelection: (Note) -> Unit,
+    bottomContentPadding: Dp
+) {
+    NoteTagFolderCollection(
+        displayItems = displayItems,
+        listState = listState,
+        bottomContentPadding = bottomContentPadding
+    ) { scored, modifier ->
+        HomeNoteCard(
+            scored,
+            noteCardStyle,
+            selectionState,
+            onNoteClick,
+            onTogglePin,
+            onRequestTrash,
+            onRequestNoteActions,
+            onToggleNoteSelection,
+            modifier
+        )
     }
 }
 
