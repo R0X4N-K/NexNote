@@ -68,4 +68,38 @@ class HomeVaultPullAccessTest {
 
         assertEquals(0f, offset, 0.001f)
     }
+
+    @Test
+    fun indicatorVisualFeedbackScalesWithProgress() {
+        val state = homeVaultPullIndicatorState(
+            pullOffsetPx = 50f,
+            thresholdPx = 100f
+        )
+
+        assertEquals(0.675f, state.contentAlpha, 0.001f)
+        assertEquals(1.06f, state.iconScale, 0.001f)
+        assertEquals(1.0125f, state.textScale, 0.001f)
+        assertEquals(17f, state.contentGapDp, 0.001f)
+    }
+
+    @Test
+    fun indicatorVisualFeedbackClampsAtThreshold() {
+        val state = homeVaultPullIndicatorState(
+            pullOffsetPx = 150f,
+            thresholdPx = 100f
+        )
+
+        assertEquals(1f, state.contentAlpha, 0.001f)
+        assertEquals(1.12f, state.iconScale, 0.001f)
+        assertEquals(1.025f, state.textScale, 0.001f)
+        assertEquals(20f, state.contentGapDp, 0.001f)
+    }
+
+    @Test
+    fun visualFeedbackUsesSmoothedProgress() {
+        assertEquals(0f, homeVaultPullSmoothedProgress(-1f), 0.001f)
+        assertEquals(0.15625f, homeVaultPullSmoothedProgress(0.25f), 0.001f)
+        assertEquals(0.84375f, homeVaultPullSmoothedProgress(0.75f), 0.001f)
+        assertEquals(1f, homeVaultPullSmoothedProgress(2f), 0.001f)
+    }
 }

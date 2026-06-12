@@ -2,8 +2,11 @@ package io.github.r0x4nk.nexnote.ui.screen.home
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -37,6 +40,8 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -50,16 +55,32 @@ import kotlin.math.max
 internal const val HOME_VAULT_PULL_IDLE_TEXT = "Pull to unlock Vault"
 internal const val HOME_VAULT_PULL_READY_TEXT = "Release to unlock Vault"
 
-private const val PULL_RESISTANCE_STRENGTH = 0.55f
+private const val PULL_RESISTANCE_STRENGTH = 0.72f
 private const val RESET_ANIMATION_MS = 180
+private const val PULL_ICON_SCALE_DELTA = 0.12f
+private const val PULL_TEXT_SCALE_DELTA = 0.025f
+private const val PULL_CONTENT_GAP_MIN_DP = 14f
+private const val PULL_CONTENT_GAP_DELTA_DP = 6f
 
-private val VaultPullThreshold = 88.dp
-private val VaultPullMaxReveal = 132.dp
+internal val VaultPullThreshold = 172.dp
+private val VaultPullMaxReveal = 244.dp
+private val VaultPullVisualSpring = spring<Float>(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessMedium
+)
+private val VaultPullGapSpring = spring<Dp>(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessMedium
+)
 
 internal data class HomeVaultPullIndicatorState(
     val progress: Float,
     val thresholdReached: Boolean,
-    val text: String
+    val text: String,
+    val contentAlpha: Float,
+    val iconScale: Float,
+    val textScale: Float,
+    val contentGapDp: Float
 )
 
 internal fun homeVaultPullIndicatorState(
@@ -76,9 +97,30 @@ internal fun homeVaultPullIndicatorState(
     return HomeVaultPullIndicatorState(
         progress = progress,
         thresholdReached = thresholdReached,
-        text = if (thresholdReached) HOME_VAULT_PULL_READY_TEXT else HOME_VAULT_PULL_IDLE_TEXT
+        text = if (thresholdReached) HOME_VAULT_PULL_READY_TEXT else HOME_VAULT_PULL_IDLE_TEXT,
+        contentAlpha = homeVaultPullContentAlpha(progress),
+        iconScale = homeVaultPullIconScale(progress),
+        textScale = homeVaultPullTextScale(progress),
+        contentGapDp = homeVaultPullContentGapDp(progress)
     )
 }
+
+internal fun homeVaultPullSmoothedProgress(progress: Float): Float {
+    val p = progress.coerceIn(0f, 1f)
+    return p * p * (3f - 2f * p)
+}
+
+internal fun homeVaultPullContentAlpha(progress: Float): Float =
+    (homeVaultPullSmoothedProgress(progress) * 1.35f).coerceIn(0f, 1f)
+
+internal fun homeVaultPullIconScale(progress: Float): Float =
+    1f + homeVaultPullSmoothedProgress(progress) * PULL_ICON_SCALE_DELTA
+
+internal fun homeVaultPullTextScale(progress: Float): Float =
+    1f + homeVaultPullSmoothedProgress(progress) * PULL_TEXT_SCALE_DELTA
+
+internal fun homeVaultPullContentGapDp(progress: Float): Float =
+    PULL_CONTENT_GAP_MIN_DP + homeVaultPullSmoothedProgress(progress) * PULL_CONTENT_GAP_DELTA_DP
 
 internal fun calculateHomeVaultPullOffset(
     currentOffsetPx: Float,
@@ -297,7 +339,26 @@ private fun VaultPullAccessIndicatorContent(
         animationSpec = tween(durationMillis = 140),
         label = "Vault pull arrow rotation"
     )
-    val contentAlpha = (indicatorState.progress * 1.4f).coerceIn(0f, 1f)
+    val contentAlpha by animateFloatAsState(
+        targetValue = indicatorState.contentAlpha,
+        animationSpec = VaultPullVisualSpring,
+        label = "Vault pull content alpha"
+    )
+    val iconScale by animateFloatAsState(
+        targetValue = indicatorState.iconScale,
+        animationSpec = VaultPullVisualSpring,
+        label = "Vault pull icon scale"
+    )
+    val textScale by animateFloatAsState(
+        targetValue = indicatorState.textScale,
+        animationSpec = VaultPullVisualSpring,
+        label = "Vault pull text scale"
+    )
+    val contentGap by animateDpAsState(
+        targetValue = indicatorState.contentGapDp.dp,
+        animationSpec = VaultPullGapSpring,
+        label = "Vault pull content gap"
+    )
 
     Box(
         modifier = modifier
@@ -309,34 +370,60 @@ private fun VaultPullAccessIndicatorContent(
         VaultPullBackgroundFill(
             progress = indicatorState.progress,
             color = readyContainerColor,
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.TopCenter)
         )
         Row(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 24.dp)
                 .alpha(contentAlpha),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            VaultPullLockIcon(contentColor)
-            Spacer(Modifier.width(12.dp))
+            Box(
+                modifier = Modifier.size(46.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                VaultPullLockIcon(
+                    contentColor = contentColor,
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    }
+                )
+            }
+            Spacer(Modifier.width(contentGap))
             Text(
                 text = indicatorState.text,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .graphicsLayer {
+                        scaleX = textScale
+                        scaleY = textScale
+                        transformOrigin = TransformOrigin(0f, 0.5f)
+                    },
                 style = MaterialTheme.typography.titleSmall,
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier
-                    .size(24.dp)
-                    .rotate(arrowRotation)
-            )
+            Box(
+                modifier = Modifier.size(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .rotate(arrowRotation)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        }
+                )
+            }
         }
     }
 }
@@ -349,15 +436,19 @@ private fun VaultPullBackgroundFill(
 ) {
     Box(
         modifier = modifier
-            .fillMaxHeight()
-            .fillMaxWidth(progress.coerceIn(0f, 1f))
+            .fillMaxWidth()
+            .fillMaxHeight(progress.coerceIn(0f, 1f))
             .background(color)
     )
 }
 
 @Composable
-private fun VaultPullLockIcon(contentColor: Color) {
+private fun VaultPullLockIcon(
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
     Surface(
+        modifier = modifier,
         shape = CircleShape,
         color = contentColor.copy(alpha = 0.14f),
         contentColor = contentColor
