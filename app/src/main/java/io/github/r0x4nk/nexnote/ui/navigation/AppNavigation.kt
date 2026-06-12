@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -58,6 +59,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
+import io.github.r0x4nk.nexnote.fileimport.ExternalFileOpenRequest
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlay
 
 /**
@@ -87,6 +89,8 @@ fun AppNavigation(
     lockVaultOnBackground: Boolean = true,
     vaultAutoLockTimeout: VaultAutoLockTimeout = VaultAutoLockTimeout.IMMEDIATELY,
     vaultState: VaultState = VaultState.NOT_CONFIGURED,
+    externalFileOpenRequest: ExternalFileOpenRequest? = null,
+    onExternalFileOpenConsumed: (Long) -> Unit = {},
     onVaultAutoLockRequested: () -> Unit = {}
 ) {
     val navController = rememberNavController()
@@ -116,6 +120,11 @@ fun AppNavigation(
         vaultAutoLockTimeout = vaultAutoLockTimeout,
         onLockVault = onVaultAutoLockRequested
     )
+    ExternalFileOpenEffect(
+        navController = navController,
+        request = externalFileOpenRequest,
+        onConsumed = onExternalFileOpenConsumed
+    )
 
     Scaffold(
         modifier            = Modifier.fillMaxSize(),
@@ -133,6 +142,21 @@ fun AppNavigation(
             innerPadding = innerPadding,
             isLeftHanded = isLeftHanded
         )
+    }
+}
+
+@Composable
+private fun ExternalFileOpenEffect(
+    navController: NavHostController,
+    request: ExternalFileOpenRequest?,
+    onConsumed: (Long) -> Unit
+) {
+    LaunchedEffect(request?.requestId) {
+        val openRequest = request ?: return@LaunchedEffect
+        navController.navigate(Screen.Editor.existingNoteRoute(openRequest.noteId)) {
+            launchSingleTop = true
+        }
+        onConsumed(openRequest.requestId)
     }
 }
 
