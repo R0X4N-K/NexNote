@@ -47,7 +47,6 @@ class EditorScreenScaffoldVaultLockTest {
                         tagsForCurrentNote = emptyList(),
                         selectedTagsInEditor = null,
                         noteBackground = Color.White,
-                        isDarkTheme = false,
                         isKeyboardVisible = false,
                         imageFileProvider = {
                             fileProviderCalls.incrementAndGet()
@@ -89,7 +88,6 @@ private fun noOpEditorActions(): EditorScreenActions =
         applyMarkdownEdit = {},
         onNoteLinkAutocompleteSelected = { _, _ -> },
         onPreviewNoteLinkClick = {},
-        onThemeToggle = {},
         onToggleColorPicker = {},
         onBackgroundColorChange = {},
         onTitleChange = {},

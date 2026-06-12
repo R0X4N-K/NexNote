@@ -1,11 +1,11 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -21,27 +21,35 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun EditorRadialMenuBindings(
-    isKeyboardVisible: Boolean,
     showPreview: Boolean,
     isTemplateMode: Boolean,
-    isDarkTheme: Boolean,
+    isReadOnly: Boolean,
     state: EditorScreenState,
     onToggleColorPicker: () -> Unit,
-    onThemeToggle: () -> Unit,
+    onCreationDateEdit: () -> Unit,
     onSearchOpen: () -> Unit,
     scope: CoroutineScope
 ) {
-    RadialMenuFabHideEffect(hide = isKeyboardVisible || !showPreview)
-    if (showPreview) {
-        EditorRadialMenuScrollBindings(state, scope)
+    RadialMenuFabHideEffect(hide = false)
+    if (showPreview || !isReadOnly) {
+        EditorRadialMenuScrollBindings(
+            showPreview = showPreview,
+            state = state,
+            shortcutAlpha = if (showPreview) {
+                EDITOR_SCROLL_SHORTCUT_NORMAL_ALPHA
+            } else {
+                editorEditScrollShortcutAlpha(state)
+            },
+            scope = scope
+        )
     }
     RadialMenuEffect(
         items = rememberEditorPreviewRadialMenuItems(
             showPreview,
             isTemplateMode,
-            isDarkTheme,
+            isReadOnly,
             onToggleColorPicker,
-            onThemeToggle,
+            onCreationDateEdit,
             onSearchOpen
         ),
         fabIcon = if (showPreview) Icons.Default.Tune else null,
@@ -51,7 +59,9 @@ internal fun EditorRadialMenuBindings(
 
 @Composable
 private fun EditorRadialMenuScrollBindings(
+    showPreview: Boolean,
     state: EditorScreenState,
+    shortcutAlpha: Float,
     scope: CoroutineScope
 ) {
     val scrollRunner = remember(scope) { EditorScrollShortcutRunner(scope) }
@@ -63,14 +73,46 @@ private fun EditorRadialMenuScrollBindings(
     RadialMenuScrollEffect(
         onScrollToTop = {
             scrollRunner.launch {
-                state.previewListState.animateScrollToPreviewTop()
+                if (showPreview) {
+                    state.previewListState.animateScrollToPreviewTop()
+                } else {
+                    state.contentScrollState.animateQuickScrollToTop()
+                }
             }
         },
         onScrollToBottom = {
             scrollRunner.launch {
-                state.previewListState.animateScrollToPreviewBottom()
+                if (showPreview) {
+                    state.previewListState.animateScrollToPreviewBottom()
+                } else {
+                    state.contentScrollState.animateQuickScrollToBottom()
+                }
             }
+        },
+        shortcutAlpha = shortcutAlpha
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun editorEditScrollShortcutAlpha(state: EditorScreenState): Float {
+    val layout = state.textLayoutResult ?: return EDITOR_SCROLL_SHORTCUT_NORMAL_ALPHA
+    val cursorBoundsInViewport = editorCursorBoundsInViewportPx(
+        layoutTextLength = layout.layoutInput.text.text.length,
+        currentTextLength = state.contentTextFieldState.text.length,
+        cursorOffset = state.contentTextFieldState.selection.end,
+        scrollOffsetPx = state.contentScrollState.value,
+        cursorBoundsProvider = { offset ->
+            val rect = layout.getCursorRect(offset)
+            EditorCursorVerticalBounds(
+                topPx = rect.top,
+                bottomPx = rect.bottom
+            )
         }
+    )
+
+    return editorScrollShortcutAlpha(
+        cursorBoundsInViewportPx = cursorBoundsInViewport,
+        viewportHeightPx = state.unobscuredContentViewportHeightPx
     )
 }
 
@@ -104,22 +146,22 @@ internal class EditorScrollShortcutRunner(
 private fun rememberEditorPreviewRadialMenuItems(
     showPreview: Boolean,
     isTemplateMode: Boolean,
-    isDarkTheme: Boolean,
+    isReadOnly: Boolean,
     onToggleColorPicker: () -> Unit,
-    onThemeToggle: () -> Unit,
+    onCreationDateEdit: () -> Unit,
     onSearchOpen: () -> Unit
 ): List<RadialMenuItem> = remember(
     showPreview,
     isTemplateMode,
-    isDarkTheme,
+    isReadOnly,
     onToggleColorPicker,
-    onThemeToggle,
+    onCreationDateEdit,
     onSearchOpen
 ) {
     if (!showPreview) return@remember emptyList()
 
     buildList {
-        if (!isTemplateMode) {
+        if (!isTemplateMode && !isReadOnly) {
             add(
                 RadialMenuItem(
                     icon = Icons.Default.Palette,
@@ -128,19 +170,15 @@ private fun rememberEditorPreviewRadialMenuItems(
                     contentDescription = "Note background color"
                 )
             )
-        }
-        add(
-            RadialMenuItem(
-                icon = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
-                label = "",
-                action = onThemeToggle,
-                contentDescription = if (isDarkTheme) {
-                    "Switch to light theme"
-                } else {
-                    "Switch to dark theme"
-                }
+            add(
+                RadialMenuItem(
+                    icon = Icons.Default.CalendarToday,
+                    label = "",
+                    action = onCreationDateEdit,
+                    contentDescription = "Edit creation date"
+                )
             )
-        )
+        }
         add(
             RadialMenuItem(
                 icon = Icons.Default.Search,

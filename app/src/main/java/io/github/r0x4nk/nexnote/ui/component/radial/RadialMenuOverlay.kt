@@ -189,6 +189,7 @@ fun RadialMenuOverlay(
             val scrollToTop    = controller.scrollToTopAction
             val scrollToBottom = controller.scrollToBottomAction
             val hasScrollShortcuts = scrollToTop != null && scrollToBottom != null
+            val showScrollShortcuts = hasScrollShortcuts && !controller.overrideFabHidden
             val radiusOffset = if (hasScrollShortcuts) {
                 SCROLL_SHORTCUT_RADIAL_RADIUS_OFFSET
             } else {
@@ -223,14 +224,15 @@ fun RadialMenuOverlay(
                     )
                 }
 
-                // ── Scroll shortcut buttons (editor-only, stacked above the FAB) ──
+                // ── Scroll shortcut buttons (editor-only, stacked above the FAB slot) ──
                 // Shown only while an editor screen has registered scroll callbacks
-                // and the FAB itself is visible (same visibility guard).
-                if (showFab && scrollToTop != null && scrollToBottom != null) {
+                // and the screen has not explicitly suppressed floating controls.
+                if (showScrollShortcuts) {
                     ScrollShortcutButtons(
                         fabX             = fabX,
                         fabY             = fabY,
                         buttonSizePx     = buttonSizePx,
+                        alpha            = controller.scrollShortcutAlpha,
                         onScrollToTop    = scrollToTop,
                         onScrollToBottom = scrollToBottom
                     )

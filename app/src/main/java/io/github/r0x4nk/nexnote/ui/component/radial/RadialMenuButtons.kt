@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.component.radial
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -17,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -29,6 +32,8 @@ private val SCROLL_BUTTON_SIZE_DP  = 36.dp
 private val SCROLL_BUTTON_GAP_DP   = 10.dp   // gap between scroll buttons and FAB top
 private val SCROLL_BUTTON_SPACE_DP =  6.dp   // vertical gap between the two scroll buttons
 private val FAB_SHAPE = RoundedCornerShape(18.dp)
+private const val SCROLL_SHORTCUT_ALPHA_ANIMATION_MS = 120
+private const val SCROLL_SHORTCUT_MIN_INTERACTIVE_ALPHA = 0.5f
 
 private data class ScrollShortcutButtonLayout(
     val buttonX: Float,
@@ -54,15 +59,22 @@ internal fun ScrollShortcutButtons(
     fabX: Float,
     fabY: Float,
     buttonSizePx: Float,
+    alpha: Float = 1f,
     onScrollToTop: () -> Unit,
     onScrollToBottom: () -> Unit
 ) {
     val layout = scrollShortcutButtonLayout(fabX, fabY, buttonSizePx)
+    val animatedAlpha = animateFloatAsState(
+        targetValue = alpha.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = SCROLL_SHORTCUT_ALPHA_ANIMATION_MS),
+        label = "scrollShortcutAlpha"
+    ).value
 
     ScrollShortcutButton(
         x           = layout.buttonX,
         y           = layout.topY,
         sizePx      = layout.sizePx,
+        alpha       = animatedAlpha,
         icon        = Icons.Default.ArrowUpward,
         description = "Scroll to top",
         onClick     = onScrollToTop
@@ -71,6 +83,7 @@ internal fun ScrollShortcutButtons(
         x           = layout.buttonX,
         y           = layout.bottomY,
         sizePx      = layout.sizePx,
+        alpha       = animatedAlpha,
         icon        = Icons.Default.ArrowDownward,
         description = "Scroll to bottom",
         onClick     = onScrollToBottom
@@ -102,6 +115,7 @@ private fun ScrollShortcutButton(
     x: Float,
     y: Float,
     sizePx: Float,
+    alpha: Float,
     icon: ImageVector,
     description: String,
     onClick: () -> Unit,
@@ -113,10 +127,17 @@ private fun ScrollShortcutButton(
         modifier = modifier
             .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
             .size(sizeDp)
+            .alpha(alpha)
             .shadow(elevation = 3.dp, shape = CircleShape, clip = false)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f))
-            .clickable(onClick = onClick)
+            .run {
+                if (alpha >= SCROLL_SHORTCUT_MIN_INTERACTIVE_ALPHA) {
+                    clickable(onClick = onClick)
+                } else {
+                    this
+                }
+            }
     ) {
         Icon(
             imageVector        = icon,

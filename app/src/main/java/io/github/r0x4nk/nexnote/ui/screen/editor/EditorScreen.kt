@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -19,7 +20,11 @@ import androidx.compose.ui.text.TextRange
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
+import io.github.r0x4nk.nexnote.ui.common.copyAsMarkdown
+import io.github.r0x4nk.nexnote.ui.common.copyAsPlainText
+import io.github.r0x4nk.nexnote.ui.component.copyTextToClipboard
 import io.github.r0x4nk.nexnote.ui.component.buildMarkdownBlockSourceRanges
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
@@ -44,6 +49,7 @@ fun EditorScreen(
     val scope = rememberCoroutineScope()
     val state = rememberEditorScreenState(mode)
     val context = LocalContext.current
+    val clipboard = LocalClipboard.current
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
     val imageFileProvider = remember(viewModel) { viewModel::getImageFile }
@@ -106,8 +112,49 @@ fun EditorScreen(
         state.showNoteLinkPicker = false
         state.showColorPicker = !state.showColorPicker
     }
-    val toggleTheme: () -> Unit = {
-        viewModel.toggleTheme(isDarkTheme)
+    val openCreationDatePicker: () -> Unit = {
+        if (!uiState.isTemplateMode && !uiState.isReadOnly) {
+            state.highlightRange = null
+            state.pendingTagScroll = null
+            state.showColorPicker = false
+            state.showNoteLinkPicker = false
+            state.showDatePicker = true
+        }
+    }
+    val currentNoteTextSnapshot: () -> Note = {
+        val body = if (uiState.showPreview) {
+            uiState.content
+        } else {
+            state.currentContentTextFieldValue().text
+        }
+
+        Note(
+            title = uiState.title,
+            content = body,
+            isMarkdown = true
+        )
+    }
+    val copyCurrentNoteAsText: () -> Unit = {
+        val text = currentNoteTextSnapshot().copyAsPlainText()
+        scope.launch {
+            copyTextToClipboard(
+                clipboard = clipboard,
+                snackbarHostState = state.snackbarHostState,
+                text = text,
+                snackbarMessage = "Copied as text"
+            )
+        }
+    }
+    val copyCurrentNoteAsMarkdown: () -> Unit = {
+        val text = currentNoteTextSnapshot().copyAsMarkdown()
+        scope.launch {
+            copyTextToClipboard(
+                clipboard = clipboard,
+                snackbarHostState = state.snackbarHostState,
+                text = text,
+                snackbarMessage = "Copied as Markdown"
+            )
+        }
     }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
     val commitActiveEditContent: () -> Unit = {
@@ -197,13 +244,12 @@ fun EditorScreen(
     EditorPreviewScrollRestorationEffect(uiState, state, density)
     EditorKeyboardTagBarEffect(isKeyboardVisible, state)
     EditorRadialMenuBindings(
-        isKeyboardVisible = isKeyboardVisible,
         showPreview = uiState.showPreview,
         isTemplateMode = uiState.isTemplateMode,
-        isDarkTheme = isDarkTheme,
+        isReadOnly = uiState.isReadOnly,
         state = state,
         onToggleColorPicker = toggleColorPicker,
-        onThemeToggle = toggleTheme,
+        onCreationDateEdit = openCreationDatePicker,
         onSearchOpen = openSearch,
         scope = scope
     )
@@ -274,7 +320,6 @@ fun EditorScreen(
             tagsForCurrentNote = tagsForCurrentNote,
             selectedTagsInEditor = selectedTagsInEditor,
             noteBackground = noteBackground,
-            isDarkTheme = isDarkTheme,
             isKeyboardVisible = isKeyboardVisible,
             imageFileProvider = imageFileProvider,
             vaultImageByteProvider = vaultImageByteProvider,
@@ -289,6 +334,8 @@ fun EditorScreen(
                     export()
                 }
             },
+            onCopyNoteAsText = copyCurrentNoteAsText,
+            onCopyNoteAsMarkdown = copyCurrentNoteAsMarkdown,
             onTogglePreview = togglePreviewPreservingScroll,
             onInsertImage = launchImagePickerAfterCommit,
             onInsertNoteLink = openNoteLinkPicker,
@@ -296,7 +343,6 @@ fun EditorScreen(
             applyMarkdownEdit = applyMarkdownEdit,
             onNoteLinkAutocompleteSelected = replaceNoteLinkAutocomplete,
             onPreviewNoteLinkClick = openNoteFromPreviewLink,
-            onThemeToggle = toggleTheme,
             onToggleColorPicker = toggleColorPicker,
             onBackgroundColorChange = viewModel::onBackgroundColorChange,
             onTitleChange = viewModel::onTitleChange,
@@ -331,7 +377,7 @@ fun EditorScreen(
                 viewModel.redoContentChange()
             },
             onCreationDateTap = {
-                if (!uiState.isReadOnly) state.showDatePicker = true
+                openCreationDatePicker()
             },
             onSearchOpen = openSearch,
             onSearchClose = closeSearch,

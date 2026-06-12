@@ -2,9 +2,11 @@ package io.github.r0x4nk.nexnote.ui.component.radial
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +51,10 @@ class RadialMenuController {
 
     /** Non-null only while the editor is active. Scrolls the note content to the bottom. */
     var scrollToBottomAction by mutableStateOf<(() -> Unit)?>(null)
+        internal set
+
+    /** Editor-owned opacity for scroll shortcuts when they would sit near the cursor. */
+    var scrollShortcutAlpha by mutableFloatStateOf(1f)
         internal set
 
     /**
@@ -230,11 +236,16 @@ fun RadialMenuFabHideEffect(hide: Boolean) {
 @Composable
 fun RadialMenuScrollEffect(
     onScrollToTop: () -> Unit,
-    onScrollToBottom: () -> Unit
+    onScrollToBottom: () -> Unit,
+    shortcutAlpha: Float = 1f
 ) {
     val controller    = LocalRadialMenuController.current
     val currentTop    by rememberUpdatedState(onScrollToTop)
     val currentBottom by rememberUpdatedState(onScrollToBottom)
+
+    SideEffect {
+        controller.scrollShortcutAlpha = shortcutAlpha.coerceIn(0f, 1f)
+    }
 
     DisposableEffect(controller) {
         val topAction = { currentTop() }
@@ -243,11 +254,16 @@ fun RadialMenuScrollEffect(
         controller.scrollToTopAction    = topAction
         controller.scrollToBottomAction = bottomAction
         onDispose {
-            if (controller.scrollToTopAction === topAction) {
+            val ownsTopAction = controller.scrollToTopAction === topAction
+            val ownsBottomAction = controller.scrollToBottomAction === bottomAction
+            if (ownsTopAction) {
                 controller.scrollToTopAction = null
             }
-            if (controller.scrollToBottomAction === bottomAction) {
+            if (ownsBottomAction) {
                 controller.scrollToBottomAction = null
+            }
+            if (ownsTopAction || ownsBottomAction) {
+                controller.scrollShortcutAlpha = 1f
             }
         }
     }

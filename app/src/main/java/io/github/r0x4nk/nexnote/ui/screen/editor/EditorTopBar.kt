@@ -18,20 +18,28 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -47,6 +55,8 @@ import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 private val EditorTopBarMinHeight = 44.dp
 private val EditorSearchFieldMinHeight = 36.dp
 
+private enum class EditorOverflowMenuPage { Actions, Copy }
+
 /**
  * Read-only snapshot of the editor controls that surface in the top bar.
  *
@@ -55,13 +65,10 @@ private val EditorSearchFieldMinHeight = 36.dp
  * call sites. The class is intentionally [internal] so it cannot leak across
  * module boundaries.
  *
- * @property isDarkTheme whether the editor is currently rendered with a dark
- *   palette — drives the theme-toggle icon (sun/moon).
  * @property hasCustomColor whether the note has a custom background colour —
  *   used to render the palette icon in a selected state.
  */
 internal data class EditorTopBarToolingState(
-    val isDarkTheme: Boolean,
     val hasCustomColor: Boolean,
 )
 
@@ -73,7 +80,6 @@ internal data class EditorTopBarToolingState(
  * by [EditorScreenScaffoldContent] / [EditorScreenActions] in this package.
  */
 internal data class EditorTopBarToolingActions(
-    val onThemeToggle: () -> Unit,
     val onToggleColorPicker: () -> Unit,
 )
 
@@ -94,7 +100,9 @@ internal fun EditorTopBar(
     onSearchQueryChange: (String) -> Unit,
     onSearchPrevious: () -> Unit,
     onSearchNext: () -> Unit,
-    onExport: (() -> Unit)? = null
+    onExport: (() -> Unit)? = null,
+    onCopyNoteAsText: (() -> Unit)? = null,
+    onCopyNoteAsMarkdown: (() -> Unit)? = null
 ) {
     val displayTitle = when {
         title.isNotBlank() -> title
@@ -146,7 +154,9 @@ internal fun EditorTopBar(
                 onSearchClose = onSearchClose,
                 onSearchPrevious = onSearchPrevious,
                 onSearchNext = onSearchNext,
-                onExport = onExport
+                onExport = onExport,
+                onCopyNoteAsText = onCopyNoteAsText,
+                onCopyNoteAsMarkdown = onCopyNoteAsMarkdown
             )
         }
     }
@@ -246,7 +256,9 @@ private fun EditorTopBarActions(
     onSearchClose: () -> Unit,
     onSearchPrevious: () -> Unit,
     onSearchNext: () -> Unit,
-    onExport: (() -> Unit)?
+    onExport: (() -> Unit)?,
+    onCopyNoteAsText: (() -> Unit)?,
+    onCopyNoteAsMarkdown: (() -> Unit)?
 ) {
     if (isSaving) EditorSavingIndicator()
 
@@ -264,7 +276,9 @@ private fun EditorTopBarActions(
             toolingState = toolingState,
             toolingActions = toolingActions,
             onSearchOpen = onSearchOpen,
-            onExport = onExport
+            onExport = onExport,
+            onCopyNoteAsText = onCopyNoteAsText,
+            onCopyNoteAsMarkdown = onCopyNoteAsMarkdown
         )
     }
 }
@@ -317,15 +331,9 @@ private fun EditorSearchActions(
 /**
  * Trailing actions shown while the user is **not** searching.
  *
- * Order is intentional and was chosen so document-level actions flow into
- * visual-styling controls and finish with the discovery-oriented search lens:
- *  1. **Export** — document-level action, only when meaningful (a saved note,
- *     not a template).
- *  2. **Palette** — note background colour; hidden for templates because
- *     templates don't carry per-note colours.
- *  3. **Theme toggle** — global UI theme; placed after palette so the two
- *     visual-styling controls cluster together.
- *  4. **Search** — last, mirroring the affordance of "open a sub-tool".
+ * Search stays directly reachable because it is a frequent document task.
+ * Export, copy and colour are secondary note actions, so they live in the
+ * overflow menu instead of competing with the Markdown editing surface.
  *
  * Editing-history controls live in the IME toolbar because they directly
  * affect text entry and must remain reachable while formatting tools scroll.
@@ -337,31 +345,190 @@ private fun EditorBrowsingActions(
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
     onSearchOpen: () -> Unit,
-    onExport: (() -> Unit)?
+    onExport: (() -> Unit)?,
+    onCopyNoteAsText: (() -> Unit)?,
+    onCopyNoteAsMarkdown: (() -> Unit)?
 ) {
-    if (onExport != null) {
-        NexIconButton(
-            imageVector = Icons.Default.IosShare,
-            contentDescription = "Export note",
-            onClick = onExport
-        )
-    }
-    if (!isTemplateMode && !isReadOnly) {
-        NexIconButton(
-            imageVector = Icons.Default.Palette,
-            contentDescription = "Note background color",
-            onClick = toolingActions.onToggleColorPicker,
-            selected = toolingState.hasCustomColor
-        )
-    }
-    NexIconButton(
-        imageVector = if (toolingState.isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
-        contentDescription = if (toolingState.isDarkTheme) "Switch to light theme" else "Switch to dark theme",
-        onClick = toolingActions.onThemeToggle
-    )
     NexIconButton(
         imageVector = Icons.Default.Search,
         contentDescription = "Search in note",
         onClick = onSearchOpen
     )
+    if (
+        onExport != null ||
+        onCopyNoteAsText != null ||
+        onCopyNoteAsMarkdown != null ||
+        (!isTemplateMode && !isReadOnly)
+    ) {
+        EditorOverflowMenu(
+            showColorAction = !isTemplateMode && !isReadOnly,
+            toolingState = toolingState,
+            toolingActions = toolingActions,
+            onExport = onExport,
+            onCopyNoteAsText = onCopyNoteAsText,
+            onCopyNoteAsMarkdown = onCopyNoteAsMarkdown
+        )
+    }
+}
+
+@Composable
+private fun EditorOverflowMenu(
+    showColorAction: Boolean,
+    toolingState: EditorTopBarToolingState,
+    toolingActions: EditorTopBarToolingActions,
+    onExport: (() -> Unit)?,
+    onCopyNoteAsText: (() -> Unit)?,
+    onCopyNoteAsMarkdown: (() -> Unit)?
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf(EditorOverflowMenuPage.Actions) }
+    val hasCopyActions = onCopyNoteAsText != null || onCopyNoteAsMarkdown != null
+    val dismiss = {
+        expanded = false
+        page = EditorOverflowMenuPage.Actions
+    }
+
+    Box {
+        NexIconButton(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = "Note options",
+            onClick = {
+                page = EditorOverflowMenuPage.Actions
+                expanded = true
+            },
+            selected = expanded
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = dismiss
+        ) {
+            when (page) {
+                EditorOverflowMenuPage.Actions -> EditorOverflowActionsPage(
+                    showColorAction = showColorAction,
+                    hasCopyActions = hasCopyActions,
+                    toolingState = toolingState,
+                    toolingActions = toolingActions,
+                    onExport = onExport,
+                    onCopyOpen = { page = EditorOverflowMenuPage.Copy },
+                    onDismiss = dismiss
+                )
+
+                EditorOverflowMenuPage.Copy -> EditorOverflowCopyPage(
+                    onBack = { page = EditorOverflowMenuPage.Actions },
+                    onCopyNoteAsText = onCopyNoteAsText,
+                    onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
+                    onDismiss = dismiss
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditorOverflowActionsPage(
+    showColorAction: Boolean,
+    hasCopyActions: Boolean,
+    toolingState: EditorTopBarToolingState,
+    toolingActions: EditorTopBarToolingActions,
+    onExport: (() -> Unit)?,
+    onCopyOpen: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (onExport != null) {
+        DropdownMenuItem(
+            text = { Text("Export note") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.IosShare,
+                    contentDescription = null
+                )
+            },
+            onClick = {
+                onDismiss()
+                onExport()
+            }
+        )
+    }
+    if (hasCopyActions) {
+        DropdownMenuItem(
+            text = { Text("Copy note") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = null
+                )
+            },
+            onClick = onCopyOpen
+        )
+    }
+    if (showColorAction) {
+        val color = if (toolingState.hasCustomColor) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        DropdownMenuItem(
+            text = { Text("Note background color") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Palette,
+                    contentDescription = null,
+                    tint = color
+                )
+            },
+            onClick = {
+                onDismiss()
+                toolingActions.onToggleColorPicker()
+            }
+        )
+    }
+}
+
+@Composable
+private fun EditorOverflowCopyPage(
+    onBack: () -> Unit,
+    onCopyNoteAsText: (() -> Unit)?,
+    onCopyNoteAsMarkdown: (() -> Unit)?,
+    onDismiss: () -> Unit
+) {
+    DropdownMenuItem(
+        text = { Text("Back") },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null
+            )
+        },
+        onClick = onBack
+    )
+    if (onCopyNoteAsText != null) {
+        DropdownMenuItem(
+            text = { Text("Copy as text") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.TextSnippet,
+                    contentDescription = null
+                )
+            },
+            onClick = {
+                onDismiss()
+                onCopyNoteAsText()
+            }
+        )
+    }
+    if (onCopyNoteAsMarkdown != null) {
+        DropdownMenuItem(
+            text = { Text("Copy as Markdown") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Code,
+                    contentDescription = null
+                )
+            },
+            onClick = {
+                onDismiss()
+                onCopyNoteAsMarkdown()
+            }
+        )
+    }
 }

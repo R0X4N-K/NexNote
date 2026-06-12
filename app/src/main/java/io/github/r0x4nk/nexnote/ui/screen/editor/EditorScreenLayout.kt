@@ -56,7 +56,6 @@ internal data class EditorScreenScaffoldContent(
     val tagsForCurrentNote: List<Tag>,
     val selectedTagsInEditor: String?,
     val noteBackground: Color,
-    val isDarkTheme: Boolean,
     val isKeyboardVisible: Boolean,
     val imageFileProvider: (String) -> File,
     val vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
@@ -67,6 +66,8 @@ internal data class EditorScreenScaffoldContent(
 internal data class EditorScreenActions(
     val onBack: () -> Unit,
     val onExport: (() -> Unit)?,
+    val onCopyNoteAsText: (() -> Unit)? = null,
+    val onCopyNoteAsMarkdown: (() -> Unit)? = null,
     val onTogglePreview: () -> Unit,
     val onInsertImage: () -> Unit,
     val onInsertNoteLink: () -> Unit,
@@ -74,7 +75,6 @@ internal data class EditorScreenActions(
     val applyMarkdownEdit: ((String, TextRange) -> MarkdownTextEdit) -> Unit,
     val onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     val onPreviewNoteLinkClick: (Long) -> Unit,
-    val onThemeToggle: () -> Unit,
     val onToggleColorPicker: () -> Unit,
     val onBackgroundColorChange: (Int?) -> Unit,
     val onTitleChange: (String) -> Unit,
@@ -128,14 +128,12 @@ private fun EditorScreenTopBar(
     content: EditorScreenScaffoldContent,
     actions: EditorScreenActions
 ) {
-    // Visual-styling controls live in the top bar so they stay reachable in
-    // preview mode, while editing-history and Markdown tools stay near the IME.
+    // Note-level secondary actions live in the top-bar overflow, while
+    // editing-history and Markdown tools stay near the IME.
     val toolingState = EditorTopBarToolingState(
-        isDarkTheme = content.isDarkTheme,
         hasCustomColor = content.uiState.backgroundColor != null,
     )
     val toolingActions = EditorTopBarToolingActions(
-        onThemeToggle = actions.onThemeToggle,
         onToggleColorPicker = actions.onToggleColorPicker,
     )
     EditorTopBar(
@@ -154,7 +152,9 @@ private fun EditorScreenTopBar(
         onSearchQueryChange = actions.onSearchQueryChange,
         onSearchPrevious = actions.onSearchPrevious,
         onSearchNext = actions.onSearchNext,
-        onExport = editorExportAction(content, actions)
+        onExport = editorExportAction(content, actions),
+        onCopyNoteAsText = editorCopyAsTextAction(content, actions),
+        onCopyNoteAsMarkdown = editorCopyAsMarkdownAction(content, actions)
     )
 }
 
@@ -168,6 +168,31 @@ private fun editorExportAction(
         null
     }
 }
+
+private fun editorCopyAsTextAction(
+    content: EditorScreenScaffoldContent,
+    actions: EditorScreenActions
+): (() -> Unit)? {
+    return if (editorCanCopyVisibleNoteText(content.uiState)) {
+        actions.onCopyNoteAsText
+    } else {
+        null
+    }
+}
+
+private fun editorCopyAsMarkdownAction(
+    content: EditorScreenScaffoldContent,
+    actions: EditorScreenActions
+): (() -> Unit)? {
+    return if (editorCanCopyVisibleNoteText(content.uiState)) {
+        actions.onCopyNoteAsMarkdown
+    } else {
+        null
+    }
+}
+
+internal fun editorCanCopyVisibleNoteText(uiState: EditorUiState): Boolean =
+    !uiState.isLoading && !uiState.isVaultLocked
 
 @Composable
 private fun EditorScreenBody(
