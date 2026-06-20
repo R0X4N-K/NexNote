@@ -146,6 +146,7 @@ private fun EditorScreenTopBar(
         toolingActions = toolingActions,
         searchState = content.state.noteSearch,
         searchFocusRequester = content.state.searchFocusRequester,
+        metadata = editorTopBarMetadata(content.uiState),
         onBack = actions.onBack,
         onSearchOpen = actions.onSearchOpen,
         onSearchClose = actions.onSearchClose,
@@ -154,9 +155,28 @@ private fun EditorScreenTopBar(
         onSearchNext = actions.onSearchNext,
         onExport = editorExportAction(content, actions),
         onCopyNoteAsText = editorCopyAsTextAction(content, actions),
-        onCopyNoteAsMarkdown = editorCopyAsMarkdownAction(content, actions)
+        onCopyNoteAsMarkdown = editorCopyAsMarkdownAction(content, actions),
+        onCreationDateEdit = editorCreationDateEditAction(content.uiState, actions)
     )
 }
+
+internal fun editorTopBarMetadata(uiState: EditorUiState): EditorNoteMetadata? {
+    if (uiState.isLoading || uiState.isTemplateMode || uiState.isVaultLocked) return null
+
+    return EditorNoteMetadata(
+        characterCount = uiState.content.length,
+        lastModifiedDate = uiState.lastModifiedDate,
+        creationDate = uiState.creationDate
+    )
+}
+
+private fun editorCreationDateEditAction(
+    uiState: EditorUiState,
+    actions: EditorScreenActions
+): (() -> Unit)? =
+    actions.onCreationDateTap.takeIf {
+        !uiState.isTemplateMode && !uiState.isReadOnly && !uiState.isVaultLocked
+    }
 
 private fun editorExportAction(
     content: EditorScreenScaffoldContent,
@@ -235,8 +255,6 @@ private fun EditorScreenBody(
                 .navigationBarsPadding()
                 .imePadding()
         ) {
-            // Metadata is placed above mode tabs to keep the editor chrome compact.
-            EditorMetadataArea(content.uiState, actions.onCreationDateTap)
             EditorModeTabsArea(content, actions)
             EditorColorPickerPanel(
                 content.uiState,
@@ -258,6 +276,7 @@ private fun EditorScreenBody(
             EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
             EditorContentModeBox(
                 content.uiState,
+                content.noteBackground,
                 content.imageFileProvider,
                 content.vaultImageByteProvider,
                 content.noteLinkTargets,
@@ -480,24 +499,6 @@ private fun EditorTagsPanel(
                 }
             )
         }
-    }
-}
-
-@Composable
-private fun EditorMetadataArea(
-    uiState: EditorUiState,
-    onCreationDateTap: () -> Unit
-) {
-    if (!uiState.isTemplateMode) {
-        MetadataBar(
-            charCount = uiState.content.length,
-            lastModifiedDate = uiState.lastModifiedDate,
-            creationDate = uiState.creationDate,
-            onCreationDateTap = onCreationDateTap,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-        )
     }
 }
 

@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.TextSnippet
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.IosShare
@@ -100,9 +102,11 @@ internal fun EditorTopBar(
     onSearchQueryChange: (String) -> Unit,
     onSearchPrevious: () -> Unit,
     onSearchNext: () -> Unit,
+    metadata: EditorNoteMetadata? = null,
     onExport: (() -> Unit)? = null,
     onCopyNoteAsText: (() -> Unit)? = null,
-    onCopyNoteAsMarkdown: (() -> Unit)? = null
+    onCopyNoteAsMarkdown: (() -> Unit)? = null,
+    onCreationDateEdit: (() -> Unit)? = null
 ) {
     val displayTitle = when {
         title.isNotBlank() -> title
@@ -137,6 +141,7 @@ internal fun EditorTopBar(
             ) {
                 EditorTopBarTitle(
                     displayTitle = displayTitle,
+                    metadata = metadata,
                     searchState = searchState,
                     searchFocusRequester = searchFocusRequester,
                     onSearchQueryChange = onSearchQueryChange,
@@ -156,7 +161,8 @@ internal fun EditorTopBar(
                 onSearchNext = onSearchNext,
                 onExport = onExport,
                 onCopyNoteAsText = onCopyNoteAsText,
-                onCopyNoteAsMarkdown = onCopyNoteAsMarkdown
+                onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
+                onCreationDateEdit = onCreationDateEdit
             )
         }
     }
@@ -165,6 +171,7 @@ internal fun EditorTopBar(
 @Composable
 private fun EditorTopBarTitle(
     displayTitle: String,
+    metadata: EditorNoteMetadata?,
     searchState: NoteSearchState,
     searchFocusRequester: FocusRequester,
     onSearchQueryChange: (String) -> Unit,
@@ -178,12 +185,15 @@ private fun EditorTopBarTitle(
             onSearchNext = onSearchNext
         )
     } else {
-        Text(
-            text = displayTitle,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = displayTitle,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            metadata?.let { EditorMetadataBar(metadata = it) }
+        }
     }
 }
 
@@ -258,7 +268,8 @@ private fun EditorTopBarActions(
     onSearchNext: () -> Unit,
     onExport: (() -> Unit)?,
     onCopyNoteAsText: (() -> Unit)?,
-    onCopyNoteAsMarkdown: (() -> Unit)?
+    onCopyNoteAsMarkdown: (() -> Unit)?,
+    onCreationDateEdit: (() -> Unit)?
 ) {
     if (isSaving) EditorSavingIndicator()
 
@@ -278,7 +289,8 @@ private fun EditorTopBarActions(
             onSearchOpen = onSearchOpen,
             onExport = onExport,
             onCopyNoteAsText = onCopyNoteAsText,
-            onCopyNoteAsMarkdown = onCopyNoteAsMarkdown
+            onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
+            onCreationDateEdit = onCreationDateEdit
         )
     }
 }
@@ -347,7 +359,8 @@ private fun EditorBrowsingActions(
     onSearchOpen: () -> Unit,
     onExport: (() -> Unit)?,
     onCopyNoteAsText: (() -> Unit)?,
-    onCopyNoteAsMarkdown: (() -> Unit)?
+    onCopyNoteAsMarkdown: (() -> Unit)?,
+    onCreationDateEdit: (() -> Unit)?
 ) {
     NexIconButton(
         imageVector = Icons.Default.Search,
@@ -358,6 +371,7 @@ private fun EditorBrowsingActions(
         onExport != null ||
         onCopyNoteAsText != null ||
         onCopyNoteAsMarkdown != null ||
+        onCreationDateEdit != null ||
         (!isTemplateMode && !isReadOnly)
     ) {
         EditorOverflowMenu(
@@ -366,7 +380,8 @@ private fun EditorBrowsingActions(
             toolingActions = toolingActions,
             onExport = onExport,
             onCopyNoteAsText = onCopyNoteAsText,
-            onCopyNoteAsMarkdown = onCopyNoteAsMarkdown
+            onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
+            onCreationDateEdit = onCreationDateEdit
         )
     }
 }
@@ -378,7 +393,8 @@ private fun EditorOverflowMenu(
     toolingActions: EditorTopBarToolingActions,
     onExport: (() -> Unit)?,
     onCopyNoteAsText: (() -> Unit)?,
-    onCopyNoteAsMarkdown: (() -> Unit)?
+    onCopyNoteAsMarkdown: (() -> Unit)?,
+    onCreationDateEdit: (() -> Unit)?
 ) {
     var expanded by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(EditorOverflowMenuPage.Actions) }
@@ -409,6 +425,7 @@ private fun EditorOverflowMenu(
                     toolingState = toolingState,
                     toolingActions = toolingActions,
                     onExport = onExport,
+                    onCreationDateEdit = onCreationDateEdit,
                     onCopyOpen = { page = EditorOverflowMenuPage.Copy },
                     onDismiss = dismiss
                 )
@@ -431,6 +448,7 @@ private fun EditorOverflowActionsPage(
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
     onExport: (() -> Unit)?,
+    onCreationDateEdit: (() -> Unit)?,
     onCopyOpen: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -459,6 +477,21 @@ private fun EditorOverflowActionsPage(
                 )
             },
             onClick = onCopyOpen
+        )
+    }
+    if (onCreationDateEdit != null) {
+        DropdownMenuItem(
+            text = { Text("Edit creation date") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.CalendarToday,
+                    contentDescription = null
+                )
+            },
+            onClick = {
+                onDismiss()
+                onCreationDateEdit()
+            }
         )
     }
     if (showColorAction) {

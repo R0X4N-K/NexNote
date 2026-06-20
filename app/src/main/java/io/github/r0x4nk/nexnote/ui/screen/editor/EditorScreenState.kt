@@ -83,6 +83,7 @@ internal class EditorScreenState(
     var currentSourceRanges by mutableStateOf<List<MarkdownSourceRange>>(emptyList())
     var contentViewportHeightPx by mutableStateOf(0)
     var keyboardToolbarHeightPx by mutableStateOf(0)
+    var bottomFadeHeightPx by mutableStateOf(0)
     var completedDirectPreviewWarmupKey by mutableStateOf<DirectPreviewWarmupKey?>(null)
     var syncedContentVersion by mutableStateOf(-1)
     var contentEditRevision by mutableStateOf(0)
@@ -108,11 +109,15 @@ internal class EditorScreenState(
     val unobscuredContentViewportHeightPx: Int
         get() = unobscuredViewportHeightPx(
             viewportHeightPx = contentViewportHeightPx,
-            bottomObstructionHeightPx = keyboardToolbarHeightPx
+            bottomObstructionHeightPx = keyboardToolbarHeightPx + bottomFadeHeightPx
         )
 
     fun updateKeyboardToolbarHeight(heightPx: Int) {
         keyboardToolbarHeightPx = heightPx.coerceAtLeast(0)
+    }
+
+    fun updateBottomFadeHeight(heightPx: Int) {
+        bottomFadeHeightPx = heightPx.coerceAtLeast(0)
     }
 
     fun markContentEdited() {

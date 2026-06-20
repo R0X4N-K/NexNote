@@ -10,6 +10,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
 import io.github.r0x4nk.nexnote.util.MarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownParser
@@ -46,6 +48,7 @@ fun MarkdownPreview(
     vaultImageByteProvider: (suspend (String) -> ByteArray?)? = null,
     highlightRanges: List<IntRange> = emptyList(),
     activeHighlightRange: IntRange? = null,
+    contentBottomPadding: Dp = 0.dp,
     onNoteLinkClick: (Long) -> Unit = {}
 ) {
     val contentState = rememberMarkdownPreviewContentState(markdown)
@@ -56,6 +59,7 @@ fun MarkdownPreview(
         vaultImageByteProvider = vaultImageByteProvider,
         highlightRanges        = highlightRanges,
         activeHighlightRange   = activeHighlightRange,
+        contentBottomPadding   = contentBottomPadding,
         onNoteLinkClick        = onNoteLinkClick
     )
 
@@ -74,6 +78,7 @@ internal class MarkdownPreviewContentConfig(
     val vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     val highlightRanges: List<IntRange>,
     val activeHighlightRange: IntRange?,
+    val contentBottomPadding: Dp,
     val onNoteLinkClick: (Long) -> Unit
 )
 

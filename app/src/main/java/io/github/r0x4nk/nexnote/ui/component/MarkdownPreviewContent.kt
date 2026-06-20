@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.ui.component
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -32,7 +33,8 @@ internal fun MarkdownPreviewContent(
 ) {
     LazyColumn(
         modifier = modifier,
-        state = lazyListState
+        state = lazyListState,
+        contentPadding = PaddingValues(bottom = config.contentBottomPadding)
     ) {
         items(
             count = state.blocks.size,

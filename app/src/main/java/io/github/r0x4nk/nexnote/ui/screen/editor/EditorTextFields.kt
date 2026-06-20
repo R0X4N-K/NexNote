@@ -43,13 +43,14 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.yield
 
 @OptIn(ExperimentalFoundationApi::class)
-private class TextHighlightOutputTransformation(
+private class EditorContentOutputTransformation(
     private val searchRanges: List<IntRange>,
     private val activeSearchRange: IntRange?,
     private val fallbackRange: IntRange?,
     private val searchColor: Color,
     private val activeSearchColor: Color,
-    private val fallbackColor: Color
+    private val fallbackColor: Color,
+    private val trailingSpacerLines: Int
 ) : OutputTransformation {
     override fun TextFieldBuffer.transformOutput() {
         searchRanges.forEach { range ->
@@ -63,6 +64,7 @@ private class TextHighlightOutputTransformation(
                 addHighlightStyle(range, length, fallbackColor)
             }
         }
+        repeat(trailingSpacerLines.coerceAtLeast(0)) { append('\n') }
     }
 }
 
@@ -138,6 +140,7 @@ internal fun ContentField(
     highlightRange: IntRange? = null,
     searchRanges: List<IntRange> = emptyList(),
     activeSearchRange: IntRange? = null,
+    trailingSpacerLines: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val fallbackHighlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
@@ -160,16 +163,23 @@ internal fun ContentField(
         activeSearchRange,
         fallbackHighlightColor,
         searchHighlightColor,
-        activeSearchHighlightColor
+        activeSearchHighlightColor,
+        trailingSpacerLines
     ) {
-        if (highlightRange != null || searchRanges.isNotEmpty() || activeSearchRange != null) {
-            TextHighlightOutputTransformation(
+        if (
+            highlightRange != null ||
+            searchRanges.isNotEmpty() ||
+            activeSearchRange != null ||
+            trailingSpacerLines > 0
+        ) {
+            EditorContentOutputTransformation(
                 searchRanges = searchRanges,
                 activeSearchRange = activeSearchRange,
                 fallbackRange = highlightRange,
                 searchColor = searchHighlightColor,
                 activeSearchColor = activeSearchHighlightColor,
-                fallbackColor = fallbackHighlightColor
+                fallbackColor = fallbackHighlightColor,
+                trailingSpacerLines = trailingSpacerLines
             )
         } else {
             null

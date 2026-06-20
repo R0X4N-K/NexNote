@@ -9,30 +9,46 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import io.github.r0x4nk.nexnote.ui.common.EditorMotion
 import io.github.r0x4nk.nexnote.ui.component.MarkdownPreview
 import java.io.File
 
 private val EditorContentHorizontalPadding = 8.dp
 private val EditorContentTopPadding = 8.dp
-private val EditorContentDefaultBottomPadding = 12.dp
+private val EditorContentDefaultBottomPadding = 8.dp
+private val EditorBottomFadeHeight = 52.dp
+private val EditorContentFadeBottomPadding = 44.dp
+private const val EditorContentFadeSpacerLines = 2
+private const val EditorBottomFadeZIndex = 10f
+
+internal const val EDITOR_BOTTOM_FADE_TAG = "editor_bottom_fade"
+internal const val EDITOR_CONTENT_FIELD_TAG = "editor_content_field"
 
 private enum class EditorContentTarget {
     Loading,
@@ -43,6 +59,7 @@ private enum class EditorContentTarget {
 @Composable
 internal fun ColumnScope.EditorContentModeBox(
     uiState: EditorUiState,
+    noteBackground: Color,
     imageFileProvider: (String) -> File,
     vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     noteLinkTargets: List<NoteLinkTarget>,
@@ -54,8 +71,15 @@ internal fun ColumnScope.EditorContentModeBox(
     onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     onPreviewNoteLinkClick: (Long) -> Unit
 ) {
+    val density = LocalDensity.current
     val previewWarmupKey = uiState.directPreviewWarmupKey(MaterialTheme.colorScheme.primary)
     val contentTarget = editorContentTarget(uiState, state, previewWarmupKey)
+    val bottomFadeVisible = editorBottomFadeVisible(uiState) &&
+        contentTarget != EditorContentTarget.Loading
+    val fadeBottomPadding = editorBottomFadePadding(bottomFadeVisible)
+    val keyboardToolbarHeight = with(density) {
+        state.keyboardToolbarHeightPx.toDp()
+    }
     val swipeDebouncer = remember { mutableLongStateOf(0L) }
     val onDebouncedSwipeToggle = remember(onTogglePreview) {
         {
@@ -64,6 +88,12 @@ internal fun ColumnScope.EditorContentModeBox(
                 swipeDebouncer.longValue = now
                 onTogglePreview()
             }
+        }
+    }
+
+    LaunchedEffect(bottomFadeVisible) {
+        if (!bottomFadeVisible) {
+            state.updateBottomFadeHeight(0)
         }
     }
 
@@ -102,6 +132,7 @@ internal fun ColumnScope.EditorContentModeBox(
                 EditorContentTarget.Preview -> {
                     EditorMarkdownPreview(
                         uiState = uiState,
+                        fadeBottomPadding = fadeBottomPadding,
                         imageFileProvider = imageFileProvider,
                         vaultImageByteProvider = vaultImageByteProvider,
                         state = state,
@@ -113,11 +144,20 @@ internal fun ColumnScope.EditorContentModeBox(
                         state = state,
                         readOnly = uiState.isReadOnly,
                         keyboardToolbarVisible = keyboardToolbarVisible,
+                        bottomFadeVisible = bottomFadeVisible,
                         onContentEdited = onContentEdited,
                         onContentSelectionChange = onContentSelectionChange
                     )
                 }
             }
+        }
+        if (bottomFadeVisible) {
+            EditorBottomFade(
+                noteBackground = noteBackground,
+                keyboardToolbarVisible = keyboardToolbarVisible,
+                keyboardToolbarHeight = keyboardToolbarHeight,
+                onHeightChanged = state::updateBottomFadeHeight
+            )
         }
         EditorNoteLinkAutocompletePopup(
             textFieldState = state.contentTextFieldState,
@@ -168,6 +208,7 @@ private fun editorContentTarget(
 @Composable
 private fun EditorMarkdownPreview(
     uiState: EditorUiState,
+    fadeBottomPadding: Dp,
     imageFileProvider: (String) -> File,
     vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     state: EditorScreenState,
@@ -186,6 +227,7 @@ private fun EditorMarkdownPreview(
         vaultImageByteProvider = vaultImageByteProvider,
         highlightRanges = state.visibleContentHighlightRanges(),
         activeHighlightRange = state.activeContentHighlightRange(),
+        contentBottomPadding = fadeBottomPadding,
         onNoteLinkClick = onPreviewNoteLinkClick
     )
 }
@@ -195,6 +237,7 @@ private fun EditorContentField(
     state: EditorScreenState,
     readOnly: Boolean,
     keyboardToolbarVisible: Boolean,
+    bottomFadeVisible: Boolean,
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit
 ) {
@@ -213,6 +256,7 @@ private fun EditorContentField(
         highlightRange = state.fallbackContentHighlightRange(),
         searchRanges = state.searchContentHighlightRanges(),
         activeSearchRange = state.activeSearchHighlightRange(),
+        trailingSpacerLines = if (bottomFadeVisible) EditorContentFadeSpacerLines else 0,
         modifier = Modifier
             .fillMaxSize()
             .padding(
@@ -224,6 +268,7 @@ private fun EditorContentField(
                     keyboardToolbarHeight = toolbarBottomPadding
                 )
             )
+            .testTag(EDITOR_CONTENT_FIELD_TAG)
             .focusRequester(state.contentFocusRequester)
     )
 }
@@ -232,13 +277,88 @@ private fun editorContentBottomPadding(
     keyboardToolbarVisible: Boolean,
     keyboardToolbarHeight: Dp
 ): Dp {
-    if (!keyboardToolbarVisible) return EditorContentDefaultBottomPadding
+    val toolbarPadding = editorKeyboardToolbarBottomPadding(
+        keyboardToolbarVisible = keyboardToolbarVisible,
+        keyboardToolbarHeight = keyboardToolbarHeight
+    )
+
+    return if (toolbarPadding > 0.dp) {
+        toolbarPadding
+    } else {
+        EditorContentDefaultBottomPadding
+    }
+}
+
+private fun editorKeyboardToolbarBottomPadding(
+    keyboardToolbarVisible: Boolean,
+    keyboardToolbarHeight: Dp
+): Dp {
+    if (!keyboardToolbarVisible) return 0.dp
 
     return if (keyboardToolbarHeight > 0.dp) {
         keyboardToolbarHeight
     } else {
         EditorKeyboardToolbarMinHeight
     }
+}
+
+internal fun editorBottomFadeVisible(uiState: EditorUiState): Boolean =
+    !uiState.isLoading && !uiState.isVaultLocked
+
+private fun editorBottomFadePadding(visible: Boolean): Dp =
+    if (visible) {
+        EditorContentFadeBottomPadding
+    } else {
+        0.dp
+    }
+
+@Composable
+private fun BoxScope.EditorBottomFade(
+    noteBackground: Color,
+    keyboardToolbarVisible: Boolean,
+    keyboardToolbarHeight: Dp,
+    onHeightChanged: (Int) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .zIndex(EditorBottomFadeZIndex)
+            .fillMaxWidth()
+            .padding(
+                bottom = editorKeyboardToolbarBottomPadding(
+                    keyboardToolbarVisible = keyboardToolbarVisible,
+                    keyboardToolbarHeight = keyboardToolbarHeight
+                )
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(EditorBottomFadeHeight)
+                .testTag(EDITOR_BOTTOM_FADE_TAG)
+                .background(
+                    editorBottomFadeBrush(
+                        noteBackground = noteBackground,
+                        surfaceTint = MaterialTheme.colorScheme.surfaceTint
+                    )
+                )
+                .onSizeChanged { size -> onHeightChanged(size.height) }
+        )
+    }
+}
+
+private fun editorBottomFadeBrush(
+    noteBackground: Color,
+    surfaceTint: Color
+): Brush {
+    val settledBackground = lerp(noteBackground, surfaceTint, 0.04f)
+    return Brush.verticalGradient(
+        colors = listOf(
+            noteBackground.copy(alpha = 0f),
+            noteBackground.copy(alpha = 0.86f),
+            settledBackground
+        )
+    )
 }
 
 private fun EditorScreenState.visibleContentHighlightRanges(): List<IntRange> {
