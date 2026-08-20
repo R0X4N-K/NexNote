@@ -129,6 +129,18 @@ private val AccentPalettesByColor = mapOf(
     AccentColor.TEAL to AccentPaletteVariants(
         light = AccentPalette(NexTealPrimary, NexTealOnPrimary, NexTealPrimaryContainer, NexTealOnPrimaryContainer),
         dark = AccentPalette(NexTealPrimaryDark, NexTealOnPrimaryDark, NexTealPrimaryContainerDark, NexTealOnPrimaryContainerDark)
+    ),
+    AccentColor.SAGE to AccentPaletteVariants(
+        light = AccentPalette(NexSagePrimary, NexSageOnPrimary, NexSagePrimaryContainer, NexSageOnPrimaryContainer),
+        dark = AccentPalette(NexSagePrimaryDark, NexSageOnPrimaryDark, NexSagePrimaryContainerDark, NexSageOnPrimaryContainerDark)
+    ),
+    AccentColor.ROSE to AccentPaletteVariants(
+        light = AccentPalette(NexRosePrimary, NexRoseOnPrimary, NexRosePrimaryContainer, NexRoseOnPrimaryContainer),
+        dark = AccentPalette(NexRosePrimaryDark, NexRoseOnPrimaryDark, NexRosePrimaryContainerDark, NexRoseOnPrimaryContainerDark)
+    ),
+    AccentColor.AMBER to AccentPaletteVariants(
+        light = AccentPalette(NexAmberPrimary, NexAmberOnPrimary, NexAmberPrimaryContainer, NexAmberOnPrimaryContainer),
+        dark = AccentPalette(NexAmberPrimaryDark, NexAmberOnPrimaryDark, NexAmberPrimaryContainerDark, NexAmberOnPrimaryContainerDark)
     )
 )
 

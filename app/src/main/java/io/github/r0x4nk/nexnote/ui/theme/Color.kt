@@ -75,6 +75,43 @@ val NexTealOnPrimaryDark          = Color(0xFF003737)
 val NexTealPrimaryContainerDark   = Color(0xFF005050)
 val NexTealOnPrimaryContainerDark = Color(0xFF70F7F6)
 
+// Sage accent. The container preserves the launcher icon's #BBE1C3 green.
+
+val NexSageSwatch                  = Color(0xFFBBE1C3)
+val NexSagePrimary                 = Color(0xFF386A48)
+val NexSageOnPrimary               = Color(0xFFFFFFFF)
+val NexSagePrimaryContainer        = NexSageSwatch
+val NexSageOnPrimaryContainer      = Color(0xFF12361F)
+
+val NexSagePrimaryDark             = Color(0xFFA0D0AB)
+val NexSageOnPrimaryDark           = Color(0xFF05391D)
+val NexSagePrimaryContainerDark    = Color(0xFF205032)
+val NexSageOnPrimaryContainerDark  = Color(0xFFBBE1C3)
+
+// Rose accent.
+
+val NexRosePrimary                 = Color(0xFF984061)
+val NexRoseOnPrimary               = Color(0xFFFFFFFF)
+val NexRosePrimaryContainer        = Color(0xFFFFD9E2)
+val NexRoseOnPrimaryContainer      = Color(0xFF3E001D)
+
+val NexRosePrimaryDark             = Color(0xFFFFB1C8)
+val NexRoseOnPrimaryDark           = Color(0xFF5E1133)
+val NexRosePrimaryContainerDark    = Color(0xFF7A2949)
+val NexRoseOnPrimaryContainerDark  = Color(0xFFFFD9E2)
+
+// Amber accent.
+
+val NexAmberPrimary                = Color(0xFF7B5800)
+val NexAmberOnPrimary              = Color(0xFFFFFFFF)
+val NexAmberPrimaryContainer       = Color(0xFFFFDEA3)
+val NexAmberOnPrimaryContainer     = Color(0xFF261A00)
+
+val NexAmberPrimaryDark            = Color(0xFFF5BF48)
+val NexAmberOnPrimaryDark          = Color(0xFF412D00)
+val NexAmberPrimaryContainerDark   = Color(0xFF5E4300)
+val NexAmberOnPrimaryContainerDark = Color(0xFFFFDEA3)
+
 // Surface / background.
 
 val NexBackground              = Color(0xFFFFFBFF)
