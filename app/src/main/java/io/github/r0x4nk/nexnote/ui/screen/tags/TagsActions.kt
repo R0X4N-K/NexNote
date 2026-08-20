@@ -12,6 +12,7 @@ internal data class TagsActions(
     val onSortMenuOpen: () -> Unit,
     val onSortMenuDismiss: () -> Unit,
     val onSortSelect: (TagSortOrder) -> Unit,
+    val onViewModeToggle: () -> Unit,
     val onTagClick: (String) -> Unit,
     val onNoteClick: (Long) -> Unit,
     val onRequestNoteActions: (Note) -> Unit,
@@ -46,6 +47,10 @@ internal fun rememberTagsActions(
             onSortMenuDismiss = { onSortMenuChange(false) },
             onSortSelect = { order ->
                 viewModel.setSortOrder(order)
+                onSortMenuChange(false)
+            },
+            onViewModeToggle = {
+                viewModel.toggleViewMode()
                 onSortMenuChange(false)
             },
             onTagClick = viewModel::toggleTagSelection,

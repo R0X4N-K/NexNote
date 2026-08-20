@@ -110,6 +110,7 @@ private fun TagsBody(
             tags = uiState.tags,
             selectedTagName = uiState.selectedTagName,
             notesForSelectedTag = uiState.notesForSelectedTag,
+            viewMode = uiState.viewMode,
             actions = actions,
             modifier = modifier
         )
@@ -131,6 +132,7 @@ private fun TagsList(
     tags: List<Tag>,
     selectedTagName: String?,
     notesForSelectedTag: List<Note>,
+    viewMode: TagsViewMode,
     actions: TagsActions,
     modifier: Modifier = Modifier
 ) {
@@ -138,6 +140,35 @@ private fun TagsList(
         tags.maxOfOrNull { it.noteCount }?.coerceAtLeast(1) ?: 1
     }
 
+    when (viewMode) {
+        TagsViewMode.LIST -> TagsScoreboardList(
+            tags = tags,
+            maxCount = maxCount,
+            selectedTagName = selectedTagName,
+            notesForSelectedTag = notesForSelectedTag,
+            actions = actions,
+            modifier = modifier
+        )
+        TagsViewMode.TREEMAP -> TagsTreemapList(
+            tags = tags,
+            maxCount = maxCount,
+            selectedTagName = selectedTagName,
+            notesForSelectedTag = notesForSelectedTag,
+            actions = actions,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun TagsScoreboardList(
+    tags: List<Tag>,
+    maxCount: Int,
+    selectedTagName: String?,
+    notesForSelectedTag: List<Note>,
+    actions: TagsActions,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),

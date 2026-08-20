@@ -110,6 +110,21 @@ class TagsViewModelTest {
         assertTrue(noteRepository.deletedNotesSnapshot().isEmpty())
     }
 
+    @Test
+    fun `toggleViewMode switches between list and treemap`() = runViewModelTest {
+        advanceInitialTagDebounce()
+
+        assertEquals(TagsViewMode.LIST, viewModel.uiState.value.viewMode)
+
+        viewModel.toggleViewMode()
+        advanceUntilIdle()
+        assertEquals(TagsViewMode.TREEMAP, viewModel.uiState.value.viewMode)
+
+        viewModel.toggleViewMode()
+        advanceUntilIdle()
+        assertEquals(TagsViewMode.LIST, viewModel.uiState.value.viewMode)
+    }
+
     private suspend fun TestScope.advanceInitialTagDebounce() {
         advanceTimeBy(350)
         advanceUntilIdle()

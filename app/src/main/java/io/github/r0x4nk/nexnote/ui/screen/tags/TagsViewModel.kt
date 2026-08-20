@@ -43,6 +43,12 @@ enum class TagSortOrder {
     DATE_ASC     // Oldest tag first
 }
 
+/** Available visualizations for the tag collection. */
+enum class TagsViewMode {
+    LIST,
+    TREEMAP
+}
+
 // ── Dialogs ───────────────────────────────────────────────────────────────────
 
 /** Sealed hierarchy for modal dialogs on the Tags screen. */
@@ -58,6 +64,7 @@ sealed class TagsDialog {
  * UI state for the Tags screen.
  *
  * [tags] is the full (possibly search-filtered) sorted list of tags.
+ * [viewMode] selects the scoreboard list or the proportional treemap.
  * [selectedTagName] is the tag whose associated notes are displayed inline.
  *   null = no expansion. Tapping the same tag again collapses the section.
  * [notesForSelectedTag] is the list of active notes for [selectedTagName].
@@ -68,6 +75,7 @@ data class TagsUiState(
     val tags: List<Tag>                    = emptyList(),
     val searchQuery: String                = "",
     val sortOrder: TagSortOrder            = TagSortOrder.USAGE_DESC,
+    val viewMode: TagsViewMode             = TagsViewMode.LIST,
     val selectedTagName: String?           = null,
     val notesForSelectedTag: List<Note>    = emptyList(),
     val isLoading: Boolean                 = true,
@@ -105,6 +113,7 @@ class TagsViewModel(
 
     private val _searchQuery     = MutableStateFlow("")
     private val _sortOrder       = MutableStateFlow(TagSortOrder.USAGE_DESC)
+    private val _viewMode        = MutableStateFlow(TagsViewMode.LIST)
     private val _selectedTagName = MutableStateFlow<String?>(null)
     private val _activeDialog    = MutableStateFlow<TagsDialog>(TagsDialog.None)
     private val _trashEvents = Channel<TrashedNoteEvent>(Channel.BUFFERED)
@@ -143,6 +152,7 @@ class TagsViewModel(
             tags = tagsFlow,
             searchQuery = _searchQuery,
             sortOrder = _sortOrder,
+            viewMode = _viewMode,
             selectedTagName = _selectedTagName,
             notesForSelectedTag = notesForSelected,
             activeDialog = _activeDialog
@@ -160,10 +170,16 @@ class TagsViewModel(
         _searchQuery.update { "" }
     }
 
-    // ── Sort ──────────────────────────────────────────────────────────────────
+    // ── Sort and view ─────────────────────────────────────────────────────────
 
     fun setSortOrder(order: TagSortOrder) {
         _sortOrder.update { order }
+    }
+
+    fun toggleViewMode() {
+        _viewMode.update { current ->
+            if (current == TagsViewMode.LIST) TagsViewMode.TREEMAP else TagsViewMode.LIST
+        }
     }
 
     // ── Tag selection ─────────────────────────────────────────────────────────

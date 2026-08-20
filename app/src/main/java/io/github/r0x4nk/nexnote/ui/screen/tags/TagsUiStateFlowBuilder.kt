@@ -13,6 +13,7 @@ internal data class TagsUiStateFlows(
     val tags: Flow<List<Tag>>,
     val searchQuery: Flow<String>,
     val sortOrder: Flow<TagSortOrder>,
+    val viewMode: Flow<TagsViewMode>,
     val selectedTagName: Flow<String?>,
     val notesForSelectedTag: Flow<List<Note>>,
     val activeDialog: Flow<TagsDialog>
@@ -21,7 +22,8 @@ internal data class TagsUiStateFlows(
 private data class TagsListData(
     val tags: List<Tag>,
     val searchQuery: String,
-    val sortOrder: TagSortOrder
+    val sortOrder: TagSortOrder,
+    val viewMode: TagsViewMode
 )
 
 private data class TagsSelectionData(
@@ -34,7 +36,13 @@ internal fun buildTagsUiStateFlow(
     scope: CoroutineScope
 ): StateFlow<TagsUiState> {
     return combine(
-        combine(flows.tags, flows.searchQuery, flows.sortOrder, ::TagsListData),
+        combine(
+            flows.tags,
+            flows.searchQuery,
+            flows.sortOrder,
+            flows.viewMode,
+            ::TagsListData
+        ),
         combine(flows.selectedTagName, flows.notesForSelectedTag, ::TagsSelectionData),
         flows.activeDialog
     ) { listData, selectionData, dialog ->
@@ -42,6 +50,7 @@ internal fun buildTagsUiStateFlow(
             tags = listData.tags,
             searchQuery = listData.searchQuery,
             sortOrder = listData.sortOrder,
+            viewMode = listData.viewMode,
             selectedTagName = selectionData.selectedTagName,
             notesForSelectedTag = selectionData.notes,
             isLoading = false,

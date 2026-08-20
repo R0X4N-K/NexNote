@@ -42,10 +42,12 @@ internal fun TagsTopBar(
                     expanded = showSortMenu,
                     onClick = actions.onSortMenuOpen
                 )
-                SortDropdownMenu(
+                TagsOverflowMenu(
                     expanded = showSortMenu,
                     current = uiState.sortOrder,
+                    viewMode = uiState.viewMode,
                     onSelect = actions.onSortSelect,
+                    onViewModeToggle = actions.onViewModeToggle,
                     onDismiss = actions.onSortMenuDismiss
                 )
             }
