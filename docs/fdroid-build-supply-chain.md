@@ -47,6 +47,10 @@ variants. Keeping this task in the metadata update command is important because
 build tools such as KSP can resolve additional detached configurations only
 while their tasks execute. The maintenance command forces task execution so an
 up-to-date output or build-cache entry cannot hide one of those configurations.
+The gate also resolves the Linux, macOS, and Windows AAPT2 binaries explicitly,
+so checksum metadata generated on one host remains valid on the other supported
+build hosts. The AAPT2 coordinate in the version catalog must be updated with
+AGP and must use the build number published by that AGP release.
 
 After a reviewed dependency or build-plugin change, refresh checksum metadata
 from the declared repositories and execute the complete gate:
