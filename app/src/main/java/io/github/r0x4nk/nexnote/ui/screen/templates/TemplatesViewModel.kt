@@ -6,13 +6,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.nextIn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -125,6 +126,8 @@ class TemplatesViewModel(
                     TemplatesDialog.None -> return@launch
                 }
                 closeDialog()
+            } catch (error: CancellationException) {
+                throw error
             } catch (e: Exception) {
                 _extra.update {
                     it.copy(
@@ -147,8 +150,7 @@ class TemplatesViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val templates = app.useCases.templates
                 TemplatesViewModel(
                     observeTemplates = templates.observeTemplates,

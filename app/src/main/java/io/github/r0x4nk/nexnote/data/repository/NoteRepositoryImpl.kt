@@ -10,6 +10,7 @@ import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.util.DateUtils
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import io.github.r0x4nk.nexnote.util.SearchUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
+import java.io.IOException
 
 /**
  * Room-backed implementation of the domain [NoteRepository] contract.
@@ -159,15 +161,15 @@ class NoteRepositoryImpl(
             ?.takeIf { it.isDeleted }
             ?.imagePaths()
             .orEmpty()
-        val deletedRows = dao.deleteNotePermanently(id)
-        if (deletedRows > 0) deleteImages(imagePaths)
+        deleteImages(imagePaths)
+        dao.deleteNotePermanently(id)
     }
 
     override suspend fun emptyTrash() {
         val imagePaths = dao.getDeletedImagePathsRaw()
             .flatMap(::parseImagePaths)
-        val deletedRows = dao.emptyTrash()
-        if (deletedRows > 0) deleteImages(imagePaths)
+        deleteImages(imagePaths)
+        dao.emptyTrash()
     }
 
     override suspend fun setPinned(id: Long, isPinned: Boolean) =
@@ -219,18 +221,28 @@ class NoteRepositoryImpl(
     )
 
     private suspend fun deleteImages(imagePaths: List<String>) {
-        imagePaths
-            .asSequence()
-            .filter { it.isNotBlank() }
-            .distinct()
-            .forEach { relativePath ->
-                runCatching { imageStorage.deleteImage(relativePath) }
-                    .onFailure { error ->
-                        NexNoteDebugLog.repositoryWarning(event = "imageCleanupFailed") {
-                            "path=$relativePath ${NexNoteDebugLog.throwableSummary(error)}"
-                        }
-                    }
+        val failedPaths = mutableListOf<String>()
+        imagePaths.filter { it.isNotBlank() }.distinct().forEach { relativePath ->
+            var deleted = false
+            for (attempt in 1..IMAGE_DELETE_MAX_ATTEMPTS) {
+                val result = runCatchingPreservingCancellation {
+                    imageStorage.deleteImage(relativePath)
+                }
+                if (result.getOrDefault(false)) {
+                    deleted = true
+                    break
+                }
+                NexNoteDebugLog.repositoryWarning(event = "imageCleanupAttemptFailed") {
+                    "attempt=$attempt " +
+                        result.exceptionOrNull()?.let(NexNoteDebugLog::throwableSummary)
+                            .orEmpty()
+                }
             }
+            if (!deleted) failedPaths += relativePath
+        }
+        if (failedPaths.isNotEmpty()) {
+            throw ImageCleanupException(failedPaths.size)
+        }
     }
 
     private fun NoteEntity.imagePaths(): List<String> =
@@ -261,7 +273,7 @@ class NoteRepositoryImpl(
                 append(" item").append(index)
                     .append(".contentLen=").append(note.content.length)
                     .append(" item").append(index)
-                    .append(".contentHash=").append(note.content.hashCode())
+                    .append(".content=redacted")
             }
         }
     }
@@ -269,5 +281,9 @@ class NoteRepositoryImpl(
     companion object {
         private const val MS_PER_DAY = 86_400_000L
         private const val FLOW_STOP_TIMEOUT_MS = 5_000L
+        private const val IMAGE_DELETE_MAX_ATTEMPTS = 3
     }
 }
+
+internal class ImageCleanupException(failedFileCount: Int) :
+    IOException("Could not delete $failedFileCount internal image file(s)")

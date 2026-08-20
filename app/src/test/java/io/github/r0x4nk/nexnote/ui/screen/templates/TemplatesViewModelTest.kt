@@ -7,6 +7,7 @@ import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,6 +131,20 @@ class TemplatesViewModelTest {
         assertEquals(2, fakeDao.deletedCount)
     }
 
+    @Test
+    fun `confirmDelete cancellation is not converted to an ordinary error`() = runViewModelTest {
+        val template = template(id = 9L)
+        fakeDao.deleteFailure = CancellationException("delete cancelled")
+        viewModel.requestDelete(template)
+
+        viewModel.confirmDelete()
+        advanceUntilIdle()
+
+        assertEquals(0, fakeDao.deletedCount)
+        assertEquals(TemplatesDialog.ConfirmDelete(template), viewModel.uiState.value.activeDialog)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
     // ── errorMessage ──────────────────────────────────────────────────────────
 
     @Test
@@ -165,6 +180,7 @@ private class FakeTemplateDao : TemplateDao {
     var deletedCount = 0
     var failOnInsert = false
     var failOnDelete = false
+    var deleteFailure: Throwable? = null
     private var nextId = 100L
 
     override fun getAllTemplates(): Flow<List<TemplateEntity>> = _templates
@@ -189,6 +205,7 @@ private class FakeTemplateDao : TemplateDao {
     }
 
     override suspend fun deleteTemplate(template: TemplateEntity) {
+        deleteFailure?.let { throw it }
         if (failOnDelete) throw RuntimeException("Delete fallito")
         deletedCount++
         _templates.value = _templates.value.filter { it.id != template.id }

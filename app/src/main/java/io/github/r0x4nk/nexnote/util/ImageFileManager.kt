@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.util
 
 import java.io.File
+import java.io.IOException
 
 /**
  * Manages note image files stored in internal storage.
@@ -56,15 +57,43 @@ object ImageFileManager {
      * Returns the absolute [File] for the given [relativePath] under [filesDir].
      * The file may or may not exist — callers must check before reading.
      */
-    fun getImageFile(filesDir: File, relativePath: String): File =
-        File(filesDir, relativePath)
+    fun getImageFile(filesDir: File, relativePath: String): File {
+        val normalized = relativePath.replace('\\', '/')
+        val segments = normalized.split('/')
+        require(
+            segments.size >= 2 &&
+                segments.first() == IMAGES_DIR &&
+                segments.none { it.isBlank() || it == "." || it == ".." }
+        ) { "Image path is outside the image namespace" }
+        require(!File(relativePath).isAbsolute) { "Absolute image paths are not allowed" }
+
+        val canonicalFilesDir = filesDir.canonicalFile
+        val logicalImageRoot = File(canonicalFilesDir, IMAGES_DIR).absoluteFile.toPath().normalize()
+        val canonicalImageRoot = logicalImageRoot.toFile().canonicalFile.toPath()
+        if (canonicalImageRoot != logicalImageRoot) {
+            throw IOException("Image directory resolves through a filesystem link")
+        }
+
+        val candidate = File(canonicalFilesDir, normalized).canonicalFile.toPath()
+        require(candidate != canonicalImageRoot && candidate.startsWith(canonicalImageRoot)) {
+            "Image path escapes the image directory"
+        }
+        return candidate.toFile()
+    }
 
     /**
      * Creates the shared images directory under [filesDir] if it does not already
      * exist and returns it. Safe to call repeatedly (idempotent).
      */
     fun ensureImageDir(filesDir: File): File =
-        File(filesDir, IMAGES_DIR).also { it.mkdirs() }
+        File(filesDir.canonicalFile, IMAGES_DIR).also { directory ->
+            if (!directory.exists() && !directory.mkdirs()) {
+                throw IOException("Could not create image directory")
+            }
+            if (!directory.isDirectory || directory.canonicalFile != directory.absoluteFile) {
+                throw IOException("Image directory is not a confined directory")
+            }
+        }
 
     /**
      * Deletes the image at [relativePath] under [filesDir].

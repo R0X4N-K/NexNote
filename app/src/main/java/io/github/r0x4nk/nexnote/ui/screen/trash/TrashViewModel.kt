@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.EmptyTrashUseCase
@@ -15,6 +15,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Immutable
@@ -22,7 +23,8 @@ data class TrashUiState(
     val notes: List<Note> = emptyList(),
     val isLoading: Boolean = true,
     val noteToDelete: Note? = null,        // non-null → delete-confirmation dialog is shown
-    val showEmptyTrashDialog: Boolean = false
+    val showEmptyTrashDialog: Boolean = false,
+    val errorMessage: String? = null
 )
 
 class TrashViewModel(
@@ -59,8 +61,16 @@ class TrashViewModel(
     fun confirmDeletePermanently() {
         val note = _extra.value.noteToDelete ?: return
         viewModelScope.launch {
-            deleteNotePermanently(note.id)
-            _extra.update { it.copy(noteToDelete = null) }
+            try {
+                deleteNotePermanently(note.id)
+                _extra.update { it.copy(noteToDelete = null, errorMessage = null) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _extra.update {
+                    it.copy(errorMessage = "Could not permanently delete the note. Try again.")
+                }
+            }
         }
     }
 
@@ -80,8 +90,14 @@ class TrashViewModel(
      */
     fun confirmEmptyTrash() {
         viewModelScope.launch {
-            emptyTrash()
-            _extra.update { it.copy(showEmptyTrashDialog = false) }
+            try {
+                emptyTrash()
+                _extra.update { it.copy(showEmptyTrashDialog = false, errorMessage = null) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _extra.update { it.copy(errorMessage = "Could not empty the trash. Try again.") }
+            }
         }
     }
 
@@ -89,11 +105,14 @@ class TrashViewModel(
         _extra.update { it.copy(showEmptyTrashDialog = false) }
     }
 
+    fun clearError() {
+        _extra.update { it.copy(errorMessage = null) }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val useCases = app.useCases
                 TrashViewModel(
                     observeDeletedNotes = useCases.notes.observeDeletedNotes,

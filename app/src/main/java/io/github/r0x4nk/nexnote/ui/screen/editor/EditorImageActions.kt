@@ -3,11 +3,15 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.util.insertStandaloneMarkdownBlock
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import java.io.InputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val IMAGE_INSERT_ERROR = "Could not insert image"
 private const val IMAGE_REMOVE_ERROR = "Could not remove image"
@@ -62,6 +66,7 @@ internal class EditorImageActions(
         val noteId = uiState.value.noteId
         uiState.update { it.copy(isSaving = true) }
         var copiedRelativePath: String? = null
+        val stateBeforeInsert = uiState.value
         try {
             val relativePath = copyNoteImageToInternal(noteId, openImageInputStream)
             copiedRelativePath = relativePath
@@ -79,10 +84,22 @@ internal class EditorImageActions(
                 return
             }
             after?.let { recordContentHistoryChange(before, it) }
+        } catch (error: CancellationException) {
+            withContext(NonCancellable) {
+                copiedRelativePath?.let { relativePath ->
+                    try {
+                        deleteNoteImage(relativePath)
+                    } catch (cleanupError: Throwable) {
+                        error.addSuppressed(cleanupError)
+                    }
+                }
+            }
+            uiState.value = stateBeforeInsert.copy(isSaving = false)
+            throw error
         } catch (e: Exception) {
             copiedRelativePath
                 ?.takeIf { uiState.value.isVaultNote }
-                ?.let { runCatching { deleteNoteImage(it) } }
+                ?.let { runCatchingPreservingCancellation { deleteNoteImage(it) } }
             uiState.update { it.copy(isSaving = false, errorMessage = IMAGE_INSERT_ERROR) }
         }
     }
@@ -91,7 +108,7 @@ internal class EditorImageActions(
         relativePath: String,
         beforeState: EditorUiState
     ) {
-        runCatching { deleteNoteImage(relativePath) }
+        runCatchingPreservingCancellation { deleteNoteImage(relativePath) }
         uiState.update { current ->
             current.copy(
                 content = beforeState.content,
@@ -161,7 +178,7 @@ internal class EditorImageActions(
             rollbackFailedVaultImageRemoval(beforeState)
             return
         }
-        runCatching { deleteNoteImage(relativePath) }
+        runCatchingPreservingCancellation { deleteNoteImage(relativePath) }
         after?.let { recordContentHistoryChange(before, it) }
     }
 

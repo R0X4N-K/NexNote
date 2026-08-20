@@ -1,6 +1,9 @@
 package io.github.r0x4nk.nexnote.data.repository
 
 import androidx.room.Room
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.r0x4nk.nexnote.data.db.NexNoteDatabase
@@ -9,19 +12,29 @@ import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
 import io.github.r0x4nk.nexnote.data.db.entity.TagEntity
 import io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage
 import io.github.r0x4nk.nexnote.data.local.VaultImageFileEncryptionResult
+import io.github.r0x4nk.nexnote.data.local.VaultImageFileRewrapBackup
 import io.github.r0x4nk.nexnote.data.local.VaultImageFileStorage
 import io.github.r0x4nk.nexnote.data.security.VaultFieldCipher
+import io.github.r0x4nk.nexnote.data.security.VaultKeyDeriver
+import io.github.r0x4nk.nexnote.data.security.VaultPinHasher
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.VaultLockedException
+import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
 import io.github.r0x4nk.nexnote.testing.NoOpNoteImageStorage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -107,74 +120,6 @@ class VaultNoteRepositoryImplTest {
 
         assertTrue(repository.vaultNotes.first().isEmpty())
         assertNull(repository.getVaultNoteById(id))
-    }
-
-    @Test
-    fun vaultTags_aggregatesUnlockedActiveVaultNotesAndDoesNotWriteNormalTagIndex() = runTest {
-        val firstId = repository.saveVaultNote(
-            Note(
-                title = "Private #titleonly",
-                content = "Body #beta #alpha",
-                creationDate = 1_000L
-            )
-        )
-        val secondId = repository.saveVaultNote(
-            Note(
-                title = "Second",
-                content = "More #alpha #gamma",
-                creationDate = 2_000L
-            )
-        )
-        val trashedId = repository.saveVaultNote(
-            Note(
-                title = "Trash #deleted",
-                content = "Hidden #alpha",
-                creationDate = 500L
-            )
-        )
-        repository.moveVaultNoteToTrash(trashedId)
-
-        val tags = repository.vaultTags.first()
-
-        assertEquals(
-            listOf("alpha" to 2, "beta" to 1, "gamma" to 1),
-            tags.map { it.name to it.noteCount }
-        )
-        assertEquals(1_000L, tags.first { it.name == "alpha" }.createdDate)
-        assertTrue(db.tagDao().getCrossRefsForNote(firstId).isEmpty())
-        assertTrue(db.tagDao().getCrossRefsForNote(secondId).isEmpty())
-        assertTrue(db.tagDao().getCrossRefsForNote(trashedId).isEmpty())
-        assertEquals(0, db.countRows("tags"))
-        assertEquals(0, db.countRows("note_tag_cross_ref"))
-
-        keyProvider.lock()
-
-        assertTrue(repository.vaultTags.first().isEmpty())
-    }
-
-    @Test
-    fun vaultTags_activeCollectorEmitsEmptyWhenVaultLocksWithoutDatabaseEmission() = runTest {
-        repository.saveVaultNote(
-            Note(
-                title = "Private",
-                content = "Body #secret",
-                creationDate = 1_000L
-            )
-        )
-
-        val emissions = mutableListOf<List<String>>()
-        val collection = launch {
-            repository.vaultTags.collect { tags ->
-                emissions += tags.map { it.name }
-            }
-        }
-
-        waitUntil { emissions.lastOrNull() == listOf("secret") }
-
-        keyProvider.lock()
-
-        waitUntil { emissions.lastOrNull() == emptyList<String>() }
-        collection.cancel()
     }
 
     @Test
@@ -1016,7 +961,7 @@ class VaultNoteRepositoryImplTest {
         val secondModifiedBefore = secondBefore?.lastModifiedDate
         val newKey: SecretKey = SecretKeySpec(ByteArray(32) { idx -> (-(idx + 1)).toByte() }, "AES")
 
-        repository.rewrapAllVaultNotesWith(newKey)
+        repository.rewrapAndCommitForTest(keyProvider, newKey)
 
         val firstAfter = db.noteDao().getVaultNoteById(firstId)
         val secondAfter = db.noteDao().getVaultNoteById(secondId)
@@ -1048,6 +993,417 @@ class VaultNoteRepositoryImplTest {
     }
 
     @Test
+    fun rewrapAllVaultNotesWith_reencryptsTrashedVaultNoteAndItsPhysicalImage() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val imageRoot = File(context.cacheDir, "vault-rewrap-trash-image").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = imageRoot)
+        val fileStorage = VaultImageFileStorage(imageStorage = realImageStorage)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher,
+            vaultImageFileStorage = fileStorage
+        )
+
+        try {
+            val relativePath = "images/note_1_img_200.jpg"
+            val originalBytes = byteArrayOf(11, 22, 33, 44)
+            realImageStorage.getImageFile(relativePath).apply {
+                parentFile?.mkdirs()
+                writeBytes(originalBytes)
+            }
+            val noteId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Trashed secret",
+                    content = "Trashed body",
+                    imagePaths = listOf(relativePath),
+                    creationDate = 1_000L
+                )
+            )
+            assertTrue(physicalRepository.moveVaultNoteToTrash(noteId))
+            val newKey: SecretKey = SecretKeySpec(
+                ByteArray(32) { index -> (index + 31).toByte() },
+                "AES"
+            )
+
+            physicalRepository.rewrapAndCommitForTest(keyProvider, newKey)
+            keyProvider.replaceKey(newKey)
+
+            val trashed = physicalRepository.vaultTrashedNotes.first().single()
+            assertEquals("Trashed secret", trashed.title)
+            assertEquals("Trashed body", trashed.content)
+            assertEquals(listOf(relativePath), trashed.imagePaths)
+            val decryptedImage = physicalRepository.decryptVaultImageBytes(relativePath)
+            assertTrue(decryptedImage?.contentEquals(originalBytes) == true)
+            decryptedImage?.fill(0)
+            assertTrue(physicalRepository.restoreVaultNoteFromTrash(noteId))
+            assertEquals("Trashed secret", physicalRepository.getVaultNoteById(noteId)?.title)
+        } finally {
+            imageRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun changePin_withRealRoomAndFiles_preservesActiveTrashImagesAndRestore() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "vault-change-pin-integration").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val dataStoreFile = File(root, "vault.preferences_pb")
+        val dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { dataStoreFile }
+        )
+        val realImageStorage = InternalNoteImageStorage(filesDir = root)
+        val vaultRepository = VaultRepositoryImpl(
+            dataStore = dataStore,
+            pinHasher = VaultPinHasher(iterations = 1_000),
+            keyDeriver = VaultKeyDeriver(iterations = 1_000)
+        )
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = vaultRepository,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+        vaultRepository.bindNoteMaintenance(physicalRepository, physicalRepository)
+
+        try {
+            vaultRepository.configurePin("1111".toCharArray())
+            assertTrue(vaultRepository.unlockWithPin("1111".toCharArray()))
+            val activePath = "images/note_1_img_active.jpg"
+            val trashPath = "images/note_2_img_trash.jpg"
+            val activeBytes = byteArrayOf(1, 3, 5, 7)
+            val trashBytes = byteArrayOf(2, 4, 6, 8)
+            realImageStorage.getImageFile(activePath).apply {
+                parentFile?.mkdirs()
+                writeBytes(activeBytes)
+            }
+            realImageStorage.getImageFile(trashPath).writeBytes(trashBytes)
+            val activeId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Active after PIN change",
+                    content = "Active body",
+                    imagePaths = listOf(activePath),
+                    creationDate = 1_000L
+                )
+            )
+            val trashId = physicalRepository.saveVaultNote(
+                Note(
+                    title = "Trash after PIN change",
+                    content = "Trash body",
+                    imagePaths = listOf(trashPath),
+                    creationDate = 2_000L
+                )
+            )
+            assertTrue(physicalRepository.moveVaultNoteToTrash(trashId))
+
+            val result = vaultRepository.changePin(
+                currentPin = "1111".toCharArray(),
+                newPin = "2222".toCharArray()
+            )
+
+            assertEquals(ChangeVaultPinResult.Success, result)
+            vaultRepository.lock()
+            assertFalse(vaultRepository.unlockWithPin("1111".toCharArray()))
+            assertTrue(vaultRepository.unlockWithPin("2222".toCharArray()))
+            assertEquals(
+                "Active after PIN change",
+                physicalRepository.getVaultNoteById(activeId)?.title
+            )
+            assertEquals(
+                "Trash after PIN change",
+                physicalRepository.vaultTrashedNotes.first().single().title
+            )
+            val activeAfter = physicalRepository.decryptVaultImageBytes(activePath)
+            val trashAfter = physicalRepository.decryptVaultImageBytes(trashPath)
+            assertTrue(activeAfter?.contentEquals(activeBytes) == true)
+            assertTrue(trashAfter?.contentEquals(trashBytes) == true)
+            activeAfter?.fill(0)
+            trashAfter?.fill(0)
+            assertTrue(physicalRepository.restoreVaultNoteFromTrash(trashId))
+            assertEquals(
+                "Trash after PIN change",
+                physicalRepository.getVaultNoteById(trashId)?.title
+            )
+            assertTrue(
+                root.walkTopDown().none { file -> file.name.contains(".rekey-old-") }
+            )
+        } finally {
+            dataStoreScope.cancel()
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rewrapAllVaultNotesWith_roomFailureRollsBackRowsAndImagesToOldKey() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "vault-rewrap-room-failure").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = root)
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+        val firstPath = "images/room_failure_first.jpg"
+        val secondPath = "images/room_failure_second.jpg"
+        val firstBytes = byteArrayOf(9, 8, 7, 6)
+        val secondBytes = byteArrayOf(6, 7, 8, 9)
+
+        try {
+            realImageStorage.getImageFile(firstPath).apply {
+                parentFile?.mkdirs()
+                writeBytes(firstBytes)
+            }
+            realImageStorage.getImageFile(secondPath).writeBytes(secondBytes)
+            val firstId = physicalRepository.saveVaultNote(
+                Note(title = "First old key", imagePaths = listOf(firstPath))
+            )
+            val secondId = physicalRepository.saveVaultNote(
+                Note(title = "Second old key", imagePaths = listOf(secondPath))
+            )
+            db.openHelper.writableDatabase.execSQL(
+                """
+                CREATE TRIGGER fail_vault_rewrap
+                BEFORE UPDATE ON notes
+                WHEN OLD.id = $secondId
+                BEGIN
+                    SELECT RAISE(ABORT, 'forced rewrap update failure');
+                END
+                """.trimIndent()
+            )
+            val newKey = SecretKeySpec(ByteArray(32) { (it + 41).toByte() }, "AES")
+
+            val result = runCatching {
+                physicalRepository.rewrapAndCommitForTest(keyProvider, newKey)
+            }
+
+            assertTrue(result.isFailure)
+            assertEquals("First old key", physicalRepository.getVaultNoteById(firstId)?.title)
+            assertEquals("Second old key", physicalRepository.getVaultNoteById(secondId)?.title)
+            val firstAfter = physicalRepository.decryptVaultImageBytes(firstPath)
+            val secondAfter = physicalRepository.decryptVaultImageBytes(secondPath)
+            assertTrue(firstAfter?.contentEquals(firstBytes) == true)
+            assertTrue(secondAfter?.contentEquals(secondBytes) == true)
+            firstAfter?.fill(0)
+            secondAfter?.fill(0)
+            assertTrue(root.walkTopDown().none { it.name.contains(".rekey-old-") })
+        } finally {
+            db.openHelper.writableDatabase.execSQL("DROP TRIGGER IF EXISTS fail_vault_rewrap")
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rewrapAllVaultNotesWith_imageFailureRollsBackEarlierImageAndRoomRows() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "vault-rewrap-image-failure").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = root)
+        val setupRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+        val firstPath = "images/io_failure_first.jpg"
+        val failingPath = "images/io_failure_second.jpg"
+        val firstBytes = byteArrayOf(12, 13, 14)
+        val secondBytes = byteArrayOf(21, 22, 23)
+
+        try {
+            realImageStorage.getImageFile(firstPath).apply {
+                parentFile?.mkdirs()
+                writeBytes(firstBytes)
+            }
+            realImageStorage.getImageFile(failingPath).writeBytes(secondBytes)
+            val firstId = setupRepository.saveVaultNote(
+                Note(title = "First I/O old key", imagePaths = listOf(firstPath))
+            )
+            val secondId = setupRepository.saveVaultNote(
+                Note(title = "Second I/O old key", imagePaths = listOf(failingPath))
+            )
+            val failingRepository = VaultNoteRepositoryImpl(
+                database = db,
+                dao = db.noteDao(),
+                tagDao = db.tagDao(),
+                keyProvider = keyProvider,
+                imageStorage = realImageStorage,
+                fieldCipher = cipher,
+                vaultImageFileStorage = RewrapFailingVaultImageFileStorage(
+                    imageStorage = realImageStorage,
+                    failPath = failingPath
+                )
+            )
+            val newKey = SecretKeySpec(ByteArray(32) { (it + 51).toByte() }, "AES")
+
+            val result = runCatching {
+                failingRepository.rewrapAndCommitForTest(keyProvider, newKey)
+            }
+
+            assertTrue(result.isFailure)
+            assertEquals("First I/O old key", setupRepository.getVaultNoteById(firstId)?.title)
+            assertEquals("Second I/O old key", setupRepository.getVaultNoteById(secondId)?.title)
+            val firstAfter = setupRepository.decryptVaultImageBytes(firstPath)
+            val secondAfter = setupRepository.decryptVaultImageBytes(failingPath)
+            assertTrue(firstAfter?.contentEquals(firstBytes) == true)
+            assertTrue(secondAfter?.contentEquals(secondBytes) == true)
+            firstAfter?.fill(0)
+            secondAfter?.fill(0)
+            assertTrue(root.walkTopDown().none { it.name.contains(".rekey-old-") })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rewrapAllVaultNotesWith_cancellationRollsBackImageAndRows() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "vault-rewrap-cancellation").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val realImageStorage = InternalNoteImageStorage(filesDir = root)
+        val setupRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = keyProvider,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+        val path = "images/cancel_rewrap.jpg"
+        val originalBytes = byteArrayOf(31, 32, 33)
+
+        try {
+            realImageStorage.getImageFile(path).apply {
+                parentFile?.mkdirs()
+                writeBytes(originalBytes)
+            }
+            val noteId = setupRepository.saveVaultNote(
+                Note(title = "Cancellation old key", imagePaths = listOf(path))
+            )
+            val pausingStorage = PausingRewrapVaultImageFileStorage(
+                imageStorage = realImageStorage,
+                pausePath = path
+            )
+            val cancellingRepository = VaultNoteRepositoryImpl(
+                database = db,
+                dao = db.noteDao(),
+                tagDao = db.tagDao(),
+                keyProvider = keyProvider,
+                imageStorage = realImageStorage,
+                fieldCipher = cipher,
+                vaultImageFileStorage = pausingStorage
+            )
+            val newKey = SecretKeySpec(ByteArray(32) { (it + 61).toByte() }, "AES")
+            val rewrapJob = async(Dispatchers.Default) {
+                cancellingRepository.rewrapAndCommitForTest(keyProvider, newKey)
+            }
+
+            pausingStorage.replacementFinished.await()
+            rewrapJob.cancel()
+            pausingStorage.allowReturn.complete(Unit)
+            val cancellation = runCatching { rewrapJob.await() }.exceptionOrNull()
+
+            assertTrue(cancellation is kotlinx.coroutines.CancellationException)
+            assertTrue(rewrapJob.isCancelled)
+            assertEquals(1, pausingStorage.rollbackCount)
+            assertEquals(1, pausingStorage.backupDeletionCount)
+            assertEquals("Cancellation old key", setupRepository.getVaultNoteById(noteId)?.title)
+            val imageAfter = setupRepository.decryptVaultImageBytes(path)
+            assertTrue(imageAfter?.contentEquals(originalBytes) == true)
+            imageAfter?.fill(0)
+            assertTrue(root.walkTopDown().none { it.name.contains(".rekey-old-") })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun changePin_dataStoreFailureRollsBackRealRoomRowsAndPhysicalImage() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "vault-change-pin-datastore-failure").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val delegate = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { File(root, "vault.preferences_pb") }
+        )
+        val dataStore = FailingPreferencesDataStore(delegate)
+        val realImageStorage = InternalNoteImageStorage(filesDir = root)
+        val vaultRepository = VaultRepositoryImpl(
+            dataStore = dataStore,
+            pinHasher = VaultPinHasher(iterations = 1_000),
+            keyDeriver = VaultKeyDeriver(iterations = 1_000)
+        )
+        val physicalRepository = VaultNoteRepositoryImpl(
+            database = db,
+            dao = db.noteDao(),
+            tagDao = db.tagDao(),
+            keyProvider = vaultRepository,
+            imageStorage = realImageStorage,
+            fieldCipher = cipher
+        )
+        vaultRepository.bindNoteMaintenance(physicalRepository, physicalRepository)
+        val path = "images/datastore_failure.jpg"
+        val originalBytes = byteArrayOf(71, 72, 73)
+
+        try {
+            vaultRepository.configurePin("1111".toCharArray())
+            assertTrue(vaultRepository.unlockWithPin("1111".toCharArray()))
+            realImageStorage.getImageFile(path).apply {
+                parentFile?.mkdirs()
+                writeBytes(originalBytes)
+            }
+            val noteId = physicalRepository.saveVaultNote(
+                Note(title = "DataStore old key", imagePaths = listOf(path))
+            )
+            dataStore.failNextUpdate = true
+
+            val result = vaultRepository.changePin(
+                currentPin = "1111".toCharArray(),
+                newPin = "2222".toCharArray()
+            )
+
+            assertEquals(ChangeVaultPinResult.RewrapFailed, result)
+            assertEquals("DataStore old key", physicalRepository.getVaultNoteById(noteId)?.title)
+            val imageAfter = physicalRepository.decryptVaultImageBytes(path)
+            assertTrue(imageAfter?.contentEquals(originalBytes) == true)
+            imageAfter?.fill(0)
+            vaultRepository.lock()
+            assertTrue(vaultRepository.unlockWithPin("1111".toCharArray()))
+            assertFalse(vaultRepository.unlockWithPin("2222".toCharArray()))
+            assertTrue(root.walkTopDown().none { it.name.contains(".rekey-old-") })
+        } finally {
+            dataStoreScope.cancel()
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rewrapAllVaultNotesWith_failsWhenLocked() = runTest {
         val noteId = repository.saveVaultNote(
             Note(title = "Locked title", content = "Locked body", creationDate = 1_000L)
@@ -1056,7 +1412,7 @@ class VaultNoteRepositoryImplTest {
         keyProvider.lock()
         val newKey: SecretKey = SecretKeySpec(ByteArray(32) { idx -> (idx + 7).toByte() }, "AES")
 
-        val result = runCatching { repository.rewrapAllVaultNotesWith(newKey) }
+        val result = runCatching { repository.rewrapAndCommitForTest(keyProvider, newKey) }
 
         assertTrue(result.exceptionOrNull() is VaultLockedException)
         val after = db.noteDao().getVaultNoteById(noteId)
@@ -1081,7 +1437,7 @@ class VaultNoteRepositoryImplTest {
         val normalBefore = db.noteDao().getNoteById(normalId)
         val newKey: SecretKey = SecretKeySpec(ByteArray(32) { idx -> (idx + 13).toByte() }, "AES")
 
-        repository.rewrapAllVaultNotesWith(newKey)
+        repository.rewrapAndCommitForTest(keyProvider, newKey)
 
         val normalAfter = db.noteDao().getNoteById(normalId)
         assertEquals("Normal title", normalAfter?.title)
@@ -1125,7 +1481,7 @@ class VaultNoteRepositoryImplTest {
         )
         assertNull(db.noteDao().getVaultNoteById(activeVaultId))
         assertEquals(emptyList<Long>(), db.noteDao().getAllVaultNotes().first().map { it.id })
-        assertTrue(db.noteDao().getAllVaultNotesOnce().isEmpty())
+        assertTrue(db.noteDao().getAllVaultNotesForWipeOnce().isEmpty())
         // Even after restoring the soft-deleted row's view, no Vault entries remain.
         assertNull(db.noteDao().getNoteById(activeVaultId))
         assertNull(db.noteDao().getNoteById(trashedVaultId))
@@ -1192,7 +1548,7 @@ class VaultNoteRepositoryImplTest {
         val result = runCatching { repository.wipeAllVaultNotes() }
 
         assertTrue(result.exceptionOrNull() is VaultLockedException)
-        assertTrue(db.noteDao().getAllVaultNotesOnce().isNotEmpty())
+        assertTrue(db.noteDao().getAllVaultNotesForWipeOnce().isNotEmpty())
         assertTrue(imageStorage.deletedPaths.isEmpty())
     }
 
@@ -1275,7 +1631,7 @@ class VaultNoteRepositoryImplTest {
         val removed = repository.wipeAllVaultNotes()
 
         assertEquals(2, removed)
-        assertTrue(db.noteDao().getAllVaultNotesOnce().isEmpty())
+        assertTrue(db.noteDao().getAllVaultNotesForWipeOnce().isEmpty())
         assertNull(db.noteDao().getNoteById(goodId))
         assertNull(db.noteDao().getNoteById(corruptId))
         // The decryptable row's image is cleaned; the corrupted row's image
@@ -1869,6 +2225,85 @@ private class FailingVaultImageFileStorage(
     }
 }
 
+private class RewrapFailingVaultImageFileStorage(
+    imageStorage: NoteImageStorage,
+    private val failPath: String
+) : VaultImageFileStorage(imageStorage = imageStorage) {
+    override suspend fun rewrapInPlace(
+        relativePath: String,
+        currentKey: SecretKey,
+        newKey: SecretKey,
+        onBackupCreated: (VaultImageFileRewrapBackup) -> Unit
+    ): VaultImageFileRewrapBackup? {
+        if (relativePath == failPath) {
+            throw IOException("Forced Vault image rewrap failure.")
+        }
+        return super.rewrapInPlace(relativePath, currentKey, newKey, onBackupCreated)
+    }
+}
+
+private class PausingRewrapVaultImageFileStorage(
+    imageStorage: NoteImageStorage,
+    private val pausePath: String
+) : VaultImageFileStorage(imageStorage = imageStorage) {
+    val replacementFinished = CompletableDeferred<Unit>()
+    val allowReturn = CompletableDeferred<Unit>()
+    @Volatile
+    var rollbackCount = 0
+        private set
+    @Volatile
+    var backupDeletionCount = 0
+        private set
+
+    override suspend fun rewrapInPlace(
+        relativePath: String,
+        currentKey: SecretKey,
+        newKey: SecretKey,
+        onBackupCreated: (VaultImageFileRewrapBackup) -> Unit
+    ): VaultImageFileRewrapBackup? {
+        val backup = super.rewrapInPlace(
+            relativePath,
+            currentKey,
+            newKey,
+            onBackupCreated
+        )
+        if (relativePath == pausePath) {
+            replacementFinished.complete(Unit)
+            allowReturn.await()
+        }
+        return backup
+    }
+
+    override suspend fun rollbackRewrap(backup: VaultImageFileRewrapBackup) {
+        rollbackCount += 1
+        super.rollbackRewrap(backup)
+    }
+
+    override suspend fun commitRewrap(backup: VaultImageFileRewrapBackup) {
+        backupDeletionCount += 1
+        super.commitRewrap(backup)
+    }
+}
+
+private class FailingPreferencesDataStore(
+    private val delegate: DataStore<Preferences>
+) : DataStore<Preferences> {
+    var failNextUpdate: Boolean = false
+
+    override val data: Flow<Preferences>
+        get() = delegate.data
+
+    override suspend fun updateData(
+        transform: suspend (t: Preferences) -> Preferences
+    ): Preferences {
+        if (failNextUpdate) {
+            failNextUpdate = false
+            throw IOException("Forced DataStore commit failure.")
+        }
+        return delegate.updateData(transform)
+    }
+}
+
 private class TestVaultKeyProvider : VaultUnlockedKeyProvider {
     private val key = MutableStateFlow<SecretKey?>(testVaultKey())
     override val unlockedVaultKey: StateFlow<SecretKey?> = key
@@ -1885,6 +2320,16 @@ private class TestVaultKeyProvider : VaultUnlockedKeyProvider {
         val unlockedKey = key.value ?: return null
         return block(unlockedKey)
     }
+}
+
+private suspend fun VaultNoteRepositoryImpl.rewrapAndCommitForTest(
+    keyProvider: VaultUnlockedKeyProvider,
+    newKey: SecretKey
+) {
+    val transaction = keyProvider.withUnlockedVaultKey { currentKey ->
+        rewrapAllVaultNotesWith(currentKey, newKey)
+    } ?: throw VaultLockedException()
+    transaction.commit()
 }
 
 private suspend fun waitUntil(condition: () -> Boolean) {

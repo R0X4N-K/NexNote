@@ -46,10 +46,10 @@ internal fun buildAgendaRawNotesForDayFlow(
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun buildAgendaFilteredNoteIdsFlow(
     selectedTagFilters: Flow<Set<String>>,
-    observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase?
+    observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase
 ): Flow<Set<Long>> {
     return selectedTagFilters.flatMapLatest { filters ->
-        if (filters.isEmpty() || observeFilteredNoteIds == null) flowOf(emptySet())
+        if (filters.isEmpty()) flowOf(emptySet())
         else observeFilteredNoteIds(filters)
     }
 }

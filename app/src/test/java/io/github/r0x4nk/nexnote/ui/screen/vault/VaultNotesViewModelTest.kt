@@ -5,7 +5,6 @@ import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
@@ -35,7 +34,6 @@ import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleVaultNotePinUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
-import io.github.r0x4nk.nexnote.util.VaultTagAggregator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -1246,8 +1244,6 @@ private class FakeVaultNoteRepository : VaultNoteRepository {
             notes.filter { it.isInVault && !it.isDeleted }
                 .map { note -> NoteLinkCandidate(id = note.id, title = note.title) }
         }
-    override val vaultTags: Flow<List<Tag>> =
-        notesFlow.map { notes -> VaultTagAggregator.aggregate(notes) }
     val removedIds = mutableListOf<Long>()
     val movedIds = mutableListOf<Long>()
     val trashedIds = mutableListOf<Long>()

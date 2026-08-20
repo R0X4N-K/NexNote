@@ -144,6 +144,82 @@ class VaultImageFileStorageTest {
         assertArrayEquals(encryptedBefore, file.readBytes())
     }
 
+    @Test
+    fun `rewrapInPlace keeps encrypted backup and writes ciphertext for new key`() = runTest {
+        val imageStorage = TestNoteImageStorage(tempFolder.root)
+        val vaultImageStorage = VaultImageFileStorage(imageStorage, fileCipher)
+        val relativePath = "images/note_rewrap.jpg"
+        val plainBytes = "REWRAP-PRIVATE-IMAGE".toByteArray(Charsets.UTF_8)
+        val file = writeImage(imageStorage, relativePath, plainBytes)
+        vaultImageStorage.encryptInPlace(relativePath, key)
+        val oldCiphertext = file.readBytes()
+
+        val backup = vaultImageStorage.rewrapInPlace(relativePath, key, differentKey)
+
+        assertTrue(backup != null)
+        assertTrue(backup!!.backupFile.isFile)
+        assertArrayEquals(oldCiphertext, backup.backupFile.readBytes())
+        assertFalse(String(backup.backupFile.readBytes()).contains("REWRAP-PRIVATE-IMAGE"))
+        val decrypted = vaultImageStorage.decryptToByteArray(relativePath, differentKey)
+        assertArrayEquals(
+            plainBytes,
+            (decrypted as VaultImageFileDecryptionResult.Decrypted).bytes
+        )
+        assertTrue(
+            runCatching { vaultImageStorage.decryptToByteArray(relativePath, key) }
+                .exceptionOrNull() is VaultDecryptionException
+        )
+
+        vaultImageStorage.commitRewrap(backup)
+
+        assertFalse(backup.backupFile.exists())
+    }
+
+    @Test
+    fun `rollbackRewrap restores exact old ciphertext and removes backup on commit`() = runTest {
+        val imageStorage = TestNoteImageStorage(tempFolder.root)
+        val vaultImageStorage = VaultImageFileStorage(imageStorage, fileCipher)
+        val relativePath = "images/note_rewrap_rollback.jpg"
+        val plainBytes = "ROLLBACK-PRIVATE-IMAGE".toByteArray(Charsets.UTF_8)
+        val file = writeImage(imageStorage, relativePath, plainBytes)
+        vaultImageStorage.encryptInPlace(relativePath, key)
+        val oldCiphertext = file.readBytes()
+        val backup = vaultImageStorage.rewrapInPlace(relativePath, key, differentKey)!!
+
+        vaultImageStorage.rollbackRewrap(backup)
+        vaultImageStorage.commitRewrap(backup)
+
+        assertArrayEquals(oldCiphertext, file.readBytes())
+        assertFalse(backup.backupFile.exists())
+        val decrypted = vaultImageStorage.decryptToByteArray(relativePath, key)
+        assertArrayEquals(
+            plainBytes,
+            (decrypted as VaultImageFileDecryptionResult.Decrypted).bytes
+        )
+    }
+
+    @Test
+    fun `rewrapInPlace failure leaves old ciphertext and no backup`() = runTest {
+        val imageStorage = TestNoteImageStorage(tempFolder.root)
+        val vaultImageStorage = VaultImageFileStorage(imageStorage, fileCipher)
+        val relativePath = "images/note_rewrap_failure.jpg"
+        val file = writeImage(
+            imageStorage,
+            relativePath,
+            "OLD-CIPHERTEXT-MUST-SURVIVE".toByteArray(Charsets.UTF_8)
+        )
+        vaultImageStorage.encryptInPlace(relativePath, key)
+        val oldCiphertext = file.readBytes()
+
+        val result = runCatching {
+            vaultImageStorage.rewrapInPlace(relativePath, differentKey, key)
+        }
+
+        assertTrue(result.exceptionOrNull() is VaultDecryptionException)
+        assertArrayEquals(oldCiphertext, file.readBytes())
+        assertTrue(file.parentFile?.listFiles()?.none { it.name.contains(".rekey-old-") } == true)
+    }
+
     private fun writeImage(
         imageStorage: NoteImageStorage,
         relativePath: String,

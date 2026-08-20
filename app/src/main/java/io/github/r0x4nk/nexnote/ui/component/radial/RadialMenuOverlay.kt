@@ -125,9 +125,9 @@ private const val ARC_END_LEFT    =  75f
  */
 @Composable
 fun RadialMenuOverlay(
+    modifier: Modifier = Modifier,
     isLeftHanded: Boolean = false,
     fabBottomOffset: Dp = 0.dp,
-    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val controller = remember { RadialMenuController() }

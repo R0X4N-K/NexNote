@@ -20,7 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -83,15 +83,15 @@ fun RadialMenu(
     items: List<RadialMenuItem>,
     onItemClick: (Int) -> Unit,
     onDismiss: () -> Unit,
-    radiusOffset: Dp = 0.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    radiusOffset: Dp = 0.dp
 ) {
     if (!state.isOpen || items.isEmpty()) return
 
     val density = LocalDensity.current
 
     // Scale from 0 → 1 on open for a pop-in entrance animation.
-    var targetScale by remember { mutableStateOf(0f) }
+    var targetScale by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) { targetScale = 1f }
     val animScale by animateFloatAsState(
         targetValue   = targetScale,

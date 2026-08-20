@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import kotlinx.coroutines.CancellationException
+
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -162,6 +164,26 @@ class EditorViewModelTemplateTest : EditorViewModelTestBase() {
             fakeNoteDao.insertedCount
         )
         assertNotEquals(EditorViewModel.NO_ID, vm.uiState.value.templateId)
+    }
+
+    @Test
+    fun `flushPendingChanges propagates template save cancellation without ordinary error`() = runTest {
+        fakeTemplateDao.insertFailure = CancellationException("cancel template save")
+        val vm = viewModel(editTemplateId = EditorViewModel.NEW_TEMPLATE_ID)
+        runCurrent()
+        vm.onTitleChange("Pending template")
+
+        var thrown: Throwable? = null
+        try {
+            vm.flushPendingChanges()
+        } catch (error: Throwable) {
+            thrown = error
+        }
+
+        assertTrue(thrown is CancellationException)
+        assertNull(vm.uiState.value.errorMessage)
+        assertTrue(vm.uiState.value.isDirty)
+        assertFalse(vm.uiState.value.isSaving)
     }
 
     @Test

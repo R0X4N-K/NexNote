@@ -59,7 +59,6 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNoteLinkCandidatesUse
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultRecentPreviewsProtectionUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTrashedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RemoveNoteFromVaultUseCase
@@ -227,7 +226,6 @@ internal class VaultUseCases internal constructor(
     val observeVaultNoteLinkCandidates =
         ObserveVaultNoteLinkCandidatesUseCase(vaultNoteRepository)
     val observeVaultTrashedNotes = ObserveVaultTrashedNotesUseCase(vaultNoteRepository)
-    val observeVaultTags = ObserveVaultTagsUseCase(vaultNoteRepository)
     val getVaultNoteById = GetVaultNoteByIdUseCase(vaultNoteRepository)
     val saveVaultNote = SaveVaultNoteUseCase(vaultNoteRepository)
     val duplicateVaultNote = DuplicateVaultNoteUseCase(vaultNoteRepository)

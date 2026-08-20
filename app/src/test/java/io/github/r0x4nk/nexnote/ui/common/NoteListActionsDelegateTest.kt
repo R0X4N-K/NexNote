@@ -145,7 +145,7 @@ class NoteListActionsDelegateTest {
         scope: CoroutineScope,
         repository: FakeNoteListRepository = FakeNoteListRepository(),
         tagRepository: FakeNoteListTagRepository = FakeNoteListTagRepository(),
-        duplicateNote: DuplicateNoteUseCase? = DuplicateNoteUseCase(
+        duplicateNote: DuplicateNoteUseCase = DuplicateNoteUseCase(
             noteRepository = repository,
             tagRepository = tagRepository,
             imageStorage = NoOpNoteImageStorage()

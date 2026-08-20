@@ -8,6 +8,7 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -25,8 +26,13 @@ internal class ExternalFileImporter(
 
             val uri = intent?.data
                 ?: return@withContext ExternalFileImportResult.Failed("File is not available")
+            val displayName = queryDisplayName(uri) ?: Uri.decode(uri.lastPathSegment.orEmpty())
+            val mimeType = intent.type ?: contentResolver.getType(uri)
+            if (!ExternalTextFormat.isSupported(mimeType, displayName)) {
+                return@withContext ExternalFileImportResult.Failed("Unsupported file type")
+            }
 
-            runCatching { importUri(uri) }
+            runCatchingPreservingCancellation { importUri(uri, displayName) }
                 .getOrElse { error ->
                     NexNoteDebugLog.persistence(
                         event = "externalFileImportFailed",
@@ -41,13 +47,12 @@ internal class ExternalFileImporter(
                 }
         }
 
-    private suspend fun importUri(uri: Uri): ExternalFileImportResult {
+    private suspend fun importUri(uri: Uri, displayName: String): ExternalFileImportResult {
         val declaredSize = querySize(uri)
         if (declaredSize != null && declaredSize > TextFileImportParser.MAX_CONTENT_BYTES) {
             return ExternalFileImportResult.Failed("File is too large")
         }
 
-        val displayName = queryDisplayName(uri) ?: Uri.decode(uri.lastPathSegment.orEmpty())
         val bytes = contentResolver.openInputStream(uri)
             ?.use { it.readBounded(TextFileImportParser.MAX_CONTENT_BYTES) }
             ?: return ExternalFileImportResult.Failed("File is not available")
@@ -68,7 +73,7 @@ internal class ExternalFileImporter(
                 lastModifiedDate = createdAt
             )
         )
-        runCatching {
+        runCatchingPreservingCancellation {
             indexNoteTags(noteId, importedFile.content)
         }.onFailure { error ->
             NexNoteDebugLog.persistence(
@@ -83,7 +88,7 @@ internal class ExternalFileImporter(
     private fun canHandle(intent: Intent?): Boolean {
         if (intent?.action != Intent.ACTION_VIEW) return false
         val scheme = intent.data?.scheme ?: return false
-        return scheme == ContentResolver.SCHEME_CONTENT || scheme == ContentResolver.SCHEME_FILE
+        return scheme == ContentResolver.SCHEME_CONTENT
     }
 
     private fun queryDisplayName(uri: Uri): String? =
@@ -124,4 +129,3 @@ internal class ExternalFileImporter(
 }
 
 private class ImportedFileTooLargeException : Exception()
-

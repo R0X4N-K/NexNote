@@ -61,9 +61,6 @@ class AgendaFakeNoteDao : NoteDao {
     override suspend fun getVaultNoteById(id: Long): NoteEntity? =
         notes.value.find { it.id == id && !it.isDeleted && it.isInVault }
 
-    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> =
-        notes.value.filter { !it.isDeleted && it.isInVault }
-
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         notes.value.filter { it.isInVault }
 

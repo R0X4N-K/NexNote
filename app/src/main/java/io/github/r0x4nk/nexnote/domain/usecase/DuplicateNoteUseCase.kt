@@ -4,6 +4,7 @@ import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
+import io.github.r0x4nk.nexnote.util.rewriteMappedPaths
 import kotlinx.coroutines.CancellationException
 
 class DuplicateNoteUseCase(
@@ -25,7 +26,7 @@ class DuplicateNoteUseCase(
         val imagePathMap = copyImagePaths(newNoteId, source.imagePaths)
         val duplicate = draft.copy(
             id = newNoteId,
-            content = draft.content.replaceImagePaths(imagePathMap),
+            content = draft.content.rewriteMappedPaths(imagePathMap),
             imagePaths = draft.imagePaths.map { imagePathMap[it] ?: it }
         )
 
@@ -61,15 +62,4 @@ class DuplicateNoteUseCase(
         } catch (_: Exception) {
             sourcePath
         }
-
-    private fun String.replaceImagePaths(pathMap: Map<String, String>): String {
-        if (pathMap.isEmpty()) return this
-        var updated = this
-        pathMap.forEach { (sourcePath, duplicatePath) ->
-            if (sourcePath != duplicatePath) {
-                updated = updated.replace(sourcePath, duplicatePath)
-            }
-        }
-        return updated
-    }
 }

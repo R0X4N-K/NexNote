@@ -1,11 +1,12 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import kotlinx.coroutines.CancellationException
+import androidx.lifecycle.ViewModelStore
+
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.Tag
-import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
@@ -593,6 +594,67 @@ class EditorViewModelTest : EditorViewModelTestBase() {
     }
 
     @Test
+    fun `ViewModel clear enqueues owned final save`() = runTest {
+        val vm = viewModel()
+        val store = ViewModelStore()
+        store.put("editor", vm)
+        vm.onContentChange("Final content")
+
+        store.clear()
+        advanceUntilIdle()
+
+        assertEquals(1, fakeNoteDao.insertedCount)
+        assertEquals("Final content", fakeNoteDao.getNoteById(1L)?.content)
+    }
+
+    @Test
+    fun `old final save completes before new editor save for same note`() = runTest {
+        fakeNoteDao.addNote(
+            NoteEntity(
+                id = 1L,
+                title = "Shared note",
+                content = "Initial",
+                creationDate = 1_000L,
+                lastModifiedDate = 1_000L
+            )
+        )
+        val oldVm = viewModel(noteId = 1L)
+        val oldStore = ViewModelStore()
+        oldStore.put("old", oldVm)
+        runCurrent()
+        oldVm.onContentChange("Old instance final")
+        oldStore.clear()
+
+        val newVm = viewModel(noteId = 1L)
+        runCurrent()
+        newVm.onContentChange("New instance final")
+        newVm.flushPendingChanges()
+        advanceUntilIdle()
+
+        assertEquals("New instance final", fakeNoteDao.getNoteById(1L)?.content)
+        assertEquals(2, fakeNoteDao.updatedCount)
+    }
+
+    @Test
+    fun `flushPendingChanges propagates note save cancellation without ordinary error`() = runTest {
+        fakeNoteDao.insertFailure = CancellationException("cancel note save")
+        val vm = viewModel()
+        vm.onContentChange("Pending content")
+
+        var thrown: Throwable? = null
+        try {
+            vm.flushPendingChanges()
+        } catch (error: Throwable) {
+            thrown = error
+        }
+
+        assertTrue(thrown is CancellationException)
+        assertNull(vm.uiState.value.errorMessage)
+        assertTrue(vm.uiState.value.isDirty)
+        assertFalse(vm.uiState.value.isSaving)
+    }
+
+    @Test
     fun `flushPendingChanges does not save empty note`() = runTest {
         val vm = viewModel()
         vm.flushPendingChanges()
@@ -643,28 +705,6 @@ class EditorViewModelTest : EditorViewModelTestBase() {
         assertTrue("preview must open even on an empty note", vm.uiState.value.showPreview)
     }
 
-    @Test
-    fun `toggleTheme switches dark theme to LIGHT`() = runTest {
-        val preferencesRepository = FakeEditorPreferencesRepository()
-        val vm = viewModel(preferencesRepository = preferencesRepository)
-
-        vm.toggleTheme(isDarkTheme = true)
-        advanceUntilIdle()
-
-        assertEquals(ThemeMode.LIGHT, preferencesRepository.lastThemeMode)
-    }
-
-    @Test
-    fun `toggleTheme switches light theme to DARK`() = runTest {
-        val preferencesRepository = FakeEditorPreferencesRepository()
-        val vm = viewModel(preferencesRepository = preferencesRepository)
-
-        vm.toggleTheme(isDarkTheme = false)
-        advanceUntilIdle()
-
-        assertEquals(ThemeMode.DARK, preferencesRepository.lastThemeMode)
-    }
-
     private fun kotlinx.coroutines.test.TestScope.advanceUndoHistoryDebounce() {
         advanceTimeBy(DEFAULT_UNDO_HISTORY_DEBOUNCE_MS)
         runCurrent()
@@ -688,8 +728,6 @@ private class RecordingDecryptVaultImageBytesRepository(
     override val vaultTrashedNotes: Flow<List<Note>> = MutableStateFlow(emptyList())
     override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> =
         MutableStateFlow(emptyList())
-    override val vaultTags: Flow<List<Tag>> = MutableStateFlow(emptyList())
-
     override suspend fun getVaultNoteById(id: Long): Note? = null
 
     override suspend fun saveVaultNote(note: Note): Long {

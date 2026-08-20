@@ -132,8 +132,8 @@ internal fun EditorKeyboardToolbar(
     onInsertHorizontalRule: () -> Unit,
     onInsertWebLink: () -> Unit,
     onInsertNoteLink: () -> Unit,
-    onHeightChanged: (Int) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onHeightChanged: (Int) -> Unit = {}
 ) {
     val onHeightChangedState = rememberUpdatedState(onHeightChanged)
 

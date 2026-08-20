@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultState
@@ -26,14 +26,13 @@ import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -42,25 +41,25 @@ import java.io.InputStream
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
-class EditorViewModel(
+class EditorViewModel internal constructor(
     private val copyNoteImageToInternal: CopyNoteImageToInternalUseCase,
     private val deleteNoteImage: DeleteNoteImageUseCase,
     private val getNoteImageFile: GetNoteImageFileUseCase,
     private val getNoteById: GetNoteByIdUseCase,
-    private val getVaultNoteById: GetVaultNoteByIdUseCase? = null,
+    private val getVaultNoteById: GetVaultNoteByIdUseCase,
     private val getTemplateById: GetTemplateByIdUseCase,
     private val saveNote: SaveNoteUseCase,
     private val saveTemplate: SaveTemplateUseCase,
-    private val saveVaultNote: SaveVaultNoteUseCase? = null,
+    private val saveVaultNote: SaveVaultNoteUseCase,
     private val setNotePreviewMode: SetNotePreviewModeUseCase,
-    observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase? = null,
-    observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase? = null,
-    private val observeTagsForNote: ObserveTagsForNoteUseCase? = null,
-    private val indexNoteTags: IndexNoteTagsUseCase? = null,
-    observeVaultState: ObserveVaultStateUseCase? = null,
-    observeThemeMode: ObserveThemeModeUseCase? = null,
-    private val setThemeMode: SetThemeModeUseCase? = null,
-    private val decryptVaultImageBytesUseCase: DecryptVaultImageBytesUseCase? = null,
+    observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase,
+    observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase,
+    private val observeTagsForNote: ObserveTagsForNoteUseCase,
+    private val indexNoteTags: IndexNoteTagsUseCase,
+    observeVaultState: ObserveVaultStateUseCase,
+    observeThemeMode: ObserveThemeModeUseCase,
+    private val decryptVaultImageBytesUseCase: DecryptVaultImageBytesUseCase,
+    private val saveCoordinator: EditorSaveCoordinator,
     private val initialMode: EditorMode,
     undoHistoryDebounceMs: Long = DEFAULT_UNDO_HISTORY_DEBOUNCE_MS,
     undoHistoryMaxSnapshots: Int = DEFAULT_UNDO_HISTORY_MAX_SNAPSHOTS
@@ -82,9 +81,7 @@ class EditorViewModel(
     )
     internal val undoRedoState: StateFlow<EditorUndoRedoState> = contentHistory.state
 
-    val themeMode: StateFlow<ThemeMode> = (
-        observeThemeMode?.invoke() ?: flowOf(ThemeMode.SYSTEM)
-    ).stateIn(
+    val themeMode: StateFlow<ThemeMode> = observeThemeMode().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = ThemeMode.SYSTEM
@@ -100,7 +97,7 @@ class EditorViewModel(
     /**
      * Tags associated with the current note, updated reactively via Room.
      * Emits an empty list until the note is saved for the first time (noteId = 0)
-     * or when [tagRepository] is null (unit-test environments).
+     * The repository dependency is mandatory; unsaved notes still emit empty.
      */
     val tagsForCurrentNote: StateFlow<List<Tag>> = buildTagsForCurrentNoteFlow(
         uiState = _uiState,
@@ -121,6 +118,7 @@ class EditorViewModel(
         saveVaultNote = saveVaultNote,
         indexNoteTags = indexNoteTags,
         scope = viewModelScope,
+        saveCoordinator = saveCoordinator,
         autosaveDelayMs = AUTOSAVE_DELAY_MS,
         savesEnabled = !initialMode.isReadOnly
     )
@@ -149,7 +147,7 @@ class EditorViewModel(
         viewModelScope.launch {
             loadDelegate.loadInitial(initialMode)
         }
-        if (initialMode.isVaultNote && observeVaultState != null) {
+        if (initialMode.isVaultNote) {
             viewModelScope.launch {
                 observeVaultState().collect { state ->
                     if (state != VaultState.UNLOCKED) {
@@ -367,8 +365,9 @@ class EditorViewModel(
         val current = _uiState.value
         if (!current.isVaultNote || current.isVaultLocked) return null
         if (normalizedPath !in current.imagePaths) return null
-        val useCase = decryptVaultImageBytesUseCase ?: return null
-        return runCatching { useCase(normalizedPath) }.getOrNull()
+        return runCatchingPreservingCancellation {
+            decryptVaultImageBytesUseCase(normalizedPath)
+        }.getOrNull()
     }
 
     // ── Preview toggle ────────────────────────────────────────────────────────
@@ -405,11 +404,6 @@ class EditorViewModel(
         if (!current.isTemplateMode && current.noteId != NO_ID) {
             viewModelScope.launch { setNotePreviewMode(current.noteId, newValue) }
         }
-    }
-
-    fun toggleTheme(isDarkTheme: Boolean) {
-        val nextThemeMode = if (isDarkTheme) ThemeMode.LIGHT else ThemeMode.DARK
-        viewModelScope.launch { setThemeMode?.invoke(nextThemeMode) }
     }
 
     // ── Saving ────────────────────────────────────────────────────────────────
@@ -475,12 +469,12 @@ class EditorViewModel(
     }
 
     /**
-     * Defensive fallback: only runs if flushPendingChanges() was never called.
-     * Uses a separate scope because viewModelScope is already cancelled here.
+     * Defensive fallback: enqueue a final write in the application-owned FIFO
+     * if explicit navigation flushing did not already clean the editor state.
      */
     override fun onCleared() {
         NexNoteDebugLog.viewModel(event = "onCleared", details = uiState.value.debugViewModelSummary())
-        saveDelegate.flushOnCleared()
+        saveDelegate.enqueueFinalSave()
         contentHistory.clear()
         super.onCleared()
     }
@@ -503,8 +497,7 @@ class EditorViewModel(
             mode: EditorMode
         ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val useCases = app.useCases
                 EditorViewModel(
                     copyNoteImageToInternal = useCases.images.copyNoteImageToInternal,
@@ -524,8 +517,8 @@ class EditorViewModel(
                     indexNoteTags         = useCases.tags.indexNoteTags,
                     observeVaultState     = useCases.vault.observeVaultState,
                     observeThemeMode      = useCases.preferences.observeThemeMode,
-                    setThemeMode          = useCases.preferences.setThemeMode,
                     decryptVaultImageBytesUseCase = useCases.vault.decryptVaultImageBytes,
+                    saveCoordinator        = app.editorSaveCoordinator,
                     initialMode           = mode
                 )
             }

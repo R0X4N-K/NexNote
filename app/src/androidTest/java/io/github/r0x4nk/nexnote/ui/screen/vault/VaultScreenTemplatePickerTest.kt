@@ -16,7 +16,6 @@ import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialAvailability
@@ -40,6 +39,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.GetVaultAndroidCredentialAvailabi
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveVaultNoteToTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAndroidCredentialUnlockUseCase
@@ -505,7 +505,8 @@ private class VaultScreenHarness(
         toggleVaultNotePin = ToggleVaultNotePinUseCase(vaultNoteRepository),
         duplicateVaultNote = DuplicateVaultNoteUseCase(vaultNoteRepository),
         removeNoteFromVault = RemoveNoteFromVaultUseCase(vaultNoteRepository),
-        observeTemplates = ObserveTemplatesUseCase(templateRepository)
+        observeTemplates = ObserveTemplatesUseCase(templateRepository),
+        observeNoteCardStyle = ObserveNoteCardStyleUseCase(preferencesRepository)
     )
 }
 
@@ -564,7 +565,6 @@ private class FakeVaultScreenVaultNoteRepository(
     override val vaultTrashedNotes: Flow<List<Note>> = trashedNotesFlow
     override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> =
         MutableStateFlow(emptyList())
-    override val vaultTags: Flow<List<Tag>> = MutableStateFlow(emptyList())
     val trashedIds = mutableListOf<Long>()
     val restoredIds = mutableListOf<Long>()
 

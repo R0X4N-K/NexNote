@@ -30,6 +30,18 @@ internal sealed interface VaultImageFileRestoreResult {
 }
 
 /**
+ * Opaque rollback token for a Vault image rewrap.
+ *
+ * [backupFile] contains the original encrypted payload, never plaintext. The
+ * token is confined to the data layer and must be either committed (backup
+ * deleted) or rolled back (backup atomically restored over [targetFile]).
+ */
+internal data class VaultImageFileRewrapBackup(
+    val targetFile: File,
+    val backupFile: File
+)
+
+/**
  * File boundary for Vault image payloads stored through [NoteImageStorage].
  *
  * This component intentionally does not update note rows or UI state. It only
@@ -111,6 +123,78 @@ internal open class VaultImageFileStorage(
         } finally {
             encryptedOrPlainBytes.fill(0)
             plainBytes.fill(0)
+        }
+    }
+
+    /**
+     * Re-encrypt one existing Vault image from [currentKey] to [newKey].
+     *
+     * The old ciphertext is copied to a private sibling backup before the new
+     * ciphertext replaces the target. Plaintext exists only in memory and is
+     * zeroed before returning. Missing files need no rollback token.
+     */
+    open suspend fun rewrapInPlace(
+        relativePath: String,
+        currentKey: SecretKey,
+        newKey: SecretKey,
+        onBackupCreated: (VaultImageFileRewrapBackup) -> Unit = {}
+    ): VaultImageFileRewrapBackup? = withContext(ioDispatcher) {
+        val target = imageStorage.getImageFile(relativePath)
+        if (!target.isFile) return@withContext null
+
+        val oldCiphertext = target.readBytes()
+        var plaintext = ByteArray(0)
+        var newCiphertext = ByteArray(0)
+        var backup: File? = null
+        var replaced = false
+
+        try {
+            if (!fileCipher.isEncryptedPayload(oldCiphertext)) {
+                throw IOException("Vault image payload is not encrypted.")
+            }
+            plaintext = fileCipher.decryptToByteArray(oldCiphertext, currentKey)
+            newCiphertext = fileCipher.encryptToByteArray(plaintext, newKey)
+
+            val parent = target.parentFile
+                ?: throw IOException("Vault image parent is unavailable.")
+            backup = File.createTempFile(".${target.name}.rekey-old-", ".tmp", parent)
+            backup.writeBytes(oldCiphertext)
+            replaceFileConservatively(target, newCiphertext)
+            replaced = true
+            VaultImageFileRewrapBackup(targetFile = target, backupFile = backup).also(
+                onBackupCreated
+            )
+        } finally {
+            oldCiphertext.fill(0)
+            plaintext.fill(0)
+            newCiphertext.fill(0)
+            if (!replaced) {
+                backup?.delete()
+            }
+        }
+    }
+
+    /** Restore the original encrypted payload represented by [backup]. */
+    open suspend fun rollbackRewrap(
+        backup: VaultImageFileRewrapBackup
+    ) = withContext(ioDispatcher) {
+        if (!backup.backupFile.isFile) {
+            throw IOException("Vault image rewrap backup is missing.")
+        }
+        val oldCiphertext = backup.backupFile.readBytes()
+        try {
+            replaceFileConservatively(backup.targetFile, oldCiphertext)
+        } finally {
+            oldCiphertext.fill(0)
+        }
+    }
+
+    /** Delete the no-longer-needed old ciphertext after the PIN commit. */
+    open suspend fun commitRewrap(
+        backup: VaultImageFileRewrapBackup
+    ) = withContext(ioDispatcher) {
+        if (backup.backupFile.exists() && !backup.backupFile.delete()) {
+            throw IOException("Vault image rewrap backup could not be removed.")
         }
     }
 

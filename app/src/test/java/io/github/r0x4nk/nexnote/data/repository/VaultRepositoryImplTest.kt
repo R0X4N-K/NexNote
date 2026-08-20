@@ -16,7 +16,9 @@ import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialP
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -32,6 +34,17 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.Base64
 import javax.crypto.SecretKey
+
+private object FailingVaultNoteRewrapper : VaultNoteRewrapper {
+    override suspend fun rewrapAllVaultNotesWith(
+        currentKey: SecretKey,
+        newKey: SecretKey
+    ): VaultNoteRewrapTransaction = error("No test rewrapper configured")
+}
+
+private object FailingVaultNoteWiper : VaultNoteWiper {
+    override suspend fun wipeAllVaultNotes(): Int = error("No test wiper configured")
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VaultRepositoryImplTest {
@@ -53,16 +66,20 @@ class VaultRepositoryImplTest {
         wiper: VaultNoteWiper? = null,
         protectUnlockMaterial: ((ByteArray) -> ProtectVaultUnlockMaterialResult)? = null,
         unprotectUnlockMaterial: ((String) -> UnprotectVaultUnlockMaterialResult)? = null
-    ): VaultRepositoryImpl =
-        VaultRepositoryImpl(
+    ): VaultRepositoryImpl {
+        val repository = VaultRepositoryImpl(
             dataStore = dataStore,
             pinHasher = VaultPinHasher(iterations = TEST_ITERATIONS),
             keyDeriver = VaultKeyDeriver(iterations = TEST_ITERATIONS),
-            noteRewrapperProvider = { rewrapper },
-            noteWiperProvider = { wiper },
             protectUnlockMaterial = protectUnlockMaterial,
             unprotectUnlockMaterial = unprotectUnlockMaterial
         )
+        repository.bindNoteMaintenance(
+            rewrapper = rewrapper ?: FailingVaultNoteRewrapper,
+            wiper = wiper ?: FailingVaultNoteWiper
+        )
+        return repository
+    }
 
     @Test
     fun `initial state is not configured`() = testScope.runTest {
@@ -457,6 +474,42 @@ class VaultRepositoryImplTest {
     }
 
     @Test
+    fun `changePin propagates cancellation from rewrap and keeps old pin usable`() =
+        testScope.runTest {
+            val dataStore = createTestDataStore()
+            val repository = createRepository(
+                dataStore = dataStore,
+                rewrapper = object : VaultNoteRewrapper {
+                    override suspend fun rewrapAllVaultNotesWith(
+                        currentKey: SecretKey,
+                        newKey: SecretKey
+                    ): VaultNoteRewrapTransaction {
+                        throw CancellationException("cancel rewrap")
+                    }
+                }
+            )
+            repository.configurePin("1111".toCharArray())
+            assertTrue(repository.unlockWithPin("1111".toCharArray()))
+            val originalHash = dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY]
+
+            var thrown: Throwable? = null
+            try {
+                repository.changePin("1111".toCharArray(), "2222".toCharArray())
+            } catch (error: Throwable) {
+                thrown = error
+            }
+
+            assertTrue(thrown is CancellationException)
+            assertEquals(
+                originalHash,
+                dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY]
+            )
+            repository.lock()
+            assertTrue(repository.unlockWithPin("1111".toCharArray()))
+            assertFalse(repository.unlockWithPin("2222".toCharArray()))
+        }
+
+    @Test
     fun `changePin rewraps with new key, persists new verifier, and unlocks with new pin`() = testScope.runTest {
         val dataStore = createTestDataStore()
         val rewrapper = RecordingRewrapper()
@@ -472,6 +525,8 @@ class VaultRepositoryImplTest {
 
         assertSame(ChangeVaultPinResult.Success, result)
         assertEquals(1, rewrapper.callCount)
+        assertEquals(1, rewrapper.commitCount)
+        assertEquals(0, rewrapper.rollbackCount)
         // Rewrapper saw the new key, not the old one.
         val rewrappedKey = rewrapper.lastKey
         assertNotNull(rewrappedKey)
@@ -500,6 +555,51 @@ class VaultRepositoryImplTest {
         assertFalse(repository.unlockWithPin("1111".toCharArray()))
         assertTrue(repository.unlockWithPin("2222".toCharArray()))
     }
+
+    @Test
+    fun `changePin rolls rewrap back when DataStore commit fails`() = testScope.runTest {
+        val delegate = createTestDataStore()
+        val dataStore = FailingDataStore(delegate)
+        val rewrapper = RecordingRewrapper()
+        val repository = createRepository(dataStore, rewrapper)
+        repository.configurePin("1111".toCharArray())
+        assertTrue(repository.unlockWithPin("1111".toCharArray()))
+        val originalHash = dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY]
+        dataStore.failNextUpdate = true
+
+        val result = repository.changePin("1111".toCharArray(), "2222".toCharArray())
+
+        assertSame(ChangeVaultPinResult.RewrapFailed, result)
+        assertEquals(1, rewrapper.callCount)
+        assertEquals(0, rewrapper.commitCount)
+        assertEquals(1, rewrapper.rollbackCount)
+        assertEquals(originalHash, dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY])
+        repository.lock()
+        assertTrue(repository.unlockWithPin("1111".toCharArray()))
+        assertFalse(repository.unlockWithPin("2222".toCharArray()))
+    }
+
+    @Test
+    fun `changePin preserves DataStore cancellation when rollback also fails`() =
+        testScope.runTest {
+            val delegate = createTestDataStore()
+            val dataStore = FailingDataStore(delegate)
+            val rewrapper = RecordingRewrapper(throwOnRollback = true)
+            val repository = createRepository(dataStore, rewrapper)
+            repository.configurePin("1111".toCharArray())
+            assertTrue(repository.unlockWithPin("1111".toCharArray()))
+            dataStore.nextFailure = CancellationException("cancel PIN config commit")
+
+            val thrown = runCatching {
+                repository.changePin("1111".toCharArray(), "2222".toCharArray())
+            }.exceptionOrNull()
+
+            assertTrue(thrown is CancellationException)
+            assertEquals("cancel PIN config commit", thrown?.message)
+            assertEquals(1, thrown?.suppressed?.size)
+            assertEquals("rollback failed", thrown?.suppressed?.single()?.message)
+            assertEquals(1, rewrapper.rollbackCount)
+        }
 
     @Test
     fun `changePin refreshes Android credential protected material with the new key`() =
@@ -591,6 +691,61 @@ class VaultRepositoryImplTest {
         }
 
     @Test
+    fun `resetVault propagates wipe cancellation and leaves configured vault usable`() =
+        testScope.runTest {
+            val dataStore = createTestDataStore()
+            val wiper = RecordingWiper(cancelOnWipe = true)
+            val repository = createRepository(dataStore, wiper = wiper)
+            repository.configurePin("1111".toCharArray())
+            assertTrue(repository.unlockWithPin("1111".toCharArray()))
+            val originalHash = dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY]
+
+            val thrown = runCatching { repository.resetVault() }.exceptionOrNull()
+
+            assertTrue(thrown is CancellationException)
+            assertEquals(1, wiper.callCount)
+            assertEquals(originalHash, dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY])
+            assertEquals(VaultState.UNLOCKED, repository.state.first())
+        }
+
+    @Test
+    fun `resetVault propagates DataStore cancellation after wipe without reporting success`() =
+        testScope.runTest {
+            val delegate = createTestDataStore()
+            val dataStore = FailingDataStore(delegate)
+            val wiper = RecordingWiper()
+            val repository = createRepository(dataStore, wiper = wiper)
+            repository.configurePin("1111".toCharArray())
+            assertTrue(repository.unlockWithPin("1111".toCharArray()))
+            val originalHash = delegate.data.first()[VaultRepositoryImpl.PIN_HASH_KEY]
+            dataStore.nextFailure = CancellationException("cancel DataStore reset")
+
+            val thrown = runCatching { repository.resetVault() }.exceptionOrNull()
+
+            assertTrue(thrown is CancellationException)
+            assertEquals(1, wiper.callCount)
+            assertEquals(originalHash, delegate.data.first()[VaultRepositoryImpl.PIN_HASH_KEY])
+            assertEquals(VaultState.LOCKED, repository.state.first())
+        }
+
+    @Test
+    fun `configurePin propagates DataStore cancellation`() = testScope.runTest {
+        val delegate = createTestDataStore()
+        val dataStore = FailingDataStore(delegate).apply {
+            nextFailure = CancellationException("cancel DataStore write")
+        }
+        val repository = createRepository(dataStore)
+
+        val thrown = runCatching {
+            repository.configurePin("1111".toCharArray())
+        }.exceptionOrNull()
+
+        assertTrue(thrown is CancellationException)
+        assertNull(delegate.data.first()[VaultRepositoryImpl.PIN_HASH_KEY])
+        assertEquals(VaultState.NOT_CONFIGURED, repository.state.first())
+    }
+
+    @Test
     fun `resetVault wipes notes, clears persisted material and discards in-memory key`() =
         testScope.runTest {
             val dataStore = createTestDataStore()
@@ -660,6 +815,7 @@ class VaultRepositoryImplTest {
      */
     private class RecordingWiper(
         private val throwOnWipe: Boolean = false,
+        private val cancelOnWipe: Boolean = false,
         private val rowsRemoved: Int = 0
     ) : VaultNoteWiper {
         var callCount: Int = 0
@@ -667,6 +823,9 @@ class VaultRepositoryImplTest {
 
         override suspend fun wipeAllVaultNotes(): Int {
             callCount += 1
+            if (cancelOnWipe) {
+                throw CancellationException("wipe cancelled")
+            }
             if (throwOnWipe) {
                 throw IllegalStateException("wipe failed")
             }
@@ -680,19 +839,63 @@ class VaultRepositoryImplTest {
      * ordering and key identity without touching the database layer.
      */
     private class RecordingRewrapper(
-        private val throwOnRewrap: Boolean = false
+        private val throwOnRewrap: Boolean = false,
+        private val throwOnRollback: Boolean = false
     ) : VaultNoteRewrapper {
         var callCount: Int = 0
             private set
         var lastKey: SecretKey? = null
             private set
+        var commitCount: Int = 0
+            private set
+        var rollbackCount: Int = 0
+            private set
 
-        override suspend fun rewrapAllVaultNotesWith(newKey: SecretKey) {
+        override suspend fun rewrapAllVaultNotesWith(
+            currentKey: SecretKey,
+            newKey: SecretKey
+        ): VaultNoteRewrapTransaction {
             callCount += 1
             lastKey = newKey
             if (throwOnRewrap) {
                 throw IllegalStateException("rewrap failed")
             }
+            return object : VaultNoteRewrapTransaction {
+                override suspend fun commit() {
+                    commitCount += 1
+                }
+
+                override suspend fun rollback() {
+                    rollbackCount += 1
+                    if (throwOnRollback) {
+                        throw IllegalStateException("rollback failed")
+                    }
+                }
+            }
+        }
+    }
+
+    private class FailingDataStore(
+        private val delegate: DataStore<Preferences>
+    ) : DataStore<Preferences> {
+        var failNextUpdate: Boolean = false
+        var nextFailure: Throwable? = null
+
+        override val data: Flow<Preferences>
+            get() = delegate.data
+
+        override suspend fun updateData(
+            transform: suspend (t: Preferences) -> Preferences
+        ): Preferences {
+            nextFailure?.let { failure ->
+                nextFailure = null
+                throw failure
+            }
+            if (failNextUpdate) {
+                failNextUpdate = false
+                throw IllegalStateException("forced DataStore failure")
+            }
+            return delegate.updateData(transform)
         }
     }
 

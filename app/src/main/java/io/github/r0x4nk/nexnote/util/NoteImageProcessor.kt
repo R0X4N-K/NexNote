@@ -42,6 +42,7 @@ import kotlin.math.max
 object NoteImageProcessor {
 
     private const val JPEG_QUALITY = 90
+    const val MAX_IMAGE_BYTES = 25L * 1024L * 1024L
 
     /**
      * Copies an image from [inputStreamProvider] to [destination], applying EXIF
@@ -185,7 +186,9 @@ object NoteImageProcessor {
         val stream = inputStreamProvider()
             ?: throw IOException("Image input stream is unavailable")
         stream.use { input ->
-            destination.outputStream().use { output -> input.copyTo(output) }
+            destination.outputStream().use { output ->
+                copyBounded(input, output, MAX_IMAGE_BYTES)
+            }
         }
     }
 

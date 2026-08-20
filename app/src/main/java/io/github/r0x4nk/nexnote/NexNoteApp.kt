@@ -11,6 +11,7 @@ import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.VaultNoteRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.VaultRepositoryImpl
 import io.github.r0x4nk.nexnote.di.AppUseCases
+import io.github.r0x4nk.nexnote.di.AppDependencies
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
@@ -18,6 +19,8 @@ import io.github.r0x4nk.nexnote.domain.repository.TemplateRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultAndroidCredentialRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
+import io.github.r0x4nk.nexnote.ui.screen.editor.EditorSaveCoordinator
+import io.github.r0x4nk.nexnote.ui.screen.export.ExportCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,9 +33,13 @@ import kotlinx.coroutines.launch
  * [appScope] uses a SupervisorJob: a failure in one child does not cancel siblings.
  * Individual IO operations still choose Dispatchers.IO at their own boundary.
  */
-class NexNoteApp : Application() {
+internal class NexNoteApp : Application(), AppDependencies {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    override val editorSaveCoordinator: EditorSaveCoordinator by lazy {
+        EditorSaveCoordinator(ownerScope = appScope)
+    }
 
     val database: NexNoteDatabase by lazy {
         NexNoteDatabase.getDatabase(this)
@@ -62,41 +69,31 @@ class NexNoteApp : Application() {
         UserPreferencesRepository(this)
     }
 
-    private val vaultRepositoryImpl: VaultRepositoryImpl by lazy {
-        // The note rewrapper and the note wiper are provided lazily to break
-        // the construction cycle: VaultNoteRepositoryImpl needs the
-        // unlocked-key provider that this repository exposes, while
-        // changePin/resetVault need the boundaries that VaultNoteRepositoryImpl
-        // implements. The lambdas are invoked only on demand, by which time
-        // both repositories exist.
-        VaultRepositoryImpl(
-            context = this,
-            noteRewrapperProvider = { vaultNoteRepositoryImpl },
-            noteWiperProvider = { vaultNoteRepositoryImpl }
+    private val vaultGraph: VaultGraph by lazy {
+        val keyRepository = VaultRepositoryImpl(this)
+        val noteRepository = VaultNoteRepositoryImpl(
+            database = database,
+            dao = database.noteDao(),
+            tagDao = database.tagDao(),
+            keyProvider = keyRepository,
+            imageStorage = noteImageStorage
         )
+        keyRepository.bindNoteMaintenance(
+            rewrapper = noteRepository,
+            wiper = noteRepository
+        )
+        VaultGraph(keyRepository, noteRepository)
     }
 
-    val vaultRepository: VaultRepository by lazy {
-        vaultRepositoryImpl
-    }
+    val vaultRepository: VaultRepository
+        get() = vaultGraph.keyRepository
 
     val vaultAndroidCredentialRepository: VaultAndroidCredentialRepository by lazy {
         AndroidVaultCredentialRepository(this)
     }
 
-    private val vaultNoteRepositoryImpl: VaultNoteRepositoryImpl by lazy {
-        VaultNoteRepositoryImpl(
-            database = database,
-            dao = database.noteDao(),
-            tagDao = database.tagDao(),
-            keyProvider = vaultRepositoryImpl,
-            imageStorage = noteImageStorage
-        )
-    }
-
-    val vaultNoteRepository: VaultNoteRepository by lazy {
-        vaultNoteRepositoryImpl
-    }
+    val vaultNoteRepository: VaultNoteRepository
+        get() = vaultGraph.noteRepository
 
     /**
      * Tag repository receives a narrow note-content patch DAO for tag deletion.
@@ -110,7 +107,7 @@ class NexNoteApp : Application() {
         )
     }
 
-    internal val useCases: AppUseCases by lazy {
+    override val useCases: AppUseCases by lazy {
         AppUseCases(
             noteRepository = noteRepository,
             tagRepository = tagRepository,
@@ -125,6 +122,9 @@ class NexNoteApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        appScope.launch(Dispatchers.IO) {
+            ExportCache(cacheDir).cleanupExpired()
+        }
         appScope.launch {
             if (!userPreferencesRepository.hasSeededPredefinedTemplates()) {
                 templateRepositoryImpl.initializePredefinedTemplates()
@@ -132,4 +132,9 @@ class NexNoteApp : Application() {
             }
         }
     }
+
+    private data class VaultGraph(
+        val keyRepository: VaultRepositoryImpl,
+        val noteRepository: VaultNoteRepositoryImpl
+    )
 }

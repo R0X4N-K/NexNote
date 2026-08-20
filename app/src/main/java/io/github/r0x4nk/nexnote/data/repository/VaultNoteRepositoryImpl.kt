@@ -11,12 +11,12 @@ import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
 import io.github.r0x4nk.nexnote.data.local.VaultImageFileDecryptionResult
 import io.github.r0x4nk.nexnote.data.local.VaultImageFileEncryptionResult
 import io.github.r0x4nk.nexnote.data.local.VaultImageFileRestoreResult
+import io.github.r0x4nk.nexnote.data.local.VaultImageFileRewrapBackup
 import io.github.r0x4nk.nexnote.data.local.VaultImageFileStorage
 import io.github.r0x4nk.nexnote.data.security.VaultDecryptionException
 import io.github.r0x4nk.nexnote.data.security.VaultFieldCipher
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
@@ -24,9 +24,12 @@ import io.github.r0x4nk.nexnote.domain.repository.VaultLockedException
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.TagParser
-import io.github.r0x4nk.nexnote.util.VaultTagAggregator
+import io.github.r0x4nk.nexnote.util.rewriteMappedPaths
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -37,7 +40,7 @@ import java.io.IOException
 import javax.crypto.SecretKey
 
 /**
- * Internal data-layer boundary that re-encrypts every active Vault note with a
+ * Internal data-layer boundary that re-encrypts every Vault note with a
  * freshly derived key. Exposed only inside the data package so callers that
  * coordinate PIN changes can swap the key without leaking [SecretKey] into the
  * domain contracts. Implementations must require the Vault to be currently
@@ -46,12 +49,20 @@ import javax.crypto.SecretKey
  */
 internal interface VaultNoteRewrapper {
     /**
-     * Re-encrypt all active Vault notes with [newKey]. The current Vault key
-     * must already be unlocked, otherwise [VaultLockedException] is thrown
-     * before any read or write happens. The operation is transactional and
-     * does not alter `lastModifiedDate` or any non-encrypted metadata.
+     * Re-encrypt all Vault notes and images from [currentKey] to [newKey]. The
+     * returned transaction retains encrypted rollback material until the
+     * caller either commits after persisting the new PIN configuration or
+     * rolls back while the old configuration is still authoritative.
      */
-    suspend fun rewrapAllVaultNotesWith(newKey: SecretKey)
+    suspend fun rewrapAllVaultNotesWith(
+        currentKey: SecretKey,
+        newKey: SecretKey
+    ): VaultNoteRewrapTransaction
+}
+
+internal interface VaultNoteRewrapTransaction {
+    suspend fun commit()
+    suspend fun rollback()
 }
 
 /**
@@ -167,19 +178,6 @@ internal class VaultNoteRepositoryImpl(
             }
         }.distinctUntilChanged()
 
-    /**
-     * Derived flow: aggregate hashtags from already-decrypted active Vault
-     * notes. The transformation runs on the same emissions of [vaultNotes],
-     * which already returns an empty list while the Vault is locked, so the
-     * tag list is automatically empty in that case. The aggregation lives only
-     * in memory and never touches the normal `tags`/`note_tag_cross_refs`
-     * tables. No tag names, titles, contents or other Vault material is logged.
-     */
-    override val vaultTags: Flow<List<Tag>> =
-        vaultNotes
-            .map { notes -> VaultTagAggregator.aggregate(notes) }
-            .distinctUntilChanged()
-
     override suspend fun getVaultNoteById(id: Long): Note? =
         keyProvider.withUnlockedVaultKey { key ->
             dao.getVaultNoteById(id)
@@ -250,7 +248,7 @@ internal class VaultNoteRepositoryImpl(
 
                     val duplicate = draft.copy(
                         id = duplicateId,
-                        content = draft.content.replaceImagePaths(imagePathMap),
+                        content = draft.content.rewriteMappedPaths(imagePathMap),
                         imagePaths = draft.imagePaths.map { path -> imagePathMap[path] ?: path }
                     )
                     dao.updateNote(duplicate.toEncryptedEntity(key = key, lastModifiedDate = now))
@@ -332,20 +330,70 @@ internal class VaultNoteRepositoryImpl(
             deletedRows > 0
         } ?: throw VaultLockedException()
 
-    override suspend fun rewrapAllVaultNotesWith(newKey: SecretKey) {
-        keyProvider.withUnlockedVaultKey { currentKey ->
+    override suspend fun rewrapAllVaultNotesWith(
+        currentKey: SecretKey,
+        newKey: SecretKey
+    ): VaultNoteRewrapTransaction {
+        val callerContext = currentCoroutineContext()
+        var originalEntities = emptyList<NoteEntity>()
+        val imageBackups = mutableListOf<VaultImageFileRewrapBackup>()
+
+        try {
             database.withTransaction {
-                val vaultEntities = dao.getAllVaultNotesOnce()
-                vaultEntities.forEach { entity ->
-                    val rewrapped = entity.copy(
+                // The all-rows query includes active and soft-deleted Vault
+                // entries; despite its historical name it is the shared
+                // complete-Vault snapshot boundary for destructive/rekey work.
+                originalEntities = dao.getAllVaultNotesForWipeOnce()
+                val rewrappedEntities = originalEntities.map { entity ->
+                    entity.copy(
                         title = rewrapField(entity.title, currentKey, newKey),
                         content = rewrapField(entity.content, currentKey, newKey),
                         imagePathsRaw = rewrapField(entity.imagePathsRaw, currentKey, newKey)
                     )
-                    dao.updateNote(rewrapped)
                 }
+                val imagePaths = originalEntities
+                    .flatMap { entity -> decryptImagePaths(entity.imagePathsRaw, currentKey) }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+
+                imagePaths.forEach { relativePath ->
+                    callerContext.ensureActive()
+                    // A file replacement and registration of its encrypted
+                    // backup are one non-cancellable step. Cancellation is
+                    // observed immediately afterwards and rolls back the full
+                    // Room/filesystem operation. Check the captured caller
+                    // context rather than Room's transaction context so a
+                    // cancellation requested during this step cannot race the
+                    // following row updates.
+                    withContext(NonCancellable) {
+                        vaultImageFileStorage.rewrapInPlace(
+                            relativePath = relativePath,
+                            currentKey = currentKey,
+                            newKey = newKey,
+                            onBackupCreated = imageBackups::add
+                        )
+                    }
+                    callerContext.ensureActive()
+                }
+
+                rewrappedEntities.forEach { entity -> dao.updateNote(entity) }
             }
-        } ?: throw VaultLockedException()
+        } catch (error: Throwable) {
+            val rollbackFailure = withContext(NonCancellable) {
+                restoreImageBackups(vaultImageFileStorage, imageBackups)
+                    ?: deleteImageBackups(vaultImageFileStorage, imageBackups)
+            }
+            rollbackFailure?.let(error::addSuppressed)
+            throw error
+        }
+
+        return RepositoryVaultNoteRewrapTransaction(
+            database = database,
+            dao = dao,
+            originalEntities = originalEntities,
+            imageBackups = imageBackups,
+            vaultImageFileStorage = vaultImageFileStorage
+        )
     }
 
     /**
@@ -432,7 +480,7 @@ internal class VaultNoteRepositoryImpl(
         key: SecretKey,
         failOnError: Boolean
     ): VaultImageFileEncryptionResult? {
-        val result = runCatching {
+        val result = runCatchingPreservingCancellation {
             val encryptionResult = vaultImageFileStorage.encryptInPlace(relativePath, key)
             when (encryptionResult) {
                 VaultImageFileEncryptionResult.Encrypted,
@@ -485,7 +533,7 @@ internal class VaultNoteRepositoryImpl(
             .filter { it.isNotBlank() }
             .distinct()
             .forEach { relativePath ->
-                runCatching {
+                runCatchingPreservingCancellation {
                     when (vaultImageFileStorage.decryptInPlace(relativePath, key)) {
                         VaultImageFileRestoreResult.Restored,
                         VaultImageFileRestoreResult.AlreadyPlaintext -> Unit
@@ -510,7 +558,7 @@ internal class VaultNoteRepositoryImpl(
             .filter { it.isNotBlank() }
             .distinct()
             .forEach { relativePath ->
-                runCatching {
+                runCatchingPreservingCancellation {
                     when (vaultImageFileStorage.decryptInPlace(relativePath, key)) {
                         VaultImageFileRestoreResult.Restored,
                         VaultImageFileRestoreResult.AlreadyPlaintext -> Unit
@@ -725,24 +773,13 @@ internal class VaultNoteRepositoryImpl(
         return result
     }
 
-    private fun String.replaceImagePaths(pathMap: Map<String, String>): String {
-        if (pathMap.isEmpty()) return this
-        var updated = this
-        pathMap.forEach { (sourcePath, duplicatePath) ->
-            if (sourcePath != duplicatePath) {
-                updated = updated.replace(sourcePath, duplicatePath)
-            }
-        }
-        return updated
-    }
-
     private suspend fun deleteVaultImages(imagePaths: List<String>) {
         imagePaths
             .asSequence()
             .filter { it.isNotBlank() }
             .distinct()
             .forEach { relativePath ->
-                runCatching {
+                runCatchingPreservingCancellation {
                     val deleted = imageStorage.deleteImage(relativePath)
                     if (!deleted) {
                         NexNoteDebugLog.repositoryWarning(event = "vaultImageCleanupFailed") {
@@ -786,4 +823,85 @@ internal class VaultNoteRepositoryImpl(
         backgroundColor = backgroundColor,
         isPreviewMode = isPreviewMode
     )
+}
+
+private class RepositoryVaultNoteRewrapTransaction(
+    private val database: RoomDatabase,
+    private val dao: NoteDao,
+    private val originalEntities: List<NoteEntity>,
+    private val imageBackups: List<VaultImageFileRewrapBackup>,
+    private val vaultImageFileStorage: VaultImageFileStorage
+) : VaultNoteRewrapTransaction {
+    private var completed = false
+
+    override suspend fun commit() {
+        if (completed) return
+        val cleanupFailure = deleteImageBackups(vaultImageFileStorage, imageBackups)
+        completed = true
+        cleanupFailure?.let { throw it }
+    }
+
+    override suspend fun rollback() {
+        if (completed) return
+
+        var failure: Throwable? = null
+        try {
+            database.withTransaction {
+                originalEntities.forEach { entity -> dao.updateNote(entity) }
+            }
+        } catch (error: Throwable) {
+            failure = error
+        }
+
+        val imageFailure = restoreImageBackups(vaultImageFileStorage, imageBackups)
+        if (failure == null) {
+            failure = imageFailure
+        } else if (imageFailure != null) {
+            failure.addSuppressed(imageFailure)
+        }
+
+        if (failure == null) {
+            failure = deleteImageBackups(vaultImageFileStorage, imageBackups)
+        }
+        completed = failure == null
+        failure?.let { throw it }
+    }
+}
+
+private suspend fun restoreImageBackups(
+    storage: VaultImageFileStorage,
+    backups: List<VaultImageFileRewrapBackup>
+): Throwable? {
+    var failure: Throwable? = null
+    backups.asReversed().forEach { backup ->
+        try {
+            storage.rollbackRewrap(backup)
+        } catch (error: Throwable) {
+            if (failure == null) {
+                failure = error
+            } else {
+                failure?.addSuppressed(error)
+            }
+        }
+    }
+    return failure
+}
+
+private suspend fun deleteImageBackups(
+    storage: VaultImageFileStorage,
+    backups: List<VaultImageFileRewrapBackup>
+): Throwable? {
+    var failure: Throwable? = null
+    backups.forEach { backup ->
+        try {
+            storage.commitRewrap(backup)
+        } catch (error: Throwable) {
+            if (failure == null) {
+                failure = error
+            } else {
+                failure?.addSuppressed(error)
+            }
+        }
+    }
+    return failure
 }

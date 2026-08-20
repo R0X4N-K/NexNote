@@ -6,12 +6,20 @@ import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveMostUsedTagsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SearchNotesScoredUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
 import io.github.r0x4nk.nexnote.testing.NoOpNoteImageStorage
+import io.github.r0x4nk.nexnote.testing.NoOpPreferencesRepository
+import io.github.r0x4nk.nexnote.testing.NoOpTagRepository
+import io.github.r0x4nk.nexnote.testing.NoOpTemplateRepository
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,14 +54,24 @@ class HomeViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao = FakeNoteDao()
-        val repository = NoteRepositoryImpl(fakeDao, NoOpNoteImageStorage())
+        val imageStorage = NoOpNoteImageStorage()
+        val repository = NoteRepositoryImpl(fakeDao, imageStorage)
         viewModel = HomeViewModel(
             searchNotesScored = SearchNotesScoredUseCase(repository),
             observeAllNotesSortedAsc = ObserveAllNotesSortedAscUseCase(repository),
             observeAllNotes = ObserveAllNotesUseCase(repository),
             moveNoteToTrash = MoveNoteToTrashUseCase(repository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),
-            toggleNotePin = ToggleNotePinUseCase(repository)
+            toggleNotePin = ToggleNotePinUseCase(repository),
+            duplicateNoteUseCase = DuplicateNoteUseCase(
+                repository,
+                NoOpTagRepository,
+                imageStorage
+            ),
+            observeTemplates = ObserveTemplatesUseCase(NoOpTemplateRepository),
+            observeMostUsedTags = ObserveMostUsedTagsUseCase(NoOpTagRepository),
+            observeFilteredNoteIds = ObserveFilteredNoteIdsUseCase(NoOpTagRepository),
+            observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository)
         )
     }
 
@@ -263,7 +281,6 @@ private class FakeNoteDao : NoteDao {
     override suspend fun getNoteById(id: Long): NoteEntity? = null
     override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
-    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> = emptyList()
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun deleteAllVaultNotes(): Int = 0

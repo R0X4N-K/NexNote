@@ -24,34 +24,36 @@ internal class NoteListActionsDelegate(
     private val moveNoteToTrash: MoveNoteToTrashUseCase,
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     private val toggleNotePin: ToggleNotePinUseCase,
-    private val duplicateNoteUseCase: DuplicateNoteUseCase?,
+    private val duplicateNoteUseCase: DuplicateNoteUseCase,
     private val sortOrder: MutableStateFlow<SortOrder>,
     private val viewMode: MutableStateFlow<NoteListViewMode>,
     private val selectedTagFilters: MutableStateFlow<Set<String>>,
     private val trashEvents: Channel<TrashedNoteEvent>,
     private val noteActionMessages: Channel<String>
 ) {
+    private val noteMutations = NoteMutationActions(
+        scope = scope,
+        moveNoteToTrash = moveNoteToTrash,
+        restoreNoteFromTrash = restoreNoteFromTrash,
+        duplicateNoteUseCase = duplicateNoteUseCase,
+        trashEvents = trashEvents,
+        noteActionMessages = noteActionMessages
+    )
 
     fun requestTrash(note: Note) {
-        requestTrash(listOf(note))
+        noteMutations.requestTrash(note)
     }
 
     fun requestTrash(notes: Collection<Note>) {
-        val event = notes.toTrashedNoteEvent() ?: return
-        scope.launch {
-            event.noteIds.forEach { noteId ->
-                moveNoteToTrash(noteId)
-            }
-            trashEvents.trySend(event)
-        }
+        noteMutations.requestTrash(notes)
     }
 
     fun confirmTrash() {
-        // No-op: Room flow already reflects the correct state.
+        noteMutations.confirmTrash()
     }
 
     fun undoPendingTrash(noteId: Long) {
-        scope.launch { restoreNoteFromTrash(noteId) }
+        noteMutations.undoPendingTrash(noteId)
     }
 
     fun togglePin(note: Note) {
@@ -59,22 +61,7 @@ internal class NoteListActionsDelegate(
     }
 
     fun duplicateNote(note: Note) {
-        if (note.isInVault) {
-            noteActionMessages.trySend("Could not duplicate note")
-            return
-        }
-        val duplicate = duplicateNoteUseCase ?: return
-        val noteLabel = note.displayLabel()
-        scope.launch {
-            try {
-                duplicate(note)
-                noteActionMessages.trySend("Duplicated \"$noteLabel\"")
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
-            }
-        }
+        noteMutations.duplicateNote(note)
     }
 
     fun toggleSortOrder() {
@@ -99,5 +86,58 @@ internal class NoteListActionsDelegate(
 
     fun clearTagFilters() {
         selectedTagFilters.update { emptySet() }
+    }
+}
+
+/**
+ * Executes the normal-note mutations shared by every list surface.
+ *
+ * The delegate owns coroutine cancellation semantics and user feedback while
+ * callers retain their screen-specific state and filtering controls.
+ */
+internal class NoteMutationActions(
+    private val scope: CoroutineScope,
+    private val moveNoteToTrash: MoveNoteToTrashUseCase,
+    private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
+    private val duplicateNoteUseCase: DuplicateNoteUseCase,
+    private val trashEvents: Channel<TrashedNoteEvent>,
+    private val noteActionMessages: Channel<String>
+) {
+    fun requestTrash(note: Note) {
+        requestTrash(listOf(note))
+    }
+
+    fun requestTrash(notes: Collection<Note>) {
+        val event = notes.toTrashedNoteEvent() ?: return
+        scope.launch {
+            event.noteIds.forEach { noteId -> moveNoteToTrash(noteId) }
+            trashEvents.trySend(event)
+        }
+    }
+
+    fun confirmTrash() {
+        // No-op: Room flow already reflects the correct state.
+    }
+
+    fun undoPendingTrash(noteId: Long) {
+        scope.launch { restoreNoteFromTrash(noteId) }
+    }
+
+    fun duplicateNote(note: Note) {
+        if (note.isInVault) {
+            noteActionMessages.trySend("Could not duplicate note")
+            return
+        }
+        val noteLabel = note.displayLabel()
+        scope.launch {
+            try {
+                duplicateNoteUseCase(note)
+                noteActionMessages.trySend("Duplicated \"$noteLabel\"")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
+            }
+        }
     }
 }

@@ -3,11 +3,16 @@ package io.github.r0x4nk.nexnote.ui.screen.agenda
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
 import io.github.r0x4nk.nexnote.testing.NoOpNoteImageStorage
+import io.github.r0x4nk.nexnote.testing.NoOpPreferencesRepository
+import io.github.r0x4nk.nexnote.testing.NoOpTagRepository
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.util.DateUtils
@@ -41,13 +46,21 @@ class AgendaViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao = AgendaFakeNoteDao()
-        val repository = NoteRepositoryImpl(fakeDao, NoOpNoteImageStorage())
+        val imageStorage = NoOpNoteImageStorage()
+        val repository = NoteRepositoryImpl(fakeDao, imageStorage)
         viewModel = AgendaViewModel(
             observeDistinctLocalDays = ObserveDistinctLocalDaysUseCase(repository),
             observeNotesByDateRange = ObserveNotesByDateRangeUseCase(repository),
             moveNoteToTrash = MoveNoteToTrashUseCase(repository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),
-            toggleNotePin = ToggleNotePinUseCase(repository)
+            toggleNotePin = ToggleNotePinUseCase(repository),
+            duplicateNoteUseCase = DuplicateNoteUseCase(
+                repository,
+                NoOpTagRepository,
+                imageStorage
+            ),
+            observeFilteredNoteIds = ObserveFilteredNoteIdsUseCase(NoOpTagRepository),
+            observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository)
         )
     }
 

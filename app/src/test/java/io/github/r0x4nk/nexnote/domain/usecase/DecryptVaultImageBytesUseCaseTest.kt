@@ -2,7 +2,6 @@ package io.github.r0x4nk.nexnote.domain.usecase
 
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
@@ -64,8 +63,6 @@ private class FakeDecryptRepository(
     override val vaultNotes: Flow<List<Note>> = flowOf(emptyList())
     override val vaultTrashedNotes: Flow<List<Note>> = flowOf(emptyList())
     override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> = flowOf(emptyList())
-    override val vaultTags: Flow<List<Tag>> = flowOf(emptyList())
-
     override suspend fun getVaultNoteById(id: Long): Note? = null
     override suspend fun saveVaultNote(note: Note): Long = 0L
     override suspend fun duplicateVaultNote(id: Long): DuplicateVaultNoteResult =

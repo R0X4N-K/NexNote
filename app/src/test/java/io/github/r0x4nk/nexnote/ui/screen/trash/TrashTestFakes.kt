@@ -13,6 +13,8 @@ internal class FakeNoteImageStorage(
     private val events: MutableList<String>
 ) : NoteImageStorage {
     val deletedPaths = mutableListOf<String>()
+    var deleteFailuresRemaining: Int = 0
+    var deleteFailure: Throwable? = null
 
     override suspend fun copyImageToInternal(
         noteId: Long,
@@ -22,6 +24,11 @@ internal class FakeNoteImageStorage(
     override suspend fun deleteImage(relativePath: String): Boolean {
         deletedPaths += relativePath
         events += "image:$relativePath"
+        deleteFailure?.let { throw it }
+        if (deleteFailuresRemaining > 0) {
+            deleteFailuresRemaining--
+            return false
+        }
         return true
     }
 
@@ -58,7 +65,6 @@ internal class FakeNoteDao(
         (_allNotes.value + _deletedNotes.value).firstOrNull { it.id == id }
     override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
-    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> = emptyList()
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun deleteAllVaultNotes(): Int = 0

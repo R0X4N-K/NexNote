@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.stateIn
 
 internal data class TrashExtraState(
     val noteToDelete: Note? = null,
-    val showEmptyTrashDialog: Boolean = false
+    val showEmptyTrashDialog: Boolean = false,
+    val errorMessage: String? = null
 )
 
 internal fun buildTrashUiStateFlow(
@@ -23,7 +24,8 @@ internal fun buildTrashUiStateFlow(
             notes = notes,
             isLoading = false,
             noteToDelete = extraState.noteToDelete,
-            showEmptyTrashDialog = extraState.showEmptyTrashDialog
+            showEmptyTrashDialog = extraState.showEmptyTrashDialog,
+            errorMessage = extraState.errorMessage
         )
     }.stateIn(
         scope = scope,

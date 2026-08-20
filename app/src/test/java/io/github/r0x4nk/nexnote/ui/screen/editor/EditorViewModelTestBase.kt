@@ -12,7 +12,6 @@ import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
@@ -33,7 +32,9 @@ import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsForNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
@@ -41,8 +42,11 @@ import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
+import io.github.r0x4nk.nexnote.testing.NoOpTagRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,19 +62,24 @@ import java.io.InputStream
 @OptIn(ExperimentalCoroutinesApi::class)
 abstract class EditorViewModelTestBase {
 
-    private val testDispatcher = StandardTestDispatcher()
+    protected val testDispatcher = StandardTestDispatcher()
+    private lateinit var editorSaveOwner: CoroutineScope
+    private lateinit var editorSaveCoordinator: EditorSaveCoordinator
     protected lateinit var fakeNoteDao: FakeEditorNoteDao
     protected lateinit var fakeTemplateDao: FakeEditorTemplateDao
 
     @Before
     fun setupEditorViewModelTestBase() {
         Dispatchers.setMain(testDispatcher)
+        editorSaveOwner = CoroutineScope(SupervisorJob() + testDispatcher)
+        editorSaveCoordinator = EditorSaveCoordinator(editorSaveOwner, testDispatcher)
         fakeNoteDao = FakeEditorNoteDao()
         fakeTemplateDao = FakeEditorTemplateDao()
     }
 
     @After
     fun tearDownEditorViewModelTestBase() {
+        editorSaveOwner.cancel()
         Dispatchers.resetMain()
     }
 
@@ -90,23 +99,32 @@ abstract class EditorViewModelTestBase {
     ): EditorViewModel {
         val noteRepository = NoteRepositoryImpl(fakeNoteDao, imageStorage)
         val templateRepository = TemplateRepositoryImpl(fakeTemplateDao)
+        val fallbackVaultNotes = FakeEditorVaultNoteRepository()
+        val fallbackVaultState = FakeEditorVaultStateRepository()
         return EditorViewModel(
             copyNoteImageToInternal = CopyNoteImageToInternalUseCase(imageStorage),
             deleteNoteImage = DeleteNoteImageUseCase(imageStorage),
             getNoteImageFile = GetNoteImageFileUseCase(imageStorage),
             getNoteById = GetNoteByIdUseCase(noteRepository),
-            getVaultNoteById = getVaultNoteById,
+            getVaultNoteById = getVaultNoteById
+                ?: GetVaultNoteByIdUseCase(fallbackVaultNotes),
             getTemplateById = GetTemplateByIdUseCase(templateRepository),
             saveNote = SaveNoteUseCase(noteRepository),
             saveTemplate = SaveTemplateUseCase(templateRepository),
-            saveVaultNote = saveVaultNote,
+            saveVaultNote = saveVaultNote
+                ?: SaveVaultNoteUseCase(fallbackVaultNotes),
             setNotePreviewMode = SetNotePreviewModeUseCase(noteRepository),
             observeNoteLinkCandidates = ObserveNoteLinkCandidatesUseCase(noteRepository),
-            observeVaultNoteLinkCandidates = observeVaultNoteLinkCandidates,
-            observeVaultState = observeVaultState,
+            observeVaultNoteLinkCandidates = observeVaultNoteLinkCandidates
+                ?: ObserveVaultNoteLinkCandidatesUseCase(fallbackVaultNotes),
+            observeTagsForNote = ObserveTagsForNoteUseCase(NoOpTagRepository),
+            indexNoteTags = IndexNoteTagsUseCase(NoOpTagRepository),
+            observeVaultState = observeVaultState
+                ?: ObserveVaultStateUseCase(fallbackVaultState),
             observeThemeMode = ObserveThemeModeUseCase(preferencesRepository),
-            setThemeMode = SetThemeModeUseCase(preferencesRepository),
-            decryptVaultImageBytesUseCase = decryptVaultImageBytes,
+            decryptVaultImageBytesUseCase = decryptVaultImageBytes
+                ?: DecryptVaultImageBytesUseCase(fallbackVaultNotes),
+            saveCoordinator = editorSaveCoordinator,
             initialMode = mode
         )
     }
@@ -165,9 +183,9 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
             list.filter { it.isInVault && !it.isDeleted }
                 .map { note -> NoteLinkCandidate(id = note.id, title = note.title) }
         }
-    override val vaultTags: Flow<List<Tag>> = MutableStateFlow<List<Tag>>(emptyList())
     val savedNotes = mutableListOf<Note>()
     var failOnSave = false
+    var saveFailure: Throwable? = null
 
     fun addNote(note: Note) {
         notes.value = notes.value + note
@@ -177,6 +195,7 @@ class FakeEditorVaultNoteRepository : VaultNoteRepository {
         notes.value.firstOrNull { it.id == id && it.isInVault && !it.isDeleted }
 
     override suspend fun saveVaultNote(note: Note): Long {
+        saveFailure?.let { throw it }
         if (failOnSave) throw RuntimeException("Vault save failed")
         val id = if (note.id == 0L) nextId++ else note.id
         val saved = note.copy(id = id, isInVault = true)
@@ -217,12 +236,15 @@ class FakeEditorNoteImageStorage : NoteImageStorage {
     val copiedNoteIds = mutableListOf<Long>()
     val deletedPaths = mutableListOf<String>()
     var failOnCopy = false
+    var copyFailure: Throwable? = null
+    var deleteFailure: Throwable? = null
     private var nextTimestamp = 100L
 
     override suspend fun copyImageToInternal(
         noteId: Long,
         openInputStream: () -> InputStream?
     ): String {
+        copyFailure?.let { throw it }
         if (failOnCopy) throw RuntimeException("Copy failed")
         openInputStream()?.use { it.readBytes() }
         copiedNoteIds += noteId
@@ -231,6 +253,7 @@ class FakeEditorNoteImageStorage : NoteImageStorage {
 
     override suspend fun deleteImage(relativePath: String): Boolean {
         deletedPaths += relativePath
+        deleteFailure?.let { throw it }
         return true
     }
 
@@ -314,6 +337,7 @@ class FakeEditorNoteDao : NoteDao {
     var insertedCount = 0
     var updatedCount = 0
     var failOnInsert = false
+    var insertFailure: Throwable? = null
 
     fun addNote(entity: NoteEntity) {
         notes[entity.id] = entity
@@ -353,9 +377,6 @@ class FakeEditorNoteDao : NoteDao {
     override suspend fun getVaultNoteById(id: Long): NoteEntity? =
         notes[id]?.takeIf { !it.isDeleted && it.isInVault }
 
-    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> =
-        notes.values.filter { !it.isDeleted && it.isInVault }.toList()
-
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         notes.values.filter { it.isInVault }.toList()
 
@@ -378,6 +399,7 @@ class FakeEditorNoteDao : NoteDao {
         MutableStateFlow(emptyList())
 
     override suspend fun insertNote(note: NoteEntity): Long {
+        insertFailure?.let { throw it }
         if (failOnInsert) throw RuntimeException("Insert failed")
         insertedCount++
         val id = if (note.id == 0L) nextId++ else note.id
@@ -412,6 +434,7 @@ class FakeEditorTemplateDao : TemplateDao {
     private var nextId = 100L
     var insertedCount = 0
     var updatedCount = 0
+    var insertFailure: Throwable? = null
 
     fun addTemplate(entity: TemplateEntity) {
         templates[entity.id] = entity
@@ -426,6 +449,7 @@ class FakeEditorTemplateDao : TemplateDao {
         templates.values.count { it.isPredefined }
 
     override suspend fun insertTemplate(template: TemplateEntity): Long {
+        insertFailure?.let { throw it }
         insertedCount++
         val id = if (template.id == 0L) nextId++ else template.id
         templates[id] = template.copy(id = id)

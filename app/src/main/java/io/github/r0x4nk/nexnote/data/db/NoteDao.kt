@@ -112,20 +112,6 @@ interface NoteDao {
     suspend fun getVaultNoteById(id: Long): NoteEntity?
 
     /**
-     * Active Vault notes as a one-shot list. Intended for transactional bulk
-     * operations such as re-encrypting all Vault entries with a new key.
-     * Callers must require an unlocked Vault key before decrypting fields.
-     */
-    @Query(
-        """
-        SELECT * FROM notes
-        WHERE isDeleted = 0
-          AND isInVault = 1
-    """
-    )
-    suspend fun getAllVaultNotesOnce(): List<NoteEntity>
-
-    /**
      * Every Vault note row, including soft-deleted rows. Intended only for the
      * reset/wipe boundary so associated resources can be inspected before the
      * rows are hard-deleted.

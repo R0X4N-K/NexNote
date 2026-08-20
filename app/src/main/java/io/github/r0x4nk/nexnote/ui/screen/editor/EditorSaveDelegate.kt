@@ -7,10 +7,10 @@ import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -22,9 +22,10 @@ internal class EditorSaveDelegate(
     private val uiState: MutableStateFlow<EditorUiState>,
     private val saveNote: SaveNoteUseCase,
     private val saveTemplate: SaveTemplateUseCase,
-    private val saveVaultNote: SaveVaultNoteUseCase?,
-    private val indexNoteTags: IndexNoteTagsUseCase?,
+    private val saveVaultNote: SaveVaultNoteUseCase,
+    private val indexNoteTags: IndexNoteTagsUseCase,
     private val scope: CoroutineScope,
+    private val saveCoordinator: EditorSaveCoordinator,
     private val autosaveDelayMs: Long,
     private val savesEnabled: Boolean = true,
     private val tagIndexDedup: TagIndexDedupPolicy = TagIndexDedupPolicy()
@@ -79,7 +80,10 @@ internal class EditorSaveDelegate(
      *         after the call (either it already did, or one was just created),
      *         `false` if the underlying save failed.
      */
-    suspend fun ensurePersisted(): Boolean = saveMutex.withLock {
+    suspend fun ensurePersisted(): Boolean =
+        saveCoordinator.runSave { ensurePersistedSerialized() }
+
+    private suspend fun ensurePersistedSerialized(): Boolean = saveMutex.withLock {
         if (!savesEnabled) return@withLock false
         val snapshot = uiState.value
         NexNoteDebugLog.persistence(
@@ -105,6 +109,9 @@ internal class EditorSaveDelegate(
                 details = uiState.value.debugSaveSummary()
             )
             true
+        } catch (error: CancellationException) {
+            uiState.update { it.copy(isSaving = false) }
+            throw error
         } catch (e: Exception) {
             NexNoteDebugLog.persistence(
                 event = "ensurePersistedFailed",
@@ -115,7 +122,10 @@ internal class EditorSaveDelegate(
         }
     }
 
-    suspend fun performSave(): Boolean = saveMutex.withLock {
+    suspend fun performSave(): Boolean =
+        saveCoordinator.runSave { performSaveSerialized() }
+
+    private suspend fun performSaveSerialized(): Boolean = saveMutex.withLock {
         if (!savesEnabled) {
             autosaveJob?.cancel()
             autosaveJob = null
@@ -154,6 +164,9 @@ internal class EditorSaveDelegate(
             )
             if (uiState.value.isDirty) scheduleAutosave()
             true
+        } catch (error: CancellationException) {
+            uiState.update { it.copy(isSaving = false) }
+            throw error
         } catch (e: Exception) {
             NexNoteDebugLog.persistence(
                 event = "performSaveFailed",
@@ -164,18 +177,17 @@ internal class EditorSaveDelegate(
         }
     }
 
-    fun flushOnCleared() {
-        if (!savesEnabled) return
+    fun enqueueFinalSave(): Deferred<Boolean>? {
+        if (!savesEnabled) return null
         val state = uiState.value
         NexNoteDebugLog.persistence(
-            event = "flushOnCleared",
+            event = "enqueueFinalSave",
             details = "willFlush=${state.isDirty && shouldSave(state)} ${state.debugSaveSummary()}"
         )
-        if (state.isDirty && shouldSave(state)) {
-            CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-                runCatching { performSave() }
-            }
-        }
+        if (!state.isDirty || !shouldSave(state)) return null
+
+        cancelPendingAutosave()
+        return saveCoordinator.enqueueFinalSave { performSaveSerialized() }
     }
 
     private suspend fun saveAsNote(snapshot: EditorUiState) {
@@ -208,14 +220,13 @@ internal class EditorSaveDelegate(
     }
 
     private suspend fun saveAsVaultNote(snapshot: EditorUiState) {
-        val saveVault = saveVaultNote ?: error("Vault note save use case is not available")
         val savedAt = System.currentTimeMillis()
         val note = buildNote(snapshot).copy(isInVault = true)
         NexNoteDebugLog.persistence(
             event = "saveAsVaultNoteBeforeRepository",
             details = NexNoteDebugLog.noteSummary("note", note)
         )
-        val savedId = saveVault(note)
+        val savedId = saveVaultNote(note)
 
         uiState.update { current ->
             val changedDuringSave = EditorSaveChangePolicy.hasUnsavedNoteChanges(
@@ -280,7 +291,6 @@ internal class EditorSaveDelegate(
      * index, preventing transient errors from leaving the tag table stale.
      */
     private suspend fun maybeIndexNoteTags(savedId: Long, content: String) {
-        val indexer = indexNoteTags ?: return
         if (!tagIndexDedup.shouldIndexAndRemember(savedId, content)) {
             NexNoteDebugLog.persistence(
                 event = "indexNoteTagsSkipped",
@@ -290,7 +300,7 @@ internal class EditorSaveDelegate(
         }
 
         try {
-            indexer(savedId, content)
+            indexNoteTags(savedId, content)
         } catch (e: Throwable) {
             tagIndexDedup.forgetLastIndex()
             throw e

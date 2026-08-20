@@ -122,6 +122,7 @@ fun AppNavigation(
     )
     ExternalFileOpenEffect(
         navController = navController,
+        isNavigationReady = currentDestination != null,
         request = externalFileOpenRequest,
         onConsumed = onExternalFileOpenConsumed
     )
@@ -148,10 +149,12 @@ fun AppNavigation(
 @Composable
 private fun ExternalFileOpenEffect(
     navController: NavHostController,
+    isNavigationReady: Boolean,
     request: ExternalFileOpenRequest?,
     onConsumed: (Long) -> Unit
 ) {
-    LaunchedEffect(request?.requestId) {
+    LaunchedEffect(request?.requestId, isNavigationReady) {
+        if (!isNavigationReady) return@LaunchedEffect
         val openRequest = request ?: return@LaunchedEffect
         navController.navigate(Screen.Editor.existingNoteRoute(openRequest.noteId)) {
             launchSingleTop = true

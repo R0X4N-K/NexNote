@@ -38,8 +38,8 @@ private data class TrashNoteCardTextState(
 internal fun TrashNoteCard(
     note: Note,
     onRestore: () -> Unit,
-    onDeletePermanently: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDeletePermanently: (() -> Unit)? = null
 ) {
     Card(
         modifier  = modifier.fillMaxWidth(),

@@ -21,6 +21,8 @@ import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialP
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
+import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +32,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
@@ -51,8 +60,6 @@ class VaultRepositoryImpl internal constructor(
     private val dataStore: DataStore<Preferences>,
     private val pinHasher: VaultPinHasher = VaultPinHasher(),
     private val keyDeriver: VaultKeyDeriver = VaultKeyDeriver(),
-    private val noteRewrapperProvider: () -> VaultNoteRewrapper? = { null },
-    private val noteWiperProvider: () -> VaultNoteWiper? = { null },
     private val protectUnlockMaterial: ((ByteArray) -> ProtectVaultUnlockMaterialResult)? = null,
     private val unprotectUnlockMaterial: ((String) -> UnprotectVaultUnlockMaterialResult)? = null
 ) : VaultRepository, VaultUnlockedKeyProvider {
@@ -63,20 +70,27 @@ class VaultRepositoryImpl internal constructor(
         unprotectUnlockMaterial = AndroidVaultUnlockMaterialProtector(context)::unprotect
     )
 
-    internal constructor(
-        context: Context,
-        noteRewrapperProvider: () -> VaultNoteRewrapper?,
-        noteWiperProvider: () -> VaultNoteWiper? = { null }
-    ) : this(
-        dataStore = context.vaultDataStore,
-        noteRewrapperProvider = noteRewrapperProvider,
-        noteWiperProvider = noteWiperProvider,
-        protectUnlockMaterial = AndroidVaultUnlockMaterialProtector(context)::protect,
-        unprotectUnlockMaterial = AndroidVaultUnlockMaterialProtector(context)::unprotect
-    )
-
     private val unlockedKey = MutableStateFlow<SecretKey?>(null)
+    private val keyAccessMutex = Mutex()
+    private lateinit var noteRewrapper: VaultNoteRewrapper
+    private lateinit var noteWiper: VaultNoteWiper
     override val unlockedVaultKey: StateFlow<SecretKey?> = unlockedKey.asStateFlow()
+
+    /**
+     * Completes the Vault object graph after the note repository has received
+     * this instance as its unlocked-key provider. Binding is one-shot and must
+     * happen before the repository is exposed to callers.
+     */
+    internal fun bindNoteMaintenance(
+        rewrapper: VaultNoteRewrapper,
+        wiper: VaultNoteWiper
+    ) {
+        check(!::noteRewrapper.isInitialized && !::noteWiper.isInitialized) {
+            "Vault note maintenance is already bound"
+        }
+        noteRewrapper = rewrapper
+        noteWiper = wiper
+    }
 
     private val storedConfig: Flow<VaultStoredConfig?> =
         dataStore.data
@@ -134,7 +148,7 @@ class VaultRepositoryImpl internal constructor(
             return false
         }
 
-        return runCatching {
+        return runCatchingPreservingCancellation {
             val key = keyDeriver.deriveKey(pin, config.keyParams)
             unlockedKey.value = key
             refreshAndroidCredentialProtectedUnlockMaterial(
@@ -196,6 +210,8 @@ class VaultRepositoryImpl internal constructor(
                 UnprotectVaultUnlockMaterialResult.Failed ->
                     UnlockVaultWithAndroidCredentialResult.Failed
             }
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: IOException) {
             UnlockVaultWithAndroidCredentialResult.Failed
         } catch (error: Exception) {
@@ -225,6 +241,13 @@ class VaultRepositoryImpl internal constructor(
     override suspend fun changePin(
         currentPin: CharArray,
         newPin: CharArray
+    ): ChangeVaultPinResult = keyAccessMutex.withLock {
+        changePinWithExclusiveKeyAccess(currentPin, newPin)
+    }
+
+    private suspend fun changePinWithExclusiveKeyAccess(
+        currentPin: CharArray,
+        newPin: CharArray
     ): ChangeVaultPinResult {
         if (newPin.isEmpty()) {
             return ChangeVaultPinResult.InvalidNewPin
@@ -240,9 +263,7 @@ class VaultRepositoryImpl internal constructor(
         // current key available. We still verify the current PIN against the
         // stored verifier: an unlocked Vault is not enough proof that the
         // caller knows the previous PIN.
-        if (unlockedKey.value == null) {
-            return ChangeVaultPinResult.VaultLocked
-        }
+        val currentKey = unlockedKey.value ?: return ChangeVaultPinResult.VaultLocked
 
         if (!pinHasher.verify(currentPin, config.pinHash)) {
             return ChangeVaultPinResult.WrongCurrentPin
@@ -257,36 +278,99 @@ class VaultRepositoryImpl internal constructor(
         val newKey: SecretKey = runCatching { keyDeriver.deriveKey(newPin, newKeyParams) }
             .getOrElse { return ChangeVaultPinResult.RewrapFailed }
 
-        val rewrapper = noteRewrapperProvider()
-            ?: return ChangeVaultPinResult.RewrapFailed
+        check(::noteRewrapper.isInitialized) { "Vault note maintenance is not bound" }
 
         // Rewrap notes BEFORE overwriting persisted verifier/params so that a
         // failure here leaves the existing PIN, key and ciphertexts coherent.
-        val rewrapOk = runCatching { rewrapper.rewrapAllVaultNotesWith(newKey) }.isSuccess
-        if (!rewrapOk) {
+        val rewrapTransaction = try {
+            noteRewrapper.rewrapAllVaultNotesWith(currentKey, newKey)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
             return ChangeVaultPinResult.RewrapFailed
         }
 
-        dataStore.edit { prefs ->
-            prefs[PIN_ALGORITHM_KEY] = newPinHash.algorithm
-            prefs[PIN_ITERATIONS_KEY] = newPinHash.iterations
-            prefs[PIN_SALT_KEY] = newPinHash.saltBase64
-            prefs[PIN_HASH_KEY] = newPinHash.hashBase64
-            prefs[KEY_DERIVATION_ALGORITHM_KEY] = newKeyParams.algorithm
-            prefs[KEY_DERIVATION_ITERATIONS_KEY] = newKeyParams.iterations
-            prefs[KEY_DERIVATION_SALT_KEY] = newKeyParams.saltBase64
-            prefs[KEY_DERIVATION_KEY_LENGTH_BITS_KEY] = newKeyParams.keyLengthBits
+        try {
+            currentCoroutineContext().ensureActive()
+        } catch (error: CancellationException) {
+            rollbackWithoutReplacing(rewrapTransaction, error)
+            throw error
         }
 
-        // Swap the in-memory key only after persistence is in place so the
-        // Vault stays unlocked under the new PIN.
-        unlockedKey.value = newKey
-        refreshAndroidCredentialProtectedUnlockMaterial(
-            key = newKey,
-            clearStoredMaterialOnFailure = true
-        )
+        var configCommitted = false
+        try {
+            // Once this point-of-no-return starts, finish the atomic DataStore
+            // commit and in-memory hand-off even if the caller is cancelled.
+            // Cancellation before this block rolls the prepared Room/filesystem
+            // transaction back; after it, the Vault is fully under the new key.
+            withContext(NonCancellable) {
+                dataStore.edit { prefs ->
+                    prefs[PIN_ALGORITHM_KEY] = newPinHash.algorithm
+                    prefs[PIN_ITERATIONS_KEY] = newPinHash.iterations
+                    prefs[PIN_SALT_KEY] = newPinHash.saltBase64
+                    prefs[PIN_HASH_KEY] = newPinHash.hashBase64
+                    prefs[KEY_DERIVATION_ALGORITHM_KEY] = newKeyParams.algorithm
+                    prefs[KEY_DERIVATION_ITERATIONS_KEY] = newKeyParams.iterations
+                    prefs[KEY_DERIVATION_SALT_KEY] = newKeyParams.saltBase64
+                    prefs[KEY_DERIVATION_KEY_LENGTH_BITS_KEY] = newKeyParams.keyLengthBits
+                }
+                configCommitted = true
+
+                // Swap the in-memory key only after persistence is in place so
+                // every subsequent Vault operation uses the new key.
+                unlockedKey.value = newKey
+
+                // Backup cleanup cannot invalidate the committed Vault. A
+                // failed deletion leaves only old ciphertext, never plaintext.
+                try {
+                    rewrapTransaction.commit()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    NexNoteDebugLog.repositoryWarning(event = "vaultRewrapBackupCleanupFailed") {
+                        "error=${error::class.java.simpleName}"
+                    }
+                }
+
+                refreshAndroidCredentialProtectedUnlockMaterial(
+                    key = newKey,
+                    clearStoredMaterialOnFailure = true
+                )
+            }
+        } catch (error: CancellationException) {
+            if (!configCommitted) {
+                rollbackWithoutReplacing(rewrapTransaction, error)
+            }
+            throw error
+        } catch (_: Exception) {
+            if (!configCommitted) {
+                val rollbackSucceeded = try {
+                    withContext(NonCancellable) { rewrapTransaction.rollback() }
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+                if (!rollbackSucceeded) {
+                    unlockedKey.value = null
+                }
+                return ChangeVaultPinResult.RewrapFailed
+            }
+        }
 
         return ChangeVaultPinResult.Success
+    }
+
+    private suspend fun rollbackWithoutReplacing(
+        transaction: VaultNoteRewrapTransaction,
+        originalFailure: Throwable
+    ) {
+        withContext(NonCancellable) {
+            try {
+                transaction.rollback()
+            } catch (rollbackFailure: Throwable) {
+                originalFailure.addSuppressed(rollbackFailure)
+            }
+        }
     }
 
     override suspend fun resetVault(): ResetVaultResult {
@@ -307,9 +391,10 @@ class VaultRepositoryImpl internal constructor(
         // the destructive operation is always preceded by authentication. If
         // the wipe fails the Vault is left intact (PIN and ciphertexts
         // unchanged).
-        val wiper = noteWiperProvider()
-            ?: return ResetVaultResult.Failed
-        val wipeSucceeded = runCatching { wiper.wipeAllVaultNotes() }.isSuccess
+        check(::noteWiper.isInitialized) { "Vault note maintenance is not bound" }
+        val wipeSucceeded = runCatchingPreservingCancellation {
+            noteWiper.wipeAllVaultNotes()
+        }.isSuccess
         if (!wipeSucceeded) {
             return ResetVaultResult.Failed
         }
@@ -320,7 +405,7 @@ class VaultRepositoryImpl internal constructor(
         // for a Vault that is logically being reset.
         unlockedKey.value = null
 
-        val storeCleared = runCatching {
+        val storeCleared = runCatchingPreservingCancellation {
             dataStore.edit { prefs ->
                 prefs.remove(PIN_ALGORITHM_KEY)
                 prefs.remove(PIN_ITERATIONS_KEY)
@@ -338,8 +423,10 @@ class VaultRepositoryImpl internal constructor(
     }
 
     override suspend fun <T> withUnlockedVaultKey(block: suspend (SecretKey) -> T): T? {
-        val key = unlockedKey.value ?: return null
-        return block(key)
+        return keyAccessMutex.withLock {
+            val key = unlockedKey.value ?: return@withLock null
+            block(key)
+        }
     }
 
     private suspend fun refreshAndroidCredentialProtectedUnlockMaterial(
@@ -396,6 +483,8 @@ class VaultRepositoryImpl internal constructor(
                     RefreshVaultAndroidCredentialProtectedMaterialResult.Failed
                 }
             }
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: IOException) {
             RefreshVaultAndroidCredentialProtectedMaterialResult.Failed
         } catch (error: Exception) {
@@ -406,7 +495,7 @@ class VaultRepositoryImpl internal constructor(
     }
 
     private suspend fun clearStoredAndroidCredentialProtectedUnlockMaterial() {
-        runCatching {
+        runCatchingPreservingCancellation {
             dataStore.edit { prefs ->
                 prefs.remove(ANDROID_CREDENTIAL_PROTECTED_UNLOCK_MATERIAL_KEY)
             }

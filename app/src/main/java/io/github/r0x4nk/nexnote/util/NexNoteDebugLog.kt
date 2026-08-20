@@ -5,16 +5,15 @@ import io.github.r0x4nk.nexnote.BuildConfig
 import io.github.r0x4nk.nexnote.domain.model.Note
 
 /**
- * Temporary structured diagnostics for the editor data-loss investigation.
+ * Structured diagnostics that deliberately exclude note text and exception
+ * messages. User-authored content must never be emitted to logcat, including
+ * in debug builds.
  *
  * Keep all events under one tag so a single `adb logcat` filter captures the
  * full path from Compose text input to Room persistence.
  */
 object NexNoteDebugLog {
     const val TAG = "NexNoteDebug"
-    private const val SAMPLE_LIMIT = 120
-    private const val FULL_HASH_LIMIT = 8_192
-    private const val PARTIAL_HASH_SAMPLE_LIMIT = 512
     val isEnabled: Boolean
         get() = BuildConfig.DEBUG
 
@@ -59,14 +58,10 @@ object NexNoteDebugLog {
         )
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun textSummary(label: String, text: String, redact: Boolean = false): String {
         if (!isEnabled) return ""
-        if (redact) {
-            return "$label.len=${text.length} $label.content=redacted"
-        }
-        return "$label.len=${text.length} " +
-            "$label.hash=${text.debugFingerprint()} " +
-            "$label.sample=\"${text.debugSample()}\""
+        return "$label.len=${text.length} $label.content=redacted"
     }
 
     fun noteSummary(label: String, note: Note?): String {
@@ -75,23 +70,18 @@ object NexNoteDebugLog {
         return buildString {
             append("$label.id=${note.id} ")
             append("$label.vault=${note.isInVault} ")
-            if (note.isInVault) {
-                append("$label.content=redacted")
-            } else {
-                append("$label.titleLen=${note.title.length} ")
-                append("$label.contentLen=${note.content.length} ")
-                append("$label.contentHash=${note.content.debugFingerprint()} ")
-                append("$label.markdown=${note.isMarkdown} ")
-                append("$label.preview=${note.isPreviewMode} ")
-                append("$label.modified=${note.lastModifiedDate} ")
-                append("$label.contentSample=\"${note.content.debugSample()}\"")
-            }
+            append("$label.titleLen=${note.title.length} ")
+            append("$label.contentLen=${note.content.length} ")
+            append("$label.markdown=${note.isMarkdown} ")
+            append("$label.preview=${note.isPreviewMode} ")
+            append("$label.modified=${note.lastModifiedDate} ")
+            append("$label.content=redacted")
         }
     }
 
     fun throwableSummary(error: Throwable): String {
         if (!isEnabled) return ""
-        return "error=${error::class.java.simpleName} message=\"${error.message.orEmpty().debugSample()}\""
+        return "error=${error::class.java.simpleName} message=redacted"
     }
 
     private fun write(
@@ -137,19 +127,4 @@ object NexNoteDebugLog {
         }
     }
 
-    private fun String.debugSample(): String {
-        return take(SAMPLE_LIMIT)
-            .replace("\\", "\\\\")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\"", "\\\"")
-    }
-
-    private fun String.debugFingerprint(): String {
-        if (length <= FULL_HASH_LIMIT) return hashCode().toString()
-
-        val headHash = take(PARTIAL_HASH_SAMPLE_LIMIT).hashCode()
-        val tailHash = takeLast(PARTIAL_HASH_SAMPLE_LIMIT).hashCode()
-        return "partial:$headHash:$tailHash"
-    }
 }

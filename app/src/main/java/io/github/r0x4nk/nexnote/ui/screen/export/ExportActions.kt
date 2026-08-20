@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 internal data class ExportActions(
@@ -59,7 +60,9 @@ private suspend fun exportCurrentSelection(
             context.startActivity(Intent.createChooser(intent, "Share"))
         }
         viewModel.onExportComplete()
-    } catch (e: Exception) {
-        viewModel.onExportError("Export failed: ${e.message}")
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
+        viewModel.onExportError("Export failed. Please try again.")
     }
 }

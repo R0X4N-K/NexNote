@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.export
 
 import android.content.Context
+import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
 import android.os.CancellationSignal
@@ -24,9 +25,10 @@ import java.util.Locale
  * All I/O operations are dispatched to [Dispatchers.IO] internally.
  * No business logic here — it only consumes the [Note] list already filtered by the ViewModel.
  */
-class ExportManager(
+internal class ExportManager(
     private val context: Context,
-    private val imageFileProvider: (String) -> File
+    private val imageFileProvider: (String) -> File,
+    private val exportCache: ExportCache = ExportCache(context.cacheDir)
 ) {
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ class ExportManager(
             Intent(Intent.ACTION_SEND).apply {
                 type = format.mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newUri(context.contentResolver, file.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         }
@@ -58,22 +61,32 @@ class ExportManager(
     suspend fun print(notes: List<Note>) {
         val file = withContext(Dispatchers.IO) { createExportFile(notes, ExportFormat.PDF) }
         val manager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-        manager.print(
-            buildFileName(notes, ExportFormat.PDF),
-            PdfPrintAdapter(file),
-            null
-        )
+        try {
+            manager.print(
+                buildFileName(notes, ExportFormat.PDF),
+                PdfPrintAdapter(file),
+                null
+            )
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        }
     }
 
     // ── Format routing ────────────────────────────────────────────────────────
 
     private fun createExportFile(notes: List<Note>, format: ExportFormat): File {
         val file = prepareFile(buildFileName(notes, format))
-        when (format) {
-            ExportFormat.TXT -> writeTxt(file, notes)
-            ExportFormat.MD -> writeMd(file, notes)
-            ExportFormat.PDF,
-            ExportFormat.PRINT -> writePdf(file, notes)
+        try {
+            when (format) {
+                ExportFormat.TXT -> writeTxt(file, notes)
+                ExportFormat.MD -> writeMd(file, notes)
+                ExportFormat.PDF,
+                ExportFormat.PRINT -> writePdf(file, notes)
+            }
+        } catch (error: Exception) {
+            file.delete()
+            throw error
         }
         return file
     }
@@ -97,8 +110,7 @@ class ExportManager(
         name.replace(Regex("""[\\/:*?"<>|]"""), "_").trim().take(100).ifBlank { "Note" }
 
     private fun prepareFile(name: String): File {
-        val dir = File(context.cacheDir, "exports").also { it.mkdirs() }
-        return File(dir, name)
+        return exportCache.prepareFile(name)
     }
 
     // ── TXT writer ────────────────────────────────────────────────────────────
@@ -159,8 +171,12 @@ class ExportManager(
                 }
                 callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
             } catch (e: Exception) {
-                callback.onWriteFailed(e.message)
+                callback.onWriteFailed("Could not write the PDF")
             }
+        }
+
+        override fun onFinish() {
+            pdfFile.delete()
         }
     }
 

@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.data.local
 
+import io.github.r0x4nk.nexnote.util.InputTooLargeException
+import io.github.r0x4nk.nexnote.util.copyBounded
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -96,6 +98,30 @@ class InternalNoteImageStorageTest {
 
         assertTrue(result.exceptionOrNull() is IOException)
         assertFalse(storage.getImageFile("images/note_8_img_789.jpg").exists())
+    }
+
+    @Test
+    fun `copyImageToInternal removes partial destination after byte limit failure`() = runTest {
+        val boundedProcessor: ((() -> InputStream?), File) -> Unit = { provider, destination ->
+            val input = provider() ?: throw IOException("Image input stream is unavailable")
+            input.use {
+                destination.outputStream().use { output -> copyBounded(it, output, 8L) }
+            }
+        }
+        val storage = InternalNoteImageStorage(
+            filesDir = tempFolder.root,
+            currentTimeMillis = { 790L },
+            processImage = boundedProcessor
+        )
+
+        val result = runCatching {
+            storage.copyImageToInternal(noteId = 8L) {
+                ByteArrayInputStream(ByteArray(9))
+            }
+        }
+
+        assertTrue(result.exceptionOrNull() is InputTooLargeException)
+        assertFalse(storage.getImageFile("images/note_8_img_790.jpg").exists())
     }
 
     @Test

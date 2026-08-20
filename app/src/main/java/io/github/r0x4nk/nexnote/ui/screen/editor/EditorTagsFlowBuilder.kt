@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun buildTagsForCurrentNoteFlow(
     uiState: StateFlow<EditorUiState>,
-    observeTagsForNote: ObserveTagsForNoteUseCase?,
+    observeTagsForNote: ObserveTagsForNoteUseCase,
     scope: CoroutineScope
 ): StateFlow<List<Tag>> {
     return uiState
@@ -25,13 +25,7 @@ internal fun buildTagsForCurrentNoteFlow(
         .flatMapLatest { source ->
             when (source) {
                 EditorTagSource.Empty -> flowOf(emptyList())
-                is EditorTagSource.Normal -> {
-                    if (observeTagsForNote == null) {
-                        flowOf(emptyList())
-                    } else {
-                        observeTagsForNote(source.noteId)
-                    }
-                }
+                is EditorTagSource.Normal -> observeTagsForNote(source.noteId)
                 is EditorTagSource.Vault -> flowOf(source.toTags())
             }
         }

@@ -163,10 +163,10 @@ internal fun StaticMenuButton(
     fabX: Float,
     fabY: Float,
     buttonSizePx: Float,
-    closedIcon: ImageVector = Icons.Default.Add,
-    closedContentDescription: String = "Open menu",
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    closedIcon: ImageVector = Icons.Default.Add,
+    closedContentDescription: String = "Open menu"
 ) {
     val density      = LocalDensity.current
     val buttonSizeDp = with(density) { buttonSizePx.toDp() }

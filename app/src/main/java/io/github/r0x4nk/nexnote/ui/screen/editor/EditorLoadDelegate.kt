@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 internal class EditorLoadDelegate(
     private val uiState: MutableStateFlow<EditorUiState>,
     private val getNoteById: GetNoteByIdUseCase,
-    private val getVaultNoteById: GetVaultNoteByIdUseCase?,
+    private val getVaultNoteById: GetVaultNoteByIdUseCase,
     private val getTemplateById: GetTemplateByIdUseCase,
     private val scheduleAutosave: () -> Unit,
     private val resetContentHistory: (content: String, selectionOffset: Int?) -> Unit
@@ -112,7 +112,7 @@ internal class EditorLoadDelegate(
 
     private suspend fun loadVaultNote(id: Long) {
         NexNoteDebugLog.viewModel(event = "loadVaultNoteStart", details = "vaultNoteId=$id")
-        val note = getVaultNoteById?.invoke(id)
+        val note = getVaultNoteById(id)
         if (note == null || !note.isInVault) {
             NexNoteDebugLog.viewModel(event = "loadVaultNoteMissing", details = "vaultNoteId=$id")
             uiState.update { it.copy(isLoading = false, errorMessage = "Vault note not available") }

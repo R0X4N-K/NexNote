@@ -9,19 +9,18 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun buildNoteLinkTargetsFlow(
     uiState: StateFlow<EditorUiState>,
-    observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase?,
-    observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase?,
+    observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase,
+    observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase,
     scope: CoroutineScope
 ): StateFlow<List<NoteLinkTarget>> {
-    val normalCandidatesFlow = observeNoteLinkCandidates?.invoke() ?: flowOf(emptyList())
-    val vaultCandidatesFlow = observeVaultNoteLinkCandidates?.invoke() ?: flowOf(emptyList())
+    val normalCandidatesFlow = observeNoteLinkCandidates()
+    val vaultCandidatesFlow = observeVaultNoteLinkCandidates()
     val linkScopeFlow = uiState
         .map { state -> NoteLinkTargetScope(isVaultNote = state.isVaultNote, noteId = state.noteId) }
         .distinctUntilChanged()

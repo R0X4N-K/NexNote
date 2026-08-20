@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.component
 
 import android.content.ClipData
+import android.os.PersistableBundle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -162,12 +163,26 @@ internal suspend fun copyTextToClipboard(
     text: String,
     snackbarMessage: String
 ) {
-    clipboard.setClipEntry(ClipData.newPlainText(NOTE_CLIP_LABEL, text).toClipEntry())
+    clipboard.setClipEntry(sensitiveNoteClipData(text).toClipEntry())
     snackbarHostState.showSnackbar(
         message = snackbarMessage,
         duration = SnackbarDuration.Short
     )
 }
+
+/**
+ * Marks copied note text as sensitive so compatible Android keyboards and
+ * system surfaces obscure the clipboard preview. This flag is a presentation
+ * safeguard; it does not encrypt or isolate the clipboard contents.
+ */
+internal fun sensitiveNoteClipData(text: String): ClipData =
+    ClipData.newPlainText(NOTE_CLIP_LABEL, text).apply {
+        description.extras = PersistableBundle().apply {
+            putBoolean(SENSITIVE_CLIPBOARD_EXTRA, true)
+        }
+    }
+
+private const val SENSITIVE_CLIPBOARD_EXTRA = "android.content.extra.IS_SENSITIVE"
 
 /**
  * Bottom sheet for secondary note actions in list and agenda surfaces.
@@ -349,9 +364,9 @@ private fun NoteActionsCopyPage(
 internal fun NoteActionsSheetRow(
     text: String,
     icon: ImageVector,
-    destructive: Boolean = false,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    destructive: Boolean = false
 ) {
     val contentColor = if (destructive) {
         MaterialTheme.colorScheme.error

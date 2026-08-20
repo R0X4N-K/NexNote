@@ -73,6 +73,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -162,7 +163,7 @@ fun VaultScreen(
         mutableStateOf(SelectionUiState())
     }
     var moveNoteIdToConsume by rememberSaveable(pendingMoveNoteId) {
-        mutableStateOf(pendingMoveNoteId)
+        mutableLongStateOf(pendingMoveNoteId)
     }
 
     val isVaultNotesSurfaceUnlocked = accessState.isUnlocked && notesState.isUnlocked
@@ -998,29 +999,29 @@ private fun VaultPinField(
 @Composable
 internal fun VaultNotesCollection(
     notes: List<Note>,
-    scoredResults: List<ScoredNote> = emptyList(),
     viewMode: NoteListViewMode,
     noteCardStyle: NoteCardStyle,
+    isTrashVisible: Boolean,
+    onNoteClick: (Long) -> Unit,
+    onRequestNoteActions: (Note) -> Unit,
+    onMoveToTrash: (Note) -> Unit,
+    onTogglePin: (Note) -> Unit,
+    onRestoreFromTrash: (Note) -> Unit,
+    onRequestDeletePermanentlyFromTrash: (Note) -> Unit,
+    modifier: Modifier = Modifier,
+    scoredResults: List<ScoredNote> = emptyList(),
     listState: LazyListState = rememberLazyListState(),
     gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     selectionState: SelectionUiState = SelectionUiState(),
     isLoading: Boolean = false,
-    isTrashVisible: Boolean,
     isSearchActive: Boolean = false,
     topTags: List<Tag> = emptyList(),
     selectedTagFilters: Set<String> = emptySet(),
-    onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit = {},
-    onMoveToTrash: (Note) -> Unit,
-    onTogglePin: (Note) -> Unit,
     onToggleTagFilter: (String) -> Unit = {},
     onRemoveTagFilter: (String) -> Unit = {},
     onClearTagFilters: () -> Unit = {},
-    onRestoreFromTrash: (Note) -> Unit,
-    onRequestDeletePermanentlyFromTrash: (Note) -> Unit,
-    bottomContentPadding: Dp = NoteCollectionLayoutDefaults.defaultBottomPadding,
-    modifier: Modifier = Modifier
+    bottomContentPadding: Dp = NoteCollectionLayoutDefaults.defaultBottomPadding
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         VaultProtectionBanner(isTrashVisible = isTrashVisible)

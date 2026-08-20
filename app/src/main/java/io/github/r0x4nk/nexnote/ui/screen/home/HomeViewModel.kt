@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -36,11 +35,11 @@ class HomeViewModel(
     moveNoteToTrash: MoveNoteToTrashUseCase,
     restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     toggleNotePin: ToggleNotePinUseCase,
-    duplicateNoteUseCase: DuplicateNoteUseCase? = null,
-    private val observeTemplates: ObserveTemplatesUseCase? = null,
-    private val observeMostUsedTags: ObserveMostUsedTagsUseCase? = null,
-    private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase? = null,
-    observeNoteCardStyle: ObserveNoteCardStyleUseCase? = null
+    duplicateNoteUseCase: DuplicateNoteUseCase,
+    private val observeTemplates: ObserveTemplatesUseCase,
+    private val observeMostUsedTags: ObserveMostUsedTagsUseCase,
+    private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase
 ) : ViewModel() {
 
     private val _searchQuery       = MutableStateFlow("")
@@ -78,7 +77,7 @@ class HomeViewModel(
     /**
      * Templates are loaded once and kept hot for the duration of the ViewModel.
      * This avoids a cold-flow re-subscription every time the picker is shown.
-     * When no TemplateRepository is provided (e.g., in unit tests), emits an empty list.
+     * The dependency is required so a wiring error cannot silently hide templates.
      */
     private val templatesFlow = buildHomeTemplatesFlow(observeTemplates, viewModelScope)
 
@@ -97,9 +96,7 @@ class HomeViewModel(
      */
     private val topTagsFlow = buildHomeTopTagsFlow(observeMostUsedTags, viewModelScope)
 
-    val noteCardStyle: StateFlow<NoteCardStyle> = (
-        observeNoteCardStyle?.invoke() ?: flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
-    ).stateIn(
+    val noteCardStyle: StateFlow<NoteCardStyle> = observeNoteCardStyle().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = NoteCardStyle.TITLE_AND_PREVIEW

@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.util.ImageFileManager
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -90,7 +91,13 @@ internal fun MarkdownImageBlock(
     }
 
     val resolver = imageFileProvider!!
-    val file = remember(resolver, relativePath) { resolver(relativePath) }
+    val file = remember(resolver, relativePath) {
+        runCatching { resolver(relativePath) }.getOrNull()
+    }
+    if (file == null) {
+        MarkdownImagePlaceholder(altText)
+        return
+    }
     val initialImageSize = remember(file.absolutePath, file.lastModified()) {
         readMarkdownImageSize(file)
     }
@@ -295,7 +302,7 @@ private suspend fun loadMarkdownBitmapFromVaultBytes(
     vaultImageByteProvider: suspend (String) -> ByteArray?
 ): MarkdownImageLoadResult? {
     return withContext(Dispatchers.IO) {
-        val bytes = runCatching { vaultImageByteProvider(relativePath) }
+        val bytes = runCatchingPreservingCancellation { vaultImageByteProvider(relativePath) }
             .getOrNull()
             ?: return@withContext null
         if (bytes.isEmpty()) return@withContext null

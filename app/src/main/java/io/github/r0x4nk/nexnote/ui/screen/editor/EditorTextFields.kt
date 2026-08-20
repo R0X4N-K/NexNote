@@ -86,9 +86,9 @@ internal fun TitleField(
     value: String,
     onValueChange: (String) -> Unit,
     onNext: () -> Unit,
+    modifier: Modifier = Modifier,
     placeholder: String = "Title",
-    readOnly: Boolean = false,
-    modifier: Modifier = Modifier
+    readOnly: Boolean = false
 ) {
     var hasFocus by remember { mutableStateOf(false) }
     val isExpanded = EditorTitleFieldPolicy.isExpanded(
@@ -133,15 +133,15 @@ internal fun TitleField(
 internal fun ContentField(
     textFieldState: TextFieldState,
     scrollState: ScrollState,
-    readOnly: Boolean = false,
     onContentEdited: () -> Unit,
+    modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
     onSelectionChange: (TextRange) -> Unit = {},
     onLayoutResult: (TextLayoutResult) -> Unit = {},
     highlightRange: IntRange? = null,
     searchRanges: List<IntRange> = emptyList(),
     activeSearchRange: IntRange? = null,
-    trailingSpacerLines: Int = 0,
-    modifier: Modifier = Modifier
+    trailingSpacerLines: Int = 0
 ) {
     val fallbackHighlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
     val searchHighlightColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)

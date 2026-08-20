@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.isSpecified
+import androidx.core.graphics.withTranslation
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.util.ColumnAlignment
 import io.github.r0x4nk.nexnote.util.DateUtils
@@ -319,10 +320,9 @@ private class PdfNoteDocumentWriter(
             if (isHeader) canvas.drawRect(rect, tableHeaderPaint)
             canvas.drawRect(rect, tableBorderPaint)
 
-            canvas.save()
-            canvas.translate(x + TABLE_CELL_PADDING_X, y + TABLE_CELL_PADDING_Y)
-            layout.draw(canvas)
-            canvas.restore()
+            canvas.withTranslation(x + TABLE_CELL_PADDING_X, y + TABLE_CELL_PADDING_Y) {
+                layout.draw(this)
+            }
 
             x += cellWidth
         }
@@ -379,10 +379,9 @@ private class PdfNoteDocumentWriter(
                 cornerRadius,
                 backgroundPaint
             )
-            canvas.save()
-            canvas.translate(x, y + paddingY)
-            layout.draw(canvas)
-            canvas.restore()
+            canvas.withTranslation(x, y + paddingY) {
+                layout.draw(this)
+            }
             y += totalHeight
             return
         }
@@ -418,11 +417,10 @@ private class PdfNoteDocumentWriter(
         x: Float,
         lineY: Float
     ) {
-        canvas.save()
-        canvas.translate(x, lineY - lineTop)
-        canvas.clipRect(0f, lineTop.toFloat(), layout.width.toFloat(), lineBottom.toFloat())
-        layout.draw(canvas)
-        canvas.restore()
+        canvas.withTranslation(x, lineY - lineTop) {
+            clipRect(0f, lineTop.toFloat(), layout.width.toFloat(), lineBottom.toFloat())
+            layout.draw(this)
+        }
     }
 
     private fun makeLayout(

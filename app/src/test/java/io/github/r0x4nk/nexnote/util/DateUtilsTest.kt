@@ -37,11 +37,6 @@ class DateUtilsTest {
     }
 
     @Test
-    fun `formatDateWithTimezone includes abbreviated timezone`() {
-        assertEquals("01/01/1970 00:00 UTC", DateUtils.formatDateWithTimezone(EPOCH, "UTC"))
-    }
-
-    @Test
     fun `formatDate falls back to device timezone when timezone is null`() {
         assertEquals("31/12/1969", DateUtils.formatDate(EPOCH))
     }

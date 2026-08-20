@@ -8,6 +8,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.nio.file.Files
 
 /**
  * Unit tests for [ImageFileManager]: pure functions with no Android dependency.
@@ -72,6 +73,41 @@ class ImageFileManagerTest {
         val file = ImageFileManager.getImageFile(filesDir, "images/note_99_img_0.jpg")
         assertTrue(file.absolutePath.contains("images"))
         assertTrue(file.absolutePath.endsWith("note_99_img_0.jpg"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `getImageFile rejects traversal outside image directory`() {
+        ImageFileManager.getImageFile(filesDir, "images/../../secrets.txt")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `getImageFile rejects absolute path`() {
+        ImageFileManager.getImageFile(filesDir, File(filesDir, "outside.jpg").absolutePath)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `getImageFile rejects sibling namespace`() {
+        ImageFileManager.getImageFile(filesDir, "databases/nexnote.db")
+    }
+
+    @Test
+    fun `getImageFile rejects symlink escaping image directory when supported`() {
+        val imageDir = ImageFileManager.ensureImageDir(filesDir)
+        val outside = tempFolder.newFolder("outside")
+        val link = File(imageDir, "linked").toPath()
+        try {
+            Files.createSymbolicLink(link, outside.toPath())
+        } catch (_: UnsupportedOperationException) {
+            return
+        } catch (_: java.nio.file.FileSystemException) {
+            return
+        }
+
+        val result = runCatching {
+            ImageFileManager.getImageFile(filesDir, "images/linked/secret.jpg")
+        }
+
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
     }
 
     // ── ensureImageDir ───────────────────────────────────────────────────────

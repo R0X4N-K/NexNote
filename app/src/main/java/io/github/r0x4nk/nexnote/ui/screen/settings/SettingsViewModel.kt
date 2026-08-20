@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
@@ -563,8 +563,7 @@ class SettingsViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val preferences = app.useCases.preferences
                 val vault = app.useCases.vault
                 SettingsViewModel(

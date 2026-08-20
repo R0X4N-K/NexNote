@@ -4,6 +4,7 @@ import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -170,6 +171,43 @@ class EditorViewModelImageAutosaveTest : EditorViewModelTestBase() {
         assertFalse(state.isDirty)
         assertEquals(0, fakeNoteDao.insertedCount)
         assertEquals(0, fakeNoteDao.updatedCount)
+    }
+
+    @Test
+    fun `onImagePicked cancellation rolls back copied image without ordinary error`() = runTest {
+        val imageStorage = FakeEditorNoteImageStorage().apply {
+            deleteFailure = IllegalStateException("cleanup failed")
+        }
+        val vaultRepository = FakeEditorVaultNoteRepository().apply {
+            saveFailure = CancellationException("save cancelled")
+            addNote(
+                Note(
+                    id = 77L,
+                    title = "Private title",
+                    content = "Private body",
+                    isInVault = true
+                )
+            )
+        }
+        val vm = viewModel(
+            mode = EditorMode.VaultNote(77L),
+            imageStorage = imageStorage,
+            getVaultNoteById = GetVaultNoteByIdUseCase(vaultRepository),
+            saveVaultNote = SaveVaultNoteUseCase(vaultRepository)
+        )
+        runCurrent()
+
+        vm.onImagePicked(openImageInputStream = { ByteArrayInputStream(byteArrayOf(1)) })
+        advanceUntilIdle()
+
+        val copiedPath = "images/note_77_img_100.jpg"
+        val state = vm.uiState.value
+        assertEquals(listOf(copiedPath), imageStorage.deletedPaths)
+        assertEquals("Private body", state.content)
+        assertTrue(state.imagePaths.isEmpty())
+        assertFalse(state.isDirty)
+        assertFalse(state.isSaving)
+        assertNull(state.errorMessage)
     }
 
     @Test

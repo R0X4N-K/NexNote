@@ -121,10 +121,47 @@ class TrashViewModelTest {
 
         assertEquals(listOf("images/a.jpg", "images/b.jpg"), fakeImageStorage.deletedPaths)
         assertEquals(
-            listOf("dao:delete:2", "image:images/a.jpg", "image:images/b.jpg"),
+            listOf("image:images/a.jpg", "image:images/b.jpg", "dao:delete:2"),
             events
         )
     }
+
+    @Test
+    fun `permanent deletion retries transient image failure before deleting row`() =
+        runViewModelTest {
+            val note = deletedNote(id = 3L, imagePaths = listOf("images/a.jpg"))
+            fakeDao.emitDeletedNotes(
+                listOf(deletedNoteEntity(3L, "Note", 1000L, "images/a.jpg"))
+            )
+            fakeImageStorage.deleteFailuresRemaining = 2
+            viewModel.requestDeletePermanently(note)
+
+            viewModel.confirmDeletePermanently()
+            advanceUntilIdle()
+
+            assertEquals(3, fakeImageStorage.deletedPaths.size)
+            assertEquals(1, fakeDao.permanentlyDeletedCount)
+            assertNull(viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun `persistent image failure keeps row and dialog available for retry`() =
+        runViewModelTest {
+            val note = deletedNote(id = 4L, imagePaths = listOf("images/a.jpg"))
+            fakeDao.emitDeletedNotes(
+                listOf(deletedNoteEntity(4L, "Note", 1000L, "images/a.jpg"))
+            )
+            fakeImageStorage.deleteFailuresRemaining = Int.MAX_VALUE
+            viewModel.requestDeletePermanently(note)
+
+            viewModel.confirmDeletePermanently()
+            advanceUntilIdle()
+
+            assertEquals(3, fakeImageStorage.deletedPaths.size)
+            assertEquals(0, fakeDao.permanentlyDeletedCount)
+            assertEquals(note, viewModel.uiState.value.noteToDelete)
+            assertTrue(viewModel.uiState.value.errorMessage?.isNotBlank() == true)
+        }
 
     // ── requestEmptyTrash / cancelEmptyTrash ──────────────────────────────────
 
@@ -162,7 +199,7 @@ class TrashViewModelTest {
         advanceUntilIdle()
 
         assertEquals(deletedImagePaths(), fakeImageStorage.deletedPaths)
-        assertEquals(listOf("dao:empty") + deletedImageEvents(), events)
+        assertEquals(deletedImageEvents() + "dao:empty", events)
     }
 
     // ── restoreNote ───────────────────────────────────────────────────────────

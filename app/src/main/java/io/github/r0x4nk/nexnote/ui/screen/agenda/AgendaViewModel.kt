@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -39,9 +38,9 @@ class AgendaViewModel(
     moveNoteToTrash: MoveNoteToTrashUseCase,
     restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     toggleNotePin: ToggleNotePinUseCase,
-    duplicateNoteUseCase: DuplicateNoteUseCase? = null,
-    private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase? = null,
-    observeNoteCardStyle: ObserveNoteCardStyleUseCase? = null
+    duplicateNoteUseCase: DuplicateNoteUseCase,
+    private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase
 ) : ViewModel() {
 
     private val initialDate = currentAgendaInitialDate()
@@ -79,9 +78,7 @@ class AgendaViewModel(
         noteActionMessages = _noteActionMessages
     )
 
-    val noteCardStyle: StateFlow<NoteCardStyle> = (
-        observeNoteCardStyle?.invoke() ?: flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
-    ).stateIn(
+    val noteCardStyle: StateFlow<NoteCardStyle> = observeNoteCardStyle().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = NoteCardStyle.TITLE_AND_PREVIEW
@@ -263,8 +260,7 @@ class AgendaViewModel(
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val useCases = app.useCases
                 AgendaViewModel(
                     observeDistinctLocalDays = useCases.notes.observeDistinctLocalDays,

@@ -182,7 +182,9 @@ internal fun Modifier.markdownAnnotationTapHandler(
                 .getStringAnnotations(tag = "URL", start = position, end = position)
                 .firstOrNull()
                 ?.let { annotation ->
-                    runCatching { openUri(annotation.item) }
+                    if (isSupportedMarkdownLink(annotation.item)) {
+                        runCatching { openUri(annotation.item) }
+                    }
                 }
         }
     }

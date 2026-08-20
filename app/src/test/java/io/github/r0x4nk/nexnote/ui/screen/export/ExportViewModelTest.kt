@@ -269,9 +269,6 @@ private class FakeNoteDao : NoteDao {
     override suspend fun getVaultNoteById(id: Long): NoteEntity? =
         _notes.value.find { it.id == id && !it.isDeleted && it.isInVault }
 
-    override suspend fun getAllVaultNotesOnce(): List<NoteEntity> =
-        _notes.value.filter { !it.isDeleted && it.isInVault }
-
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         _notes.value.filter { it.isInVault }
 

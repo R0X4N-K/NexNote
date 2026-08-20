@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
@@ -147,8 +147,7 @@ class ExportViewModel(
         /** Factory without a noteId (global access from Agenda or Settings). */
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val notes = app.useCases.notes
                 ExportViewModel(
                     getNoteById = notes.getNoteById,
@@ -162,8 +161,7 @@ class ExportViewModel(
         /** Factory with a noteId (navigation from the editor). */
         fun factory(noteId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val notes = app.useCases.notes
                 ExportViewModel(
                     getNoteById = notes.getNoteById,

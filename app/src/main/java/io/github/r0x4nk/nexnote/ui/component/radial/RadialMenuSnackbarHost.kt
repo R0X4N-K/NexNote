@@ -42,8 +42,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun RadialMenuSnackbarHost(
     hostState: SnackbarHostState,
-    bottomInset: Dp = 0.dp,
     modifier: Modifier = Modifier,
+    bottomInset: Dp = 0.dp,
     snackbar: @Composable (SnackbarData) -> Unit = { data -> Snackbar(snackbarData = data) }
 ) {
     val controller = LocalRadialMenuController.current

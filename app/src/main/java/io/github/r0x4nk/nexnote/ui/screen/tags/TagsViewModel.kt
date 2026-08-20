@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
@@ -20,10 +20,8 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SearchTagsUseCase
+import io.github.r0x4nk.nexnote.ui.common.NoteMutationActions
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
-import io.github.r0x4nk.nexnote.ui.common.displayLabel
-import io.github.r0x4nk.nexnote.ui.common.toTrashedNoteEvent
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,6 +112,15 @@ class TagsViewModel(
 
     private val _noteActionMessages = Channel<String>(Channel.BUFFERED)
     val noteActionMessages: Flow<String> = _noteActionMessages.receiveAsFlow()
+
+    private val noteMutations = NoteMutationActions(
+        scope = viewModelScope,
+        moveNoteToTrash = moveNoteToTrash,
+        restoreNoteFromTrash = restoreNoteFromTrash,
+        duplicateNoteUseCase = duplicateNoteUseCase,
+        trashEvents = _trashEvents,
+        noteActionMessages = _noteActionMessages
+    )
 
     private val tagsFlow = buildTagsFlow(
         searchQuery = _searchQuery,
@@ -207,33 +214,19 @@ class TagsViewModel(
     // ── Note actions ─────────────────────────────────────────────────────────
 
     fun requestTrash(note: Note) {
-        val event = note.toTrashedNoteEvent()
-        viewModelScope.launch {
-            moveNoteToTrash(note.id)
-            _trashEvents.trySend(event)
-        }
+        noteMutations.requestTrash(note)
     }
 
     fun confirmTrash() {
-        // No-op: the note was already moved to trash.
+        noteMutations.confirmTrash()
     }
 
     fun undoPendingTrash(noteId: Long) {
-        viewModelScope.launch { restoreNoteFromTrash(noteId) }
+        noteMutations.undoPendingTrash(noteId)
     }
 
     fun duplicateNote(note: Note) {
-        val noteLabel = note.displayLabel()
-        viewModelScope.launch {
-            try {
-                duplicateNoteUseCase(note)
-                _noteActionMessages.trySend("Duplicated \"$noteLabel\"")
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                _noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
-            }
-        }
+        noteMutations.duplicateNote(note)
     }
 
     // ── Factory ───────────────────────────────────────────────────────────────
@@ -241,8 +234,7 @@ class TagsViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val useCases = app.useCases
                 TagsViewModel(
                     observeTagsByUsageDesc = useCases.tags.observeTagsByUsageDesc,

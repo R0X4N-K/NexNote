@@ -13,6 +13,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,12 +82,12 @@ internal class EditorScreenState(
     var pendingTagScroll by mutableStateOf<TagSearchState?>(null)
     /** Source ranges for each parsed markdown block, updated when content changes. */
     var currentSourceRanges by mutableStateOf<List<MarkdownSourceRange>>(emptyList())
-    var contentViewportHeightPx by mutableStateOf(0)
-    var keyboardToolbarHeightPx by mutableStateOf(0)
-    var bottomFadeHeightPx by mutableStateOf(0)
+    var contentViewportHeightPx by mutableIntStateOf(0)
+    var keyboardToolbarHeightPx by mutableIntStateOf(0)
+    var bottomFadeHeightPx by mutableIntStateOf(0)
     var completedDirectPreviewWarmupKey by mutableStateOf<DirectPreviewWarmupKey?>(null)
-    var syncedContentVersion by mutableStateOf(-1)
-    var contentEditRevision by mutableStateOf(0)
+    var syncedContentVersion by mutableIntStateOf(-1)
+    var contentEditRevision by mutableIntStateOf(0)
     var hasPendingContentCommit by mutableStateOf(false)
     var isNoteLinkAutocompleteVisible by mutableStateOf(false)
 

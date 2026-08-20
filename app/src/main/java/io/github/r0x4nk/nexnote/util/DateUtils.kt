@@ -16,10 +16,6 @@ object DateUtils {
     fun formatDateTime(timestamp: Long, timezone: String? = null): String =
         format(timestamp, pattern = "dd/MM/yyyy HH:mm", timezone = timezone)
 
-    /** Formats a timestamp as "dd/MM/yyyy HH:mm zzz" (with abbreviated timezone). */
-    fun formatDateWithTimezone(timestamp: Long, timezone: String): String =
-        format(timestamp, pattern = "dd/MM/yyyy HH:mm zzz", timezone = timezone)
-
     private fun format(timestamp: Long, pattern: String, timezone: String?): String =
         SimpleDateFormat(pattern, Locale.getDefault())
             .apply {

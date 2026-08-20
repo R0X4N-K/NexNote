@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.r0x4nk.nexnote.NexNoteApp
+import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
@@ -99,8 +99,8 @@ class VaultNotesViewModel(
     private val toggleVaultNotePin: ToggleVaultNotePinUseCase,
     private val duplicateVaultNote: DuplicateVaultNoteUseCase,
     private val removeNoteFromVault: RemoveNoteFromVaultUseCase,
-    observeTemplates: ObserveTemplatesUseCase? = null,
-    observeNoteCardStyle: ObserveNoteCardStyleUseCase? = null
+    observeTemplates: ObserveTemplatesUseCase,
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -127,17 +127,13 @@ class VaultNotesViewModel(
     private val _vaultTrashEvents = Channel<VaultTrashSnackbarEvent>(Channel.BUFFERED)
     internal val vaultTrashEvents = _vaultTrashEvents.receiveAsFlow()
 
-    val noteCardStyle: StateFlow<NoteCardStyle> = (
-        observeNoteCardStyle?.invoke() ?: flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
-    ).stateIn(
+    val noteCardStyle: StateFlow<NoteCardStyle> = observeNoteCardStyle().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = NoteCardStyle.TITLE_AND_PREVIEW
     )
 
-    private val templates: StateFlow<List<Template>> = (
-        observeTemplates?.invoke() ?: flowOf(emptyList())
-    ).stateIn(
+    private val templates: StateFlow<List<Template>> = observeTemplates().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
@@ -603,8 +599,7 @@ class VaultNotesViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app =
-                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NexNoteApp
+                val app = requireAppDependencies()
                 val vault = app.useCases.vault
                 VaultNotesViewModel(
                     observeVaultState = vault.observeVaultState,
