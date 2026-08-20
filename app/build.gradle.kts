@@ -4,6 +4,28 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val prepareLegalAssets by tasks.registering(Sync::class) {
+    from(rootProject.file("LICENSE")) {
+        rename { "GPL-3.0-only.txt" }
+    }
+    from(rootProject.file("THIRD_PARTY_NOTICES.md"))
+    into(layout.buildDirectory.dir("generated/legalAssets/legal"))
+
+    // Git may materialize tracked text with CRLF on Windows. Package one
+    // canonical representation so the unsigned APK does not depend on the
+    // checkout platform's line-ending policy.
+    doLast {
+        destinationDir.walkTopDown()
+            .filter { file -> file.isFile }
+            .forEach { file ->
+                val normalized = file.readText(Charsets.UTF_8)
+                    .replace("\r\n", "\n")
+                    .replace('\r', '\n')
+                file.writeText(normalized, Charsets.UTF_8)
+            }
+    }
+}
+
 android {
     namespace = "io.github.r0x4nk.nexnote"
     compileSdk {
@@ -44,10 +66,22 @@ android {
         compose = true
         buildConfig = true
     }
+    sourceSets {
+        getByName("main").assets.directories.add("$projectDir/build/generated/legalAssets")
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareLegalAssets)
 }
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+dependencyLocking {
+    lockAllConfigurations()
 }
 
 dependencies {
@@ -92,6 +126,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
