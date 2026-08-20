@@ -21,9 +21,10 @@ class HomeTopAppBarTest {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Test
-    fun overflowMenuOpensVaultAndTrashActions() {
+    fun browsingActionsExposeBrandSortAndOverflowDestinations() {
         var openedVault = false
         var openedTrash = false
+        var toggledSort = false
 
         composeRule.setContent {
             NexNoteTheme {
@@ -33,7 +34,7 @@ class HomeTopAppBarTest {
                     searchFocusRequester = remember { FocusRequester() },
                     onSearchQueryChange = {},
                     onSearchToggle = {},
-                    onSortToggle = {},
+                    onSortToggle = { toggledSort = true },
                     onViewModeToggle = {},
                     onOpenTrash = { openedTrash = true },
                     onOpenVault = { openedVault = true },
@@ -42,10 +43,14 @@ class HomeTopAppBarTest {
             }
         }
 
+        composeRule.onNodeWithContentDescription("NexNote app icon").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Sort oldest first")
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithContentDescription("More options")
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithText("Oldest first").assertIsDisplayed()
+        composeRule.onNodeWithText("Oldest first").assertDoesNotExist()
         composeRule.onNodeWithText("Grid view").assertIsDisplayed()
         composeRule.onNodeWithText("Access Vault")
             .assertIsDisplayed()
@@ -58,5 +63,6 @@ class HomeTopAppBarTest {
 
         assertTrue(openedVault)
         assertTrue(openedTrash)
+        assertTrue(toggledSort)
     }
 }

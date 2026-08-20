@@ -9,15 +9,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,7 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.roundedClickableTarget
 import io.github.r0x4nk.nexnote.util.DateUtils
 import java.util.Calendar
@@ -64,12 +75,26 @@ private fun AgendaCalendarContent(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = MaterialTheme.shapes.large,
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp
+        tonalElevation = 0.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        )
     ) {
-        Column(Modifier.padding(vertical = 8.dp)) {
+        Column(Modifier.padding(vertical = 12.dp)) {
+            CalendarMonthHeader(
+                year = uiState.displayedYear,
+                month = uiState.displayedMonth,
+                onPreviousMonth = actions.onPreviousMonth,
+                onNextMonth = actions.onNextMonth
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+            )
             WeekdayHeader()
             CalendarGrid(
                 cells = calendarCells,
@@ -80,11 +105,48 @@ private fun AgendaCalendarContent(
                     actions.onSelectDate(uiState.displayedYear, uiState.displayedMonth, day)
                 }
             )
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 6.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        }
+    }
+}
+
+@Composable
+private fun CalendarMonthHeader(
+    year: Int,
+    month: Int,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit
+) {
+    val monthTitle = remember(year, month) { DateUtils.formatMonthYear(year, month) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "MONTH",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = monthTitle,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
+        NexIconButton(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+            contentDescription = "Previous month",
+            onClick = onPreviousMonth
+        )
+        NexIconButton(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = "Next month",
+            onClick = onNextMonth
+        )
     }
 }
 
@@ -234,7 +296,7 @@ private fun DayCell(
     hasDot: Boolean,
     onClick: () -> Unit
 ) {
-    val circleBg = if (isSelected) {
+    val containerColor = if (isSelected) {
         MaterialTheme.colorScheme.primary
     } else {
         Color.Transparent
@@ -246,7 +308,14 @@ private fun DayCell(
         modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        DayCircle(day, circleBg, textColor, isToday, isSelected, onClick)
+        DayNumber(
+            day = day,
+            containerColor = containerColor,
+            textColor = textColor,
+            isToday = isToday,
+            isSelected = isSelected,
+            onClick = onClick
+        )
         DayDot(dotColor)
     }
 }
@@ -277,41 +346,46 @@ private fun dayDotColor(hasDot: Boolean, isSelected: Boolean) = when {
 }
 
 @Composable
-private fun DayCircle(
+private fun DayNumber(
     day: Int,
-    circleBg: androidx.compose.ui.graphics.Color,
+    containerColor: androidx.compose.ui.graphics.Color,
     textColor: androidx.compose.ui.graphics.Color,
     isToday: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val circleModifier = Modifier
-        .size(32.dp)
-        .clip(CircleShape)
-        .background(circleBg)
-        .then(
-            if (isToday && !isSelected) {
-                Modifier.border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
-            } else {
-                Modifier
-            }
-        )
-
     Box(
         modifier = Modifier
-            .size(36.dp)
+            .size(40.dp)
+            .semantics {
+                selected = isSelected
+                if (isSelected || isToday) {
+                    stateDescription = when {
+                        isSelected && isToday -> "Selected, today"
+                        isSelected -> "Selected"
+                        else -> "Today"
+                    }
+                }
+            }
             .roundedClickableTarget(
-                shape = CircleShape,
+                shape = RoundedCornerShape(13.dp),
                 role = Role.Button,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
     ) {
-        Box(modifier = circleModifier, contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(containerColor),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
                 text = day.toString(),
-                style = MaterialTheme.typography.bodySmall,
-                color = textColor
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
+                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal
             )
         }
     }

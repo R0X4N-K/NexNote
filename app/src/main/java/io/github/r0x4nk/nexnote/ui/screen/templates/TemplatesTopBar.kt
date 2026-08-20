@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -24,6 +25,7 @@ import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
+import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,10 +85,17 @@ private fun TemplatesTopBarTitle(
             enter = fadeIn(tween(120)),
             exit = fadeOut(tween(100))
         ) {
-            Text(
-                text = "Templates",
-                style = MaterialTheme.typography.headlineSmall
-            )
+            Column {
+                Text(
+                    text = "Templates",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    text = "${uiState.predefined.size + uiState.custom.size} starting points",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -146,9 +155,12 @@ private fun TemplatesDefaultActions(
         contentDescription = "Search",
         onClick = { onSearchToggle(true) }
     )
+    NoteListSortButton(
+        sortOrder = uiState.sortOrder,
+        onToggleSortOrder = onToggleSortOrder
+    )
     TemplatesOverflowMenu(
         uiState = uiState,
-        onToggleSortOrder = onToggleSortOrder,
         onToggleViewMode = onToggleViewMode,
         onStartSelection = onStartSelection
     )
@@ -157,14 +169,11 @@ private fun TemplatesDefaultActions(
 @Composable
 private fun TemplatesOverflowMenu(
     uiState: TemplatesUiState,
-    onToggleSortOrder: () -> Unit,
     onToggleViewMode: () -> Unit,
     onStartSelection: () -> Unit
 ) {
     NoteListOverflowMenu(
-        sortOrder = uiState.sortOrder,
         viewMode = uiState.viewMode,
-        onToggleSortOrder = onToggleSortOrder,
         onToggleViewMode = onToggleViewMode,
         availableViewModes = NoteListViewMode.listGridModes
     ) { dismiss ->

@@ -108,6 +108,7 @@ import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheetHeader
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheetRow
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
+import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
 import io.github.r0x4nk.nexnote.ui.component.NoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderCollection
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
@@ -508,16 +509,18 @@ private fun VaultTopBar(
                         },
                         onClick = { onSearchToggle(true) }
                     )
+                    NoteListSortButton(
+                        sortOrder = sortOrder,
+                        onToggleSortOrder = onToggleSortOrder
+                    )
                     VaultTrashButton(
                         isTrashVisible = isTrashVisible,
                         onToggleTrashVisibility = onToggleTrashVisibility
                     )
                 }
                 VaultOverflowMenu(
-                    sortOrder = sortOrder,
                     viewMode = viewMode,
                     isTrashVisible = isTrashVisible,
-                    onToggleSortOrder = onToggleSortOrder,
                     onToggleViewMode = onToggleViewMode,
                     onStartSelection = onStartSelection,
                     onLock = onLock
@@ -531,18 +534,14 @@ private fun VaultTopBar(
 
 @Composable
 private fun VaultOverflowMenu(
-    sortOrder: SortOrder,
     viewMode: NoteListViewMode,
     isTrashVisible: Boolean,
-    onToggleSortOrder: () -> Unit,
     onToggleViewMode: () -> Unit,
     onStartSelection: () -> Unit,
     onLock: () -> Unit
 ) {
     NoteListOverflowMenu(
-        sortOrder = sortOrder,
         viewMode = viewMode,
-        onToggleSortOrder = onToggleSortOrder,
         onToggleViewMode = onToggleViewMode,
         contentDescription = "Vault options"
     ) { dismiss ->
@@ -1579,8 +1578,7 @@ private fun VaultActiveNoteCard(
             { onRequestNoteActions(note) }
         },
         selectionMode = selectionState.isActive,
-        selected = selectionState.isSelected(note.id),
-        showPinAction = true
+        selected = selectionState.isSelected(note.id)
     )
 }
 

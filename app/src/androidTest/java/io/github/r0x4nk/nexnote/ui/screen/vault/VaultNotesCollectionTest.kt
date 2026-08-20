@@ -2,6 +2,9 @@ package io.github.r0x4nk.nexnote.ui.screen.vault
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
@@ -33,7 +37,7 @@ class VaultNotesCollectionTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun activeVaultList_usesNormalNoteCardWithPinAffordance() {
+    fun activeVaultList_usesSwipeToPinWithoutCardButton() {
         var clickedNoteId: Long? = null
         var actionRequestedNoteId: Long? = null
         var selectedNoteId: Long? = null
@@ -57,10 +61,7 @@ class VaultNotesCollectionTest {
 
         composeRule.onNodeWithText("Active Vault note").assertIsDisplayed()
         composeRule.onNodeWithText("Active body preview").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Pin to top")
-            .assertIsDisplayed()
-            .performClick()
-        assertEquals(11L, pinnedNoteId)
+        composeRule.onNodeWithContentDescription("Pin to top").assertDoesNotExist()
 
         composeRule.onNodeWithText("Active Vault note").performClick()
         assertEquals(11L, clickedNoteId)
@@ -71,6 +72,58 @@ class VaultNotesCollectionTest {
 
         composeRule.onNodeWithContentDescription("Note actions").performClick()
         assertEquals(11L, actionRequestedNoteId)
+
+        composeRule.onNodeWithTag(VAULT_NOTE_ROW_TAG)
+            .performTouchInput { swipeRight() }
+        composeRule.waitUntil { pinnedNoteId == 11L }
+    }
+
+    @Test
+    fun activeVaultList_restoresCardAfterPinAndUnpinSwipes() {
+        var note by mutableStateOf(
+            Note(
+                id = 23L,
+                title = "Repeated pin swipe note",
+                content = "Card content remains visible",
+                isInVault = true,
+                isDeleted = false
+            )
+        )
+        var toggleCount = 0
+
+        composeRule.setContent {
+            NexNoteTheme {
+                Box(Modifier.fillMaxSize()) {
+                    VaultNotesCollection(
+                        notes = listOf(note),
+                        viewMode = NoteListViewMode.LIST,
+                        noteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
+                        isTrashVisible = false,
+                        onNoteClick = {},
+                        onRequestNoteActions = {},
+                        onMoveToTrash = {},
+                        onTogglePin = { currentNote ->
+                            toggleCount++
+                            note = currentNote.copy(isPinned = !currentNote.isPinned)
+                        },
+                        onRestoreFromTrash = {},
+                        onRequestDeletePermanentlyFromTrash = {}
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(VAULT_NOTE_ROW_TAG)
+            .performTouchInput { swipeRight() }
+        composeRule.waitUntil { toggleCount == 1 && note.isPinned }
+        composeRule.onNodeWithText("Repeated pin swipe note").assertIsDisplayed()
+        composeRule.onNodeWithText("Card content remains visible").assertIsDisplayed()
+
+        composeRule.onNodeWithTag(VAULT_NOTE_ROW_TAG)
+            .performTouchInput { swipeRight() }
+        composeRule.waitUntil { toggleCount == 2 && !note.isPinned }
+        composeRule.onNodeWithText("Repeated pin swipe note").assertIsDisplayed()
+        composeRule.onNodeWithText("Card content remains visible").assertIsDisplayed()
     }
 
     @Test
@@ -110,7 +163,7 @@ class VaultNotesCollectionTest {
 
         composeRule.onNodeWithText("Compact Vault note").assertIsDisplayed()
         composeRule.onAllNodesWithText("Hidden compact preview").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Pin to top").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Pin to top").assertDoesNotExist()
     }
 
     @Test

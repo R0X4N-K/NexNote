@@ -1,18 +1,19 @@
 package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,23 +28,24 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.util.DateUtils
 
 /**
- * Header row for a note card: title text plus the pin toggle.
+ * Header row for a note card: title text plus selection or overflow actions.
  *
  * The title is already markdown/search-highlight aware when it reaches this
- * function, so the row only handles layout, truncation, and the pinned control.
+ * function, so the row only handles layout, truncation, and trailing controls.
  */
 @Composable
 internal fun NoteCardTitleRow(
     title: AnnotatedString,
     isPinned: Boolean,
-    primaryColor: Color,
-    onPin: () -> Unit,
     onActions: (() -> Unit)? = null,
-    showPinAction: Boolean = true,
     selectionMode: Boolean = false,
     selected: Boolean = false
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+        if (isPinned) {
+            PinnedNoteBadge()
+            Spacer(Modifier.width(9.dp))
+        }
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
@@ -53,11 +55,30 @@ internal fun NoteCardTitleRow(
         )
         if (selectionMode) {
             SelectionIndicator(selected = selected)
-        } else if (showPinAction) {
-            NoteCardPinButton(isPinned, primaryColor, onPin)
         }
         if (!selectionMode && onActions != null) {
             NoteCardActionsButton(onActions)
+        }
+    }
+}
+
+/** Displays pinned state as a compact status mark without tinting the note body. */
+@Composable
+private fun PinnedNoteBadge() {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    ) {
+        Box(
+            modifier = Modifier.size(28.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.PushPin,
+                contentDescription = "Pinned note",
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }
@@ -123,40 +144,6 @@ internal fun showsContentPreview(note: Note, noteCardStyle: NoteCardStyle): Bool
     noteCardStyle == NoteCardStyle.TITLE_AND_PREVIEW &&
         note.title.isNotBlank() &&
         note.content.isNotBlank()
-
-@Composable
-private fun NoteCardPinButton(
-    isPinned: Boolean,
-    primaryColor: Color,
-    onPin: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .padding(start = 4.dp)
-            .clip(CircleShape)
-            .background(
-                if (isPinned) {
-                    primaryColor.copy(alpha = 0.12f)
-                } else {
-                    Color.Transparent
-                }
-            )
-            .clickable(onClick = onPin)
-            .padding(6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-            contentDescription = if (isPinned) "Unpin" else "Pin to top",
-            tint = if (isPinned) {
-                primaryColor
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
-            },
-            modifier = Modifier.size(16.dp)
-        )
-    }
-}
 
 @Composable
 private fun NoteCardActionsButton(onActions: () -> Unit) {

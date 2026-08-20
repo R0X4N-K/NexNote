@@ -9,11 +9,9 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
  * Card for a single note in list and grid views.
  *
  * Swipe left (EndToStart) → vertical collapse animation → [onTrash].
+ * Swipe right (StartToEnd) → [onPin] and restore the card's resting position.
  * Tap → [onClick].
- * Pin button (top-right of card header) → [onPin] toggles the pinned state.
  * Long-press → [onLongPress].
- * [showPinAction] can hide the pin affordance on surfaces that render note
- * cards but do not yet support pin toggling.
  *
  * [noteCardStyle] controls how much information is shown:
  *   - TITLE_ONLY: title and date only (most compact).
@@ -21,7 +19,7 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
  *   - TITLE_DATE: title and date with the date shown more prominently.
  *
  * [titleHighlightRanges] and [contentHighlightRanges] highlight search matches.
- * Pinned notes receive a subtle primaryContainer tint.
+ * Pinned notes expose a compact status badge without recoloring the card.
  */
 @Composable
 fun NoteCard(
@@ -35,24 +33,23 @@ fun NoteCard(
     onPin: () -> Unit = {},
     onLongPress: () -> Unit = {},
     onActions: (() -> Unit)? = null,
-    showPinAction: Boolean = true,
     selectionMode: Boolean = false,
     selected: Boolean = false
 ) {
-    SwipeToDeleteContainer(
-        onDelete = onTrash,
-        contentDescription = "Move to trash",
+    SwipeToCollectionActionsContainer(
+        endToStartAction = SwipeCollectionAction.Delete("Move to trash"),
+        onEndToStart = onTrash,
+        startToEndAction = SwipeCollectionAction.TogglePin(note.isPinned),
+        onStartToEnd = onPin,
         modifier = modifier,
-        collapseBeforeDelete = true,
+        collapseBeforeEndToStart = true,
         enabled = !selectionMode
     ) {
         NoteCardContent(
             note = note,
             onClick = onClick,
-            onPin = onPin,
             onLongPress = onLongPress,
             onActions = onActions,
-            showPinAction = showPinAction,
             selectionMode = selectionMode,
             selected = selected,
             noteCardStyle = noteCardStyle,

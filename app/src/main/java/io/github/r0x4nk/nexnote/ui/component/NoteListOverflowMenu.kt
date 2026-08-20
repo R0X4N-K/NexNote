@@ -7,7 +7,6 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -20,14 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
-import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.nextIn
 
 @Composable
 internal fun NoteListOverflowMenu(
-    sortOrder: SortOrder,
     viewMode: NoteListViewMode,
-    onToggleSortOrder: () -> Unit,
     onToggleViewMode: () -> Unit,
     availableViewModes: List<NoteListViewMode> = NoteListViewMode.noteModes,
     contentDescription: String = "More options",
@@ -48,27 +44,6 @@ internal fun NoteListOverflowMenu(
             expanded = expanded,
             onDismissRequest = dismiss
         ) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (sortOrder == SortOrder.MODIFIED_DESC) {
-                            "Oldest first"
-                        } else {
-                            "Newest first"
-                        }
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.SwapVert,
-                        contentDescription = null
-                    )
-                },
-                onClick = {
-                    onToggleSortOrder()
-                    dismiss()
-                }
-            )
             if (availableViewModes.size > 1) {
                 DropdownMenuItem(
                     text = { Text(nextViewMode.actionLabel()) },

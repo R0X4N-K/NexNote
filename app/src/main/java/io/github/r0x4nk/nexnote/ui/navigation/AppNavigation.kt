@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.SystemClock
 import android.view.Window
 import android.view.WindowManager
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,26 +16,32 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.automirrored.outlined.Note
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,8 +51,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -79,12 +91,9 @@ import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlay
  * content itself remains full height and can draw behind the floating bottom
  * bar.
  *
- * [isLeftHanded] mirrors the FAB to the bottom-left corner and adjusts the
- * radial arc direction so items always stay fully on-screen.
  */
 @Composable
 fun AppNavigation(
-    isLeftHanded: Boolean = false,
     protectVaultRecentPreviews: Boolean = true,
     lockVaultOnBackground: Boolean = true,
     vaultAutoLockTimeout: VaultAutoLockTimeout = VaultAutoLockTimeout.IMMEDIATELY,
@@ -140,8 +149,7 @@ fun AppNavigation(
     ) { innerPadding ->
         AppNavigationContent(
             navController = navController,
-            innerPadding = innerPadding,
-            isLeftHanded = isLeftHanded
+            innerPadding = innerPadding
         )
     }
 }
@@ -317,13 +325,11 @@ private fun Window.setSecurePreviewProtection(enabled: Boolean) {
 @Composable
 private fun AppNavigationContent(
     navController: NavHostController,
-    innerPadding: PaddingValues,
-    isLeftHanded: Boolean
+    innerPadding: PaddingValues
 ) {
     // RadialMenuOverlay lives inside the Scaffold content lambda so
     // fabBottomOffset is based on the already measured innerPadding.
     RadialMenuOverlay(
-        isLeftHanded    = isLeftHanded,
         fabBottomOffset = innerPadding.calculateBottomPadding()
     ) {
         AppNavHost(
@@ -345,8 +351,7 @@ private fun AppBottomBar(
                 AppBottomNavItem(
                     item = item,
                     currentDestination = currentDestination,
-                    navController = navController,
-                    modifier = Modifier.weight(1f)
+                    navController = navController
                 )
             }
         }
@@ -364,24 +369,24 @@ private fun FloatingBottomBar(content: @Composable RowScope.() -> Unit) {
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 420.dp)
+                .widthIn(max = 440.dp)
                 .fillMaxWidth(),
-            shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
+            shape = RoundedCornerShape(30.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.98f),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 3.dp,
-            shadowElevation = 8.dp,
+            tonalElevation = 0.dp,
+            shadowElevation = 12.dp,
             border = BorderStroke(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
             )
         ) {
             Row(
                 modifier = Modifier
-                    .height(56.dp)
-                    .padding(horizontal = 8.dp)
+                    .height(60.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
                     .selectableGroup(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically,
                 content = content
             )
@@ -393,23 +398,53 @@ private fun FloatingBottomBar(content: @Composable RowScope.() -> Unit) {
 private fun RowScope.AppBottomNavItem(
     item: BottomNavItem,
     currentDestination: NavDestination?,
-    navController: NavHostController,
-    modifier: Modifier = Modifier
+    navController: NavHostController
 ) {
-    NavigationBarItem(
-        modifier = modifier,
-        selected = item.isSelected(currentDestination),
-        onClick = { navController.navigateBottomNav(item.screen.route) },
-        icon = { Icon(item.icon, contentDescription = item.label) },
-        alwaysShowLabel = false,
-        colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    val selected = item.isSelected(currentDestination)
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            Color.Transparent
+        },
+        label = "bottom navigation container"
     )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        label = "bottom navigation content"
+    )
+    val shape = RoundedCornerShape(19.dp)
+
+    Surface(
+        modifier = Modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .semantics { contentDescription = item.label }
+            .clip(shape)
+            .selectable(
+                selected = selected,
+                role = Role.Tab,
+                onClick = { navController.navigateBottomNav(item.screen.route) }
+            ),
+        shape = shape,
+        color = containerColor,
+        contentColor = contentColor
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = if (selected) item.selectedIcon else item.icon,
+                contentDescription = null,
+                modifier = Modifier.size(21.dp)
+            )
+        }
+    }
 }
 
 private fun BottomNavItem.isSelected(currentDestination: NavDestination?): Boolean =
@@ -436,13 +471,34 @@ private val bottomNavRoutes = setOf(
 private data class BottomNavItem(
     val screen: Screen,
     val label: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val selectedIcon: ImageVector
 )
 
 private val bottomNavItems = listOf(
-    BottomNavItem(Screen.Home,      "Notes",     Icons.AutoMirrored.Filled.Note),
-    BottomNavItem(Screen.Agenda,    "Agenda",    Icons.Default.CalendarToday),
-    BottomNavItem(Screen.Tags,      "Tags",      Icons.Default.Tag),
-    BottomNavItem(Screen.Templates, "Templates", Icons.Default.Description),
-    BottomNavItem(Screen.Settings,  "Settings",  Icons.Default.Settings),
+    BottomNavItem(
+        Screen.Home,
+        "Notes",
+        Icons.AutoMirrored.Outlined.Note,
+        Icons.AutoMirrored.Filled.Note
+    ),
+    BottomNavItem(
+        Screen.Agenda,
+        "Agenda",
+        Icons.Outlined.CalendarToday,
+        Icons.Filled.CalendarToday
+    ),
+    BottomNavItem(Screen.Tags, "Tags", Icons.Outlined.Tag, Icons.Filled.Tag),
+    BottomNavItem(
+        Screen.Templates,
+        "Templates",
+        Icons.Outlined.Description,
+        Icons.Filled.Description
+    ),
+    BottomNavItem(
+        Screen.Settings,
+        "Settings",
+        Icons.Outlined.Settings,
+        Icons.Filled.Settings
+    )
 )

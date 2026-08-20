@@ -4,8 +4,16 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -21,10 +29,17 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
+import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,11 +103,31 @@ private fun HomeTopAppBarTitle(
             enter = fadeIn(tween(120)),
             exit = fadeOut(tween(100))
         ) {
-            Text(
-                text = "Notes",
-                style = MaterialTheme.typography.headlineSmall
+            HomeBrandTitle()
+        }
+    }
+}
+
+@Composable
+private fun HomeBrandTitle() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF2D2D2A))
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = "NexNote app icon",
+                modifier = Modifier.fillMaxSize()
             )
         }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "Notes",
+            style = MaterialTheme.typography.headlineSmall
+        )
     }
 }
 
@@ -157,9 +192,12 @@ private fun HomeBrowsingActions(
         contentDescription = "Search",
         onClick = { onSearchToggle(true) }
     )
+    NoteListSortButton(
+        sortOrder = uiState.sortOrder,
+        onToggleSortOrder = onSortToggle
+    )
     HomeOverflowMenu(
         uiState = uiState,
-        onSortToggle = onSortToggle,
         onViewModeToggle = onViewModeToggle,
         onOpenVault = onOpenVault,
         onOpenTrash = onOpenTrash,
@@ -170,16 +208,13 @@ private fun HomeBrowsingActions(
 @Composable
 private fun HomeOverflowMenu(
     uiState: HomeUiState,
-    onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
     onOpenVault: () -> Unit,
     onOpenTrash: () -> Unit,
     onStartSelection: () -> Unit
 ) {
     NoteListOverflowMenu(
-        sortOrder = uiState.sortOrder,
         viewMode = uiState.viewMode,
-        onToggleSortOrder = onSortToggle,
         onToggleViewMode = onViewModeToggle
     ) { dismiss ->
         DropdownMenuItem(

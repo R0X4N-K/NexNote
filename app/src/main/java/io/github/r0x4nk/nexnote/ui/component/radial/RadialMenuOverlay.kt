@@ -60,21 +60,16 @@ private val SCROLL_SHORTCUT_RADIAL_RADIUS_OFFSET = 12.dp
 // Angles use the clockwise-from-12-o'clock convention:
 //   0° = directly above, 90° = right, 180° = below, 270° = left.
 //
-// Right-handed: FAB at bottom-right, items fan from 285° to 360°
-//   (lower-left to directly above FAB).  At 285° the item is ~36 dp above the
+// The bottom-right FAB fans items from 285° to 360°
+//   (lower-left to directly above the FAB). At 285° the item is ~36 dp above the
 //   FAB centre; labels never descend into the navigation-bar zone.
-//
-// Left-handed: FAB at bottom-left, arc spans 0° to 75° (directly above to
-//   upper-right). Geometry is symmetric.
 //
 // The previous variable-spread approach could place items at 252°–270° where
 // sin(mathAngle) ≥ 0, meaning items sat at or below the FAB centre and their
 // labels overlapped the navigation bar on small screens. The fixed range
 // eliminates this entirely.
-private const val ARC_START_RIGHT = 285f
-private const val ARC_END_RIGHT   = 360f
-private const val ARC_START_LEFT  =   0f
-private const val ARC_END_LEFT    =  75f
+private const val ARC_START = 285f
+private const val ARC_END = 360f
 
 /**
  * Full-screen wrapper that owns the floating action button (FAB) and the
@@ -118,15 +113,10 @@ private const val ARC_END_LEFT    =  75f
  * via [RadialMenuController.fabIcon]. The editor uses a tools icon to
  * communicate that the menu contains editor-specific actions.
  *
- * **Handedness**
- *
- * [isLeftHanded] moves the FAB to the bottom-left corner and mirrors the
- * radial arc so items always expand away from the screen corner.
  */
 @Composable
 fun RadialMenuOverlay(
     modifier: Modifier = Modifier,
-    isLeftHanded: Boolean = false,
     fabBottomOffset: Dp = 0.dp,
     content: @Composable () -> Unit
 ) {
@@ -172,8 +162,7 @@ fun RadialMenuOverlay(
                 label         = "fabBottomOffset"
             )
 
-            val fabX = if (isLeftHanded) buttonMarginPx
-                       else containerW - buttonSizePx - buttonMarginPx
+            val fabX = containerW - buttonSizePx - buttonMarginPx
             val fabY = containerH - buttonSizePx - buttonMarginPx - animatedSafeBottomPx
 
             val fabCenter = Offset(fabX + buttonSizePx / 2f, fabY + buttonSizePx / 2f)
@@ -181,8 +170,8 @@ fun RadialMenuOverlay(
             // Fixed safe arc: items always land above the navigation bar. The
             // angles stay stable across screens; editor scroll shortcuts only
             // add radial distance below.
-            val arcStartDeg = if (isLeftHanded) ARC_START_LEFT else ARC_START_RIGHT
-            val arcEndDeg   = if (isLeftHanded) ARC_END_LEFT   else ARC_END_RIGHT
+            val arcStartDeg = ARC_START
+            val arcEndDeg = ARC_END
 
             val hasMenuItems = controller.items.isNotEmpty()
             val directFabAction = controller.fabAction

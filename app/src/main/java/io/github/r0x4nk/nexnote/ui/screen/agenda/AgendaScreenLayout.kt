@@ -72,11 +72,7 @@ internal fun AgendaScreenLayout(
                     onDeleteSelected = actions.onDeleteSelectedNotes
                 )
             } else {
-                AgendaTopBar(
-                    displayedYear = layoutState.uiState.displayedYear,
-                    displayedMonth = layoutState.uiState.displayedMonth,
-                    actions = actions
-                )
+                AgendaTopBar(actions = actions)
             }
         }
     ) { padding ->
@@ -199,7 +195,6 @@ private fun LazyListScope.agendaHeaderItems(params: AgendaBodyParams) {
         AgendaStickyControlsRow(params)
     }
     agendaTagFilterItem(params)
-    agendaNotesHeaderItem(params)
 }
 
 private fun LazyListScope.agendaCalendarItem(params: AgendaBodyParams) {
@@ -209,6 +204,7 @@ private fun LazyListScope.agendaCalendarItem(params: AgendaBodyParams) {
             isCalendarVisible = params.isCalendarVisible,
             actions = params.actions
         )
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -218,16 +214,6 @@ private fun LazyListScope.agendaTagFilterItem(params: AgendaBodyParams) {
             selectedTags = params.uiState.selectedTagFilters,
             onTagRemove = params.actions.onRemoveTagFilter,
             onClearAll = params.actions.onClearTagFilters
-        )
-    }
-}
-
-private fun LazyListScope.agendaNotesHeaderItem(params: AgendaBodyParams) {
-    item {
-        NotesSectionHeader(
-            year = params.uiState.selectedYear,
-            month = params.uiState.selectedMonth,
-            day = params.uiState.selectedDay
         )
     }
 }
@@ -246,6 +232,10 @@ private fun AgendaStickyControlsRow(params: AgendaBodyParams) {
             isSearchActive = params.uiState.isSearchActive,
             searchQuery = params.uiState.searchQuery,
             searchFocusRequester = params.searchFocusRequester,
+            selectedYear = params.uiState.selectedYear,
+            selectedMonth = params.uiState.selectedMonth,
+            selectedDay = params.uiState.selectedDay,
+            noteCount = params.uiState.notesForSelectedDate.size,
             actions = params.actions
         )
     }

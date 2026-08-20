@@ -16,6 +16,7 @@ import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
+import io.github.r0x4nk.nexnote.ui.navigation.Screen
 
 internal data class TemplatesLayoutActions(
     val onNavigateToApplyTemplate: (Long) -> Unit,
@@ -142,7 +143,10 @@ private fun TemplatesScreenContent(
         uiState.predefined.isEmpty() && uiState.custom.isEmpty() -> {
             TemplatesEmptyState(
                 isSearchActive = uiState.isSearchActive,
-                padding = padding
+                padding = padding,
+                onCreateTemplate = {
+                    actions.onNavigateToEditTemplate(Screen.NEW_TEMPLATE_ID)
+                }
             )
         }
 
