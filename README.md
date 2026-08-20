@@ -55,24 +55,26 @@ Prerequisites:
 Useful commands:
 
 ```bash
+./gradlew ci
 ./gradlew clean assembleDebug
 ./gradlew assembleRelease
-./gradlew testDebugUnitTest
 ./gradlew compileDebugAndroidTestKotlin
-./gradlew lintDebug lintRelease
 ./gradlew lintRelease --offline
 ```
 
 On Windows PowerShell:
 
 ```powershell
+.\gradlew.bat ci
 .\gradlew.bat clean assembleDebug
 .\gradlew.bat assembleRelease
-.\gradlew.bat testDebugUnitTest
 .\gradlew.bat compileDebugAndroidTestKotlin
-.\gradlew.bat lintDebug lintRelease
 .\gradlew.bat lintRelease --offline
 ```
+
+The `ci` task is the canonical validation gate. It runs all configured local
+unit tests, compiles instrumentation tests, runs debug and release lint, and
+assembles both APK variants.
 
 The Android-test command compiles instrumentation tests; running them requires a
 connected device or AVD. Dependency lock state and strict checksum verification

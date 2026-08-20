@@ -52,10 +52,7 @@ clean checkout with Android SDK API 36 and JDK 21:
 
 ```bash
 ./gradlew clean
-./gradlew testDebugUnitTest
-./gradlew compileDebugAndroidTestKotlin
-./gradlew lintDebug lintRelease
-./gradlew assembleDebug assembleRelease
+./gradlew ci
 ```
 
 Instrumentation tests should also be run on a compatible device or emulator.

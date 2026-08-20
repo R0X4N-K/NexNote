@@ -38,6 +38,31 @@ test-only, and build-only components are deliberately separated there. All
 release runtime components and native libraries are FLOSS and resolve from the
 two declared repositories.
 
+## Verification maintenance
+
+The root `ci` task is the single validation entry point for local builds and
+GitHub Actions. It runs all configured local unit tests, compiles
+instrumentation tests, runs debug and release lint, and assembles both APK
+variants. Keeping this task in the metadata update command is important because
+build tools such as KSP can resolve additional detached configurations only
+while their tasks execute. The maintenance command forces task execution so an
+up-to-date output or build-cache entry cannot hide one of those configurations.
+
+After a reviewed dependency or build-plugin change, refresh checksum metadata
+from the declared repositories and execute the complete gate:
+
+```bash
+./gradlew --no-daemon --refresh-dependencies --rerun-tasks \
+  --write-verification-metadata sha256 ci
+./gradlew --no-daemon --refresh-dependencies --rerun-tasks ci
+./gradlew --no-daemon --offline --no-build-cache clean ci
+```
+
+Review every addition to `gradle/verification-metadata.xml` before committing
+it. An unexpected component or version must be investigated rather than
+trusted automatically. Strict dependency verification must not be disabled to
+make a build pass.
+
 ## Deliberate version dispositions
 
 Lint version checks are advisory, not proof that an upgrade is compatible. These
