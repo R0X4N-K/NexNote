@@ -6,8 +6,24 @@ enum class FontScale(val multiplier: Float) {
     SMALL(0.85f), NORMAL(1.0f), LARGE(1.15f)
 }
 
+/** Determines whether Markdown tables fit the viewport or retain readable column widths. */
+enum class TableLayoutMode {
+    FIT_SCREEN,
+    HORIZONTAL_SCROLL
+}
+
 /** Predefined accent color options for the app theme. */
-enum class AccentColor { VIOLET, BLUE, GREEN, ORANGE, RED, TEAL }
+enum class AccentColor {
+    VIOLET,
+    BLUE,
+    GREEN,
+    ORANGE,
+    RED,
+    TEAL,
+    SAGE,
+    ROSE,
+    AMBER
+}
 
 /** Controls how much information is shown on each note card in list/grid views. */
 enum class NoteCardStyle {

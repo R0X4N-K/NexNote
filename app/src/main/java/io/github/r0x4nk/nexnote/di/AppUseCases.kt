@@ -38,9 +38,9 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveDeletedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveLeftHandedUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveMostUsedTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateAscUseCase
@@ -72,8 +72,8 @@ import io.github.r0x4nk.nexnote.domain.usecase.SearchNotesScoredUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SearchTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SetLeftHandedUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SetTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetTimezoneIdUseCase
@@ -161,9 +161,9 @@ internal class PreferencesUseCases internal constructor(
     val observeThemeMode = ObserveThemeModeUseCase(preferencesRepository)
     val observeFontScale = ObserveFontScaleUseCase(preferencesRepository)
     val observeTimezoneId = ObserveTimezoneIdUseCase(preferencesRepository)
-    val observeLeftHanded = ObserveLeftHandedUseCase(preferencesRepository)
     val observeAccentColor = ObserveAccentColorUseCase(preferencesRepository)
     val observeNoteCardStyle = ObserveNoteCardStyleUseCase(preferencesRepository)
+    val observeTableLayoutMode = ObserveTableLayoutModeUseCase(preferencesRepository)
     val observeVaultRecentPreviewsProtection =
         ObserveVaultRecentPreviewsProtectionUseCase(preferencesRepository)
     val observeVaultLockOnBackground =
@@ -175,9 +175,9 @@ internal class PreferencesUseCases internal constructor(
     val setThemeMode = SetThemeModeUseCase(preferencesRepository)
     val setFontScale = SetFontScaleUseCase(preferencesRepository)
     val setTimezoneId = SetTimezoneIdUseCase(preferencesRepository)
-    val setLeftHanded = SetLeftHandedUseCase(preferencesRepository)
     val setAccentColor = SetAccentColorUseCase(preferencesRepository)
     val setNoteCardStyle = SetNoteCardStyleUseCase(preferencesRepository)
+    val setTableLayoutMode = SetTableLayoutModeUseCase(preferencesRepository)
     val setVaultRecentPreviewsProtection =
         SetVaultRecentPreviewsProtectionUseCase(preferencesRepository)
     val setVaultLockOnBackground =

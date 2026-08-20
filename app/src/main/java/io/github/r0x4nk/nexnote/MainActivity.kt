@@ -7,17 +7,20 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.fileimport.ExternalFileImportResult
 import io.github.r0x4nk.nexnote.fileimport.ExternalFileImporter
 import io.github.r0x4nk.nexnote.fileimport.ExternalFileOpenRequest
+import io.github.r0x4nk.nexnote.ui.component.LocalMarkdownTableLayoutMode
 import io.github.r0x4nk.nexnote.ui.navigation.AppNavigation
 import io.github.r0x4nk.nexnote.ui.theme.NexNoteTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,8 +47,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by preferences.observeThemeMode().collectAsStateWithLifecycle(ThemeMode.SYSTEM)
             val fontScale by preferences.observeFontScale().collectAsStateWithLifecycle(FontScale.NORMAL)
-            val isLeftHanded by preferences.observeLeftHanded().collectAsStateWithLifecycle(false)
             val accentColor by preferences.observeAccentColor().collectAsStateWithLifecycle(AccentColor.VIOLET)
+            val tableLayoutMode by preferences
+                .observeTableLayoutMode()
+                .collectAsStateWithLifecycle(TableLayoutMode.FIT_SCREEN)
             val protectVaultRecentPreviews by preferences
                 .observeVaultRecentPreviewsProtection()
                 .collectAsStateWithLifecycle(true)
@@ -73,16 +78,19 @@ class MainActivity : ComponentActivity() {
                 fontScale   = fontScale.multiplier,
                 accentColor = accentColor
             ) {
-                AppNavigation(
-                    isLeftHanded = isLeftHanded,
-                    protectVaultRecentPreviews = protectVaultRecentPreviews,
-                    lockVaultOnBackground = lockVaultOnBackground,
-                    vaultAutoLockTimeout = vaultAutoLockTimeout,
-                    vaultState = vaultState,
-                    externalFileOpenRequest = pendingExternalFileOpen,
-                    onExternalFileOpenConsumed = ::consumeExternalFileOpenRequest,
-                    onVaultAutoLockRequested = { vault.lockVault() }
-                )
+                CompositionLocalProvider(
+                    LocalMarkdownTableLayoutMode provides tableLayoutMode
+                ) {
+                    AppNavigation(
+                        protectVaultRecentPreviews = protectVaultRecentPreviews,
+                        lockVaultOnBackground = lockVaultOnBackground,
+                        vaultAutoLockTimeout = vaultAutoLockTimeout,
+                        vaultState = vaultState,
+                        externalFileOpenRequest = pendingExternalFileOpen,
+                        onExternalFileOpenConsumed = ::consumeExternalFileOpenRequest,
+                        onVaultAutoLockRequested = { vault.lockVault() }
+                    )
+                }
             }
         }
 

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.r0x4nk.nexnote.util.MARKDOWN_TASK_LIST_ANNOTATION_TAG
 import io.github.r0x4nk.nexnote.util.NoteLinkMarkdown
 
 /**
@@ -55,7 +56,8 @@ internal fun MarkdownTextBlock(
     highlightRanges: List<IntRange>,
     activeHighlightRange: IntRange?,
     highlightColor: Color,
-    onNoteLinkClick: (Long) -> Unit
+    onNoteLinkClick: (Long) -> Unit,
+    onTaskListItemClick: (lineIndex: Int) -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -76,7 +78,8 @@ internal fun MarkdownTextBlock(
                 displayText = displayText,
                 getLayoutResult = { layoutResult },
                 openUri = uriHandler::openUri,
-                onNoteLinkClick = onNoteLinkClick
+                onNoteLinkClick = onNoteLinkClick,
+                onTaskListItemClick = onTaskListItemClick
             ),
         style        = markdownTextStyle(style),
         onTextLayout = { layoutResult = it }
@@ -98,7 +101,8 @@ internal fun MarkdownBlockquote(
     highlightRanges: List<IntRange>,
     activeHighlightRange: IntRange?,
     highlightColor: Color,
-    onNoteLinkClick: (Long) -> Unit
+    onNoteLinkClick: (Long) -> Unit,
+    onTaskListItemClick: (lineIndex: Int) -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     val barColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
@@ -123,7 +127,8 @@ internal fun MarkdownBlockquote(
             displayText = displayText,
             style = style,
             openUri = uriHandler::openUri,
-            onNoteLinkClick = onNoteLinkClick
+            onNoteLinkClick = onNoteLinkClick,
+            onTaskListItemClick = onTaskListItemClick
         )
     }
 }
@@ -158,9 +163,10 @@ internal fun Modifier.markdownAnnotationTapHandler(
     displayText: AnnotatedString,
     getLayoutResult: () -> TextLayoutResult?,
     openUri: (String) -> Unit,
-    onNoteLinkClick: (Long) -> Unit
+    onNoteLinkClick: (Long) -> Unit,
+    onTaskListItemClick: (lineIndex: Int) -> Unit = {}
 ): Modifier =
-    pointerInput(displayText, openUri, onNoteLinkClick) {
+    pointerInput(displayText, openUri, onNoteLinkClick, onTaskListItemClick) {
         detectTapGestures { offset ->
             val layout = getLayoutResult() ?: return@detectTapGestures
             val position = layout.getOffsetForPosition(offset)
@@ -178,14 +184,26 @@ internal fun Modifier.markdownAnnotationTapHandler(
                 return@detectTapGestures
             }
 
-            displayText
+            val url = displayText
                 .getStringAnnotations(tag = "URL", start = position, end = position)
                 .firstOrNull()
-                ?.let { annotation ->
-                    if (isSupportedMarkdownLink(annotation.item)) {
-                        runCatching { openUri(annotation.item) }
-                    }
+            if (url != null) {
+                if (isSupportedMarkdownLink(url.item)) {
+                    runCatching { openUri(url.item) }
                 }
+                return@detectTapGestures
+            }
+
+            displayText
+                .getStringAnnotations(
+                    tag = MARKDOWN_TASK_LIST_ANNOTATION_TAG,
+                    start = position,
+                    end = position
+                )
+                .firstOrNull()
+                ?.item
+                ?.toIntOrNull()
+                ?.let(onTaskListItemClick)
         }
     }
 
@@ -208,7 +226,8 @@ private fun RowScope.BlockquoteText(
     displayText: AnnotatedString,
     style: TextStyle,
     openUri: (String) -> Unit,
-    onNoteLinkClick: (Long) -> Unit
+    onNoteLinkClick: (Long) -> Unit,
+    onTaskListItemClick: (lineIndex: Int) -> Unit
 ) {
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
 
@@ -222,7 +241,8 @@ private fun RowScope.BlockquoteText(
                 displayText = displayText,
                 getLayoutResult = { layoutResult },
                 openUri = openUri,
-                onNoteLinkClick = onNoteLinkClick
+                onNoteLinkClick = onNoteLinkClick,
+                onTaskListItemClick = onTaskListItemClick
             )
     )
 }

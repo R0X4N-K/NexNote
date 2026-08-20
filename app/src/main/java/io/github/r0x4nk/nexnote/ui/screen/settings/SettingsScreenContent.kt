@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
@@ -80,7 +81,7 @@ internal fun SettingsScreenContent(
     onAccentColorChange: (AccentColor) -> Unit,
     onFontScaleChange: (FontScale) -> Unit,
     onNoteCardStyleChange: (NoteCardStyle) -> Unit,
-    onLeftHandedChange: (Boolean) -> Unit,
+    onTableLayoutModeChange: (TableLayoutMode) -> Unit,
     onTimezoneChange: (String) -> Unit,
     onOpenVault: () -> Unit = {},
     onLockVault: () -> Unit = {},
@@ -119,7 +120,7 @@ internal fun SettingsScreenContent(
             onAccentColorChange = onAccentColorChange,
             onFontScaleChange = onFontScaleChange,
             onNoteCardStyleChange = onNoteCardStyleChange,
-            onLeftHandedChange = onLeftHandedChange,
+            onTableLayoutModeChange = onTableLayoutModeChange,
             onTimezoneChange = onTimezoneChange,
             onOpenVault = onOpenVault,
             onLockVault = onLockVault,
@@ -148,7 +149,7 @@ private fun SettingsList(
     onAccentColorChange: (AccentColor) -> Unit,
     onFontScaleChange: (FontScale) -> Unit,
     onNoteCardStyleChange: (NoteCardStyle) -> Unit,
-    onLeftHandedChange: (Boolean) -> Unit,
+    onTableLayoutModeChange: (TableLayoutMode) -> Unit,
     onTimezoneChange: (String) -> Unit,
     onOpenVault: () -> Unit,
     onLockVault: () -> Unit,
@@ -171,7 +172,7 @@ private fun SettingsList(
         accentColorSection(uiState.accentColor, onAccentColorChange)
         textSection(uiState.fontScale, onFontScaleChange)
         noteAppearanceSection(uiState.noteCardStyle, onNoteCardStyleChange)
-        accessibilitySection(uiState.isLeftHanded, onLeftHandedChange)
+        tableLayoutSection(uiState.tableLayoutMode, onTableLayoutModeChange)
         vaultSection(
             vaultState = uiState.vaultState,
             canChangePin = uiState.canChangeVaultPin,
@@ -265,17 +266,23 @@ private fun LazyListScope.noteAppearanceSection(
     }
 }
 
-private fun LazyListScope.accessibilitySection(
-    isLeftHanded: Boolean,
-    onToggle: (Boolean) -> Unit
+private fun LazyListScope.tableLayoutSection(
+    selected: TableLayoutMode,
+    onSelect: (TableLayoutMode) -> Unit
 ) {
     item {
         SettingsSectionSurface {
-            SettingsSectionHeader("Accessibility")
+            SettingsSectionHeader("Tables")
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Wrap table text to fit the screen or keep wider columns and scroll horizontally.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(10.dp))
-            LeftHandedToggle(
-                isLeftHanded = isLeftHanded,
-                onToggle = onToggle
+            TableLayoutModePicker(
+                selected = selected,
+                onSelect = onSelect
             )
         }
     }

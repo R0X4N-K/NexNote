@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.ui.screen.settings
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
@@ -15,8 +16,8 @@ import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredenti
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveLeftHandedUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTimezoneIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAndroidCredentialUnlockUseCase
@@ -31,8 +32,8 @@ import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProt
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SetLeftHandedUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SetTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetTimezoneIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAndroidCredentialUnlockUseCase
@@ -76,9 +77,9 @@ class SettingsViewModelTest {
             observeThemeMode = ObserveThemeModeUseCase(fakeRepo),
             observeFontScale = ObserveFontScaleUseCase(fakeRepo),
             observeTimezoneId = ObserveTimezoneIdUseCase(fakeRepo),
-            observeLeftHanded = ObserveLeftHandedUseCase(fakeRepo),
             observeAccentColor = ObserveAccentColorUseCase(fakeRepo),
             observeNoteCardStyle = ObserveNoteCardStyleUseCase(fakeRepo),
+            observeTableLayoutMode = ObserveTableLayoutModeUseCase(fakeRepo),
             observeVaultState = ObserveVaultStateUseCase(fakeVaultRepo),
             observeVaultRecentPreviewsProtection =
                 ObserveVaultRecentPreviewsProtectionUseCase(fakeRepo),
@@ -96,9 +97,9 @@ class SettingsViewModelTest {
             setThemeModeUseCase = SetThemeModeUseCase(fakeRepo),
             setFontScaleUseCase = SetFontScaleUseCase(fakeRepo),
             setTimezoneIdUseCase = SetTimezoneIdUseCase(fakeRepo),
-            setLeftHandedUseCase = SetLeftHandedUseCase(fakeRepo),
             setAccentColorUseCase = SetAccentColorUseCase(fakeRepo),
             setNoteCardStyleUseCase = SetNoteCardStyleUseCase(fakeRepo),
+            setTableLayoutModeUseCase = SetTableLayoutModeUseCase(fakeRepo),
             setVaultRecentPreviewsProtectionUseCase =
                 SetVaultRecentPreviewsProtectionUseCase(fakeRepo),
             setVaultLockOnBackgroundUseCase = SetVaultLockOnBackgroundUseCase(fakeRepo),
@@ -188,30 +189,6 @@ class SettingsViewModelTest {
         assertEquals("America/New_York", fakeRepo.lastTimezoneId)
     }
 
-    // ── isLeftHanded ──────────────────────────────────────────────────────────
-
-    @Test
-    fun `setLeftHanded true is reflected in uiState`() = runViewModelTest {
-        viewModel.setLeftHanded(true)
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isLeftHanded)
-    }
-
-    @Test
-    fun `setLeftHanded false is reflected in uiState`() = runViewModelTest {
-        fakeRepo.setLeftHanded(true)   // start with true
-        viewModel.setLeftHanded(false)
-        advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.isLeftHanded)
-    }
-
-    @Test
-    fun `setLeftHanded delegates to repository`() = runViewModelTest {
-        viewModel.setLeftHanded(true)
-        advanceUntilIdle()
-        assertEquals(true, fakeRepo.lastIsLeftHanded)
-    }
-
     // ── AccentColor ───────────────────────────────────────────────────────────
 
     @Test
@@ -244,6 +221,20 @@ class SettingsViewModelTest {
         assertEquals(NoteCardStyle.TITLE_DATE, fakeRepo.lastNoteCardStyle)
     }
 
+    @Test
+    fun `setTableLayoutMode HORIZONTAL_SCROLL is reflected in uiState`() = runViewModelTest {
+        viewModel.setTableLayoutMode(TableLayoutMode.HORIZONTAL_SCROLL)
+        advanceUntilIdle()
+        assertEquals(TableLayoutMode.HORIZONTAL_SCROLL, viewModel.uiState.value.tableLayoutMode)
+    }
+
+    @Test
+    fun `setTableLayoutMode delegates to repository`() = runViewModelTest {
+        viewModel.setTableLayoutMode(TableLayoutMode.HORIZONTAL_SCROLL)
+        advanceUntilIdle()
+        assertEquals(TableLayoutMode.HORIZONTAL_SCROLL, fakeRepo.lastTableLayoutMode)
+    }
+
     // ── Initial state ─────────────────────────────────────────────────────────
 
     @Test
@@ -259,12 +250,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `initial isLeftHanded is false`() = runViewModelTest {
-        advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.isLeftHanded)
-    }
-
-    @Test
     fun `initial accentColor is VIOLET`() = runViewModelTest {
         advanceUntilIdle()
         assertEquals(AccentColor.VIOLET, viewModel.uiState.value.accentColor)
@@ -274,6 +259,12 @@ class SettingsViewModelTest {
     fun `initial noteCardStyle is TITLE_AND_PREVIEW`() = runViewModelTest {
         advanceUntilIdle()
         assertEquals(NoteCardStyle.TITLE_AND_PREVIEW, viewModel.uiState.value.noteCardStyle)
+    }
+
+    @Test
+    fun `initial tableLayoutMode is FIT_SCREEN`() = runViewModelTest {
+        advanceUntilIdle()
+        assertEquals(TableLayoutMode.FIT_SCREEN, viewModel.uiState.value.tableLayoutMode)
     }
 
     @Test
@@ -1004,9 +995,9 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     private val _themeMode     = MutableStateFlow(ThemeMode.SYSTEM)
     private val _fontScale     = MutableStateFlow(FontScale.NORMAL)
     private val _timezoneId    = MutableStateFlow("")
-    private val _isLeftHanded  = MutableStateFlow(false)
     private val _accentColor   = MutableStateFlow(AccentColor.VIOLET)
     private val _noteCardStyle = MutableStateFlow(NoteCardStyle.TITLE_AND_PREVIEW)
+    private val _tableLayoutMode = MutableStateFlow(TableLayoutMode.FIT_SCREEN)
     private val _protectVaultRecentPreviews = MutableStateFlow(true)
     private val _lockVaultOnBackground = MutableStateFlow(true)
     private val _vaultAutoLockTimeout =
@@ -1016,9 +1007,9 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     var lastThemeMode:     ThemeMode?     = null
     var lastFontScale:     FontScale?     = null
     var lastTimezoneId:    String?        = null
-    var lastIsLeftHanded:  Boolean?       = null
     var lastAccentColor:   AccentColor?   = null
     var lastNoteCardStyle: NoteCardStyle? = null
+    var lastTableLayoutMode: TableLayoutMode? = null
     var lastProtectVaultRecentPreviews: Boolean? = null
     var lastLockVaultOnBackground: Boolean? = null
     var lastVaultAutoLockTimeout: VaultAutoLockTimeout? = null
@@ -1027,9 +1018,9 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     override val themeMode:     Flow<ThemeMode>     = _themeMode
     override val fontScale:     Flow<FontScale>     = _fontScale
     override val timezoneId:    Flow<String>        = _timezoneId
-    override val isLeftHanded:  Flow<Boolean>       = _isLeftHanded
     override val accentColor:   Flow<AccentColor>   = _accentColor
     override val noteCardStyle: Flow<NoteCardStyle> = _noteCardStyle
+    override val tableLayoutMode: Flow<TableLayoutMode> = _tableLayoutMode
     override val protectVaultRecentPreviews: Flow<Boolean> = _protectVaultRecentPreviews
     override val lockVaultOnBackground: Flow<Boolean> = _lockVaultOnBackground
     override val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout> = _vaultAutoLockTimeout
@@ -1051,11 +1042,6 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
         _timezoneId.value = id
     }
 
-    override suspend fun setLeftHanded(value: Boolean) {
-        lastIsLeftHanded    = value
-        _isLeftHanded.value = value
-    }
-
     override suspend fun setAccentColor(color: AccentColor) {
         lastAccentColor    = color
         _accentColor.value = color
@@ -1064,6 +1050,11 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     override suspend fun setNoteCardStyle(style: NoteCardStyle) {
         lastNoteCardStyle    = style
         _noteCardStyle.value = style
+    }
+
+    override suspend fun setTableLayoutMode(mode: TableLayoutMode) {
+        lastTableLayoutMode = mode
+        _tableLayoutMode.value = mode
     }
 
     override suspend fun setProtectVaultRecentPreviews(value: Boolean) {

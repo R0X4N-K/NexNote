@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
 import io.github.r0x4nk.nexnote.util.MarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownParser
@@ -49,7 +50,9 @@ fun MarkdownPreview(
     highlightRanges: List<IntRange> = emptyList(),
     activeHighlightRange: IntRange? = null,
     contentBottomPadding: Dp = 0.dp,
-    onNoteLinkClick: (Long) -> Unit = {}
+    tableLayoutMode: TableLayoutMode = LocalMarkdownTableLayoutMode.current,
+    onNoteLinkClick: (Long) -> Unit = {},
+    onTaskListItemClick: (markerOffset: Int) -> Unit = {}
 ) {
     val contentState = rememberMarkdownPreviewContentState(markdown)
     val config = MarkdownPreviewContentConfig(
@@ -60,7 +63,9 @@ fun MarkdownPreview(
         highlightRanges        = highlightRanges,
         activeHighlightRange   = activeHighlightRange,
         contentBottomPadding   = contentBottomPadding,
-        onNoteLinkClick        = onNoteLinkClick
+        tableLayoutMode        = tableLayoutMode,
+        onNoteLinkClick        = onNoteLinkClick,
+        onTaskListItemClick    = onTaskListItemClick
     )
 
     MarkdownPreviewContent(
@@ -79,7 +84,9 @@ internal class MarkdownPreviewContentConfig(
     val highlightRanges: List<IntRange>,
     val activeHighlightRange: IntRange?,
     val contentBottomPadding: Dp,
-    val onNoteLinkClick: (Long) -> Unit
+    val tableLayoutMode: TableLayoutMode,
+    val onNoteLinkClick: (Long) -> Unit,
+    val onTaskListItemClick: (markerOffset: Int) -> Unit
 )
 
 internal class MarkdownPreviewContentState(

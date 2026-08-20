@@ -28,6 +28,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
+import io.github.r0x4nk.nexnote.util.toggleMarkdownTaskListItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
@@ -204,21 +205,55 @@ class EditorViewModel internal constructor(
             return
         }
 
-        contentHistory.recordUserChange(
-            EditorContentSnapshot(text = value, selectionOffset = safeSelectionOffset)
+        applyContentChange(
+            value = value,
+            selectionOffset = safeSelectionOffset,
+            synchronizeEditorContent = false
         )
-        _uiState.update {
-            it.copy(
-                content = value,
-                isDirty = true,
-                errorMessage = null,
-                contentSelectionOffset = safeSelectionOffset
-            )
-        }
         NexNoteDebugLog.viewModel(
             event = "onContentChangeApplied",
             details = "safeSelection=$safeSelectionOffset ${uiState.value.debugViewModelSummary()}"
         )
+    }
+
+    /**
+     * Toggles a task-list marker selected from Markdown preview.
+     *
+     * The content version advances because this edit originates outside the
+     * text field and must be synchronized before the user returns to Editing.
+     */
+    fun togglePreviewTaskListItem(markerOffset: Int) {
+        if (ignoreReadOnlyChange("togglePreviewTaskListItem")) return
+        val current = _uiState.value
+        val updatedContent = toggleMarkdownTaskListItem(current.content, markerOffset) ?: return
+        NexNoteDebugLog.viewModel(
+            event = "togglePreviewTaskListItem",
+            details = "markerOffset=$markerOffset ${current.debugViewModelSummary()}"
+        )
+        applyContentChange(
+            value = updatedContent,
+            selectionOffset = current.contentSelectionOffset,
+            synchronizeEditorContent = true
+        )
+    }
+
+    private fun applyContentChange(
+        value: String,
+        selectionOffset: Int?,
+        synchronizeEditorContent: Boolean
+    ) {
+        contentHistory.recordUserChange(
+            EditorContentSnapshot(text = value, selectionOffset = selectionOffset)
+        )
+        _uiState.update { current ->
+            current.copy(
+                content = value,
+                isDirty = true,
+                errorMessage = null,
+                contentSelectionOffset = selectionOffset,
+                contentVersion = current.contentVersion + if (synchronizeEditorContent) 1 else 0
+            )
+        }
         scheduleAutosave()
     }
 

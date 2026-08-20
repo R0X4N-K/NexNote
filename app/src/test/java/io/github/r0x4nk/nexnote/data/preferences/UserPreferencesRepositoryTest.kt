@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -89,6 +90,28 @@ class UserPreferencesRepositoryTest {
         assertEquals(FontScale.LARGE, ds.fontScale.first())
     }
 
+    @Test
+    fun `tableLayoutMode defaults to FIT_SCREEN`() = testScope.runTest {
+        val ds = createTestDataStore()
+        assertEquals(TableLayoutMode.FIT_SCREEN, ds.tableLayoutMode.first())
+    }
+
+    @Test
+    fun `tableLayoutMode persists all values`() = testScope.runTest {
+        val ds = createTestDataStore()
+        TableLayoutMode.entries.forEach { mode ->
+            ds.edit { it[TABLE_LAYOUT_MODE_KEY] = mode.name }
+            assertEquals(mode, ds.tableLayoutMode.first())
+        }
+    }
+
+    @Test
+    fun `unknown tableLayoutMode falls back to FIT_SCREEN`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[TABLE_LAYOUT_MODE_KEY] = "UNKNOWN_MODE" }
+        assertEquals(TableLayoutMode.FIT_SCREEN, ds.tableLayoutMode.first())
+    }
+
     // ── TimezoneId ────────────────────────────────────────────────────────────
 
     @Test
@@ -110,29 +133,6 @@ class UserPreferencesRepositoryTest {
         ds.edit { it[TIMEZONE_KEY] = "America/New_York" }
         ds.edit { it[TIMEZONE_KEY] = "" }
         assertEquals("", ds.timezoneId.first())
-    }
-
-    // ── isLeftHanded ──────────────────────────────────────────────────────────
-
-    @Test
-    fun `isLeftHanded defaults to false`() = testScope.runTest {
-        val ds = createTestDataStore()
-        assertFalse(ds.isLeftHanded.first())
-    }
-
-    @Test
-    fun `setLeftHanded persists true`() = testScope.runTest {
-        val ds = createTestDataStore()
-        ds.edit { it[LEFT_HANDED_KEY] = true }
-        assertTrue(ds.isLeftHanded.first())
-    }
-
-    @Test
-    fun `setLeftHanded round-trips false after true`() = testScope.runTest {
-        val ds = createTestDataStore()
-        ds.edit { it[LEFT_HANDED_KEY] = true }
-        ds.edit { it[LEFT_HANDED_KEY] = false }
-        assertFalse(ds.isLeftHanded.first())
     }
 
     // ── AccentColor ───────────────────────────────────────────────────────────
@@ -263,8 +263,8 @@ class UserPreferencesRepositoryTest {
 
 private val THEME_MODE_KEY   = stringPreferencesKey("theme_mode")
 private val FONT_SCALE_KEY   = stringPreferencesKey("font_scale")
+private val TABLE_LAYOUT_MODE_KEY = stringPreferencesKey("table_layout_mode")
 private val TIMEZONE_KEY     = stringPreferencesKey("timezone_id")
-private val LEFT_HANDED_KEY  = booleanPreferencesKey("is_left_handed")
 private val ACCENT_COLOR_KEY = stringPreferencesKey("accent_color")
 private val VAULT_RECENT_PREVIEWS_PROTECTED_KEY =
     booleanPreferencesKey("vault_recent_previews_protected")
@@ -287,11 +287,14 @@ private val DataStore<Preferences>.fontScale
         FontScale.entries.firstOrNull { it.name == name } ?: FontScale.NORMAL
     }
 
+private val DataStore<Preferences>.tableLayoutMode
+    get() = data.map { prefs ->
+        val name = prefs[TABLE_LAYOUT_MODE_KEY] ?: TableLayoutMode.FIT_SCREEN.name
+        TableLayoutMode.entries.firstOrNull { it.name == name } ?: TableLayoutMode.FIT_SCREEN
+    }
+
 private val DataStore<Preferences>.timezoneId
     get() = data.map { prefs -> prefs[TIMEZONE_KEY] ?: "" }
-
-private val DataStore<Preferences>.isLeftHanded
-    get() = data.map { prefs -> prefs[LEFT_HANDED_KEY] ?: false }
 
 private val DataStore<Preferences>.accentColor
     get() = data.map { prefs ->

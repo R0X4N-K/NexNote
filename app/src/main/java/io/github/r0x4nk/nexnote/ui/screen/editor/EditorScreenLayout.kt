@@ -75,6 +75,7 @@ internal data class EditorScreenActions(
     val applyMarkdownEdit: ((String, TextRange) -> MarkdownTextEdit) -> Unit,
     val onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     val onPreviewNoteLinkClick: (Long) -> Unit,
+    val onPreviewTaskListItemClick: (Int) -> Unit = {},
     val onToggleColorPicker: () -> Unit,
     val onBackgroundColorChange: (Int?) -> Unit,
     val onTitleChange: (String) -> Unit,
@@ -286,7 +287,8 @@ private fun EditorScreenBody(
                 actions.onContentEdited,
                 actions.onContentSelectionChange,
                 actions.onNoteLinkAutocompleteSelected,
-                actions.onPreviewNoteLinkClick
+                actions.onPreviewNoteLinkClick,
+                actions.onPreviewTaskListItemClick
             )
         }
         EditorKeyboardToolbar(

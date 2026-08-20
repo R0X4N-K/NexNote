@@ -101,6 +101,32 @@ class EditorViewModelTest : EditorViewModelTestBase() {
     }
 
     @Test
+    fun `preview task toggle updates content sync version and persisted note`() = runTest {
+        fakeNoteDao.addNote(
+            NoteEntity(
+                id = 42L,
+                title = "Checklist",
+                content = "- [ ] Publish release",
+                isPreviewMode = true
+            )
+        )
+        val vm = viewModel(noteId = 42L)
+        runCurrent()
+        val initialContentVersion = vm.uiState.value.contentVersion
+
+        vm.togglePreviewTaskListItem(markerOffset = 3)
+
+        assertEquals("- [x] Publish release", vm.uiState.value.content)
+        assertTrue(vm.uiState.value.isDirty)
+        assertEquals(initialContentVersion + 1, vm.uiState.value.contentVersion)
+
+        advanceTimeBy(1_501L)
+        advanceUntilIdle()
+
+        assertEquals("- [x] Publish release", fakeNoteDao.getNoteById(42L)?.content)
+    }
+
+    @Test
     fun `noteLinkTargets excludes current note and normalizes blank titles`() = runTest {
         fakeNoteDao.addNote(NoteEntity(id = 42L, title = "Current"))
         fakeNoteDao.addNote(NoteEntity(id = 7L, title = "   "))

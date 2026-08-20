@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
@@ -29,6 +30,21 @@ class SettingsScreenContentTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun tableLayoutModePicker_submitsHorizontalScroll() {
+        var submittedMode: TableLayoutMode? = null
+        composeRule.setSettingsContent(
+            vaultState = VaultState.NOT_CONFIGURED,
+            onTableLayoutModeChange = { submittedMode = it }
+        )
+
+        composeRule.onNodeWithText("Scroll")
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(TableLayoutMode.HORIZONTAL_SCROLL, submittedMode)
+    }
 
     @Test
     fun vaultChangePinForm_isHiddenWhenVaultIsLocked() {
@@ -275,6 +291,7 @@ class SettingsScreenContentTest {
         onChangeVaultPin: (CharArray, CharArray, CharArray) -> Unit = { _, _, _ -> },
         onUnlockVaultWithAndroidCredentialChange: (Boolean) -> Unit = {},
         onVaultAutoLockTimeoutChange: (VaultAutoLockTimeout) -> Unit = {},
+        onTableLayoutModeChange: (TableLayoutMode) -> Unit = {},
         onRequestVaultReset: () -> Unit = {},
         onCancelVaultReset: () -> Unit = {},
         onConfirmVaultReset: () -> Unit = {},
@@ -288,7 +305,6 @@ class SettingsScreenContentTest {
                         fontScale = FontScale.NORMAL,
                         timezoneId = "",
                         availableTimezones = emptyList(),
-                        isLeftHanded = false,
                         accentColor = AccentColor.VIOLET,
                         noteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
                         vaultState = vaultState,
@@ -303,7 +319,7 @@ class SettingsScreenContentTest {
                     onAccentColorChange = {},
                     onFontScaleChange = {},
                     onNoteCardStyleChange = {},
-                    onLeftHandedChange = {},
+                    onTableLayoutModeChange = onTableLayoutModeChange,
                     onTimezoneChange = {},
                     onUnlockVaultWithAndroidCredentialChange =
                         onUnlockVaultWithAndroidCredentialChange,

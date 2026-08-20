@@ -66,7 +66,7 @@ class EditorBottomFadeRenderingTest {
     }
 
     @Test
-    fun scrollableEditContentExtendsBehindBottomFade() {
+    fun scrollableEditContentReservesBottomFadeClearance() {
         lateinit var editorState: EditorScreenState
         val longContent = List(80) { index -> "Scrollable editor line $index" }.joinToString("\n")
 
@@ -82,7 +82,7 @@ class EditorBottomFadeRenderingTest {
         val fieldBottom = composeRule.onNodeWithTag(EDITOR_CONTENT_FIELD_TAG)
             .getUnclippedBoundsInRoot().bottom.value
 
-        assertEquals(8f, hostBottom - fieldBottom, 1f)
+        assertEquals(60f, hostBottom - fieldBottom, 1f)
     }
 
     private fun composeEditorContentMode(

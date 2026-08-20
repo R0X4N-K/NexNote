@@ -4,6 +4,7 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
@@ -1350,10 +1351,11 @@ private class FakeUserPreferencesRepository : IUserPreferencesRepository {
     override val themeMode: Flow<ThemeMode> = MutableStateFlow(ThemeMode.SYSTEM)
     override val fontScale: Flow<FontScale> = MutableStateFlow(FontScale.NORMAL)
     override val timezoneId: Flow<String> = MutableStateFlow("UTC")
-    override val isLeftHanded: Flow<Boolean> = MutableStateFlow(false)
     override val accentColor: Flow<AccentColor> = MutableStateFlow(AccentColor.VIOLET)
     private val noteCardStyleFlow = MutableStateFlow(NoteCardStyle.TITLE_AND_PREVIEW)
     override val noteCardStyle: Flow<NoteCardStyle> = noteCardStyleFlow
+    override val tableLayoutMode: Flow<TableLayoutMode> =
+        MutableStateFlow(TableLayoutMode.FIT_SCREEN)
     override val protectVaultRecentPreviews: Flow<Boolean> = MutableStateFlow(true)
     override val lockVaultOnBackground: Flow<Boolean> = MutableStateFlow(true)
     override val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout> =
@@ -1363,12 +1365,13 @@ private class FakeUserPreferencesRepository : IUserPreferencesRepository {
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
     override suspend fun setFontScale(scale: FontScale) = Unit
     override suspend fun setTimezoneId(id: String) = Unit
-    override suspend fun setLeftHanded(value: Boolean) = Unit
     override suspend fun setAccentColor(color: AccentColor) = Unit
 
     override suspend fun setNoteCardStyle(style: NoteCardStyle) {
         noteCardStyleFlow.value = style
     }
+
+    override suspend fun setTableLayoutMode(mode: TableLayoutMode) = Unit
 
     override suspend fun setProtectVaultRecentPreviews(value: Boolean) = Unit
     override suspend fun setLockVaultOnBackground(value: Boolean) = Unit

@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.testing
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
@@ -37,9 +38,9 @@ internal object NoOpPreferencesRepository : IUserPreferencesRepository {
     override val themeMode = flowOf(ThemeMode.SYSTEM)
     override val fontScale = flowOf(FontScale.NORMAL)
     override val timezoneId = flowOf("UTC")
-    override val isLeftHanded = flowOf(false)
     override val accentColor = flowOf(AccentColor.VIOLET)
     override val noteCardStyle = flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
+    override val tableLayoutMode = flowOf(TableLayoutMode.FIT_SCREEN)
     override val protectVaultRecentPreviews = flowOf(true)
     override val lockVaultOnBackground = flowOf(true)
     override val vaultAutoLockTimeout = flowOf(VaultAutoLockTimeout.IMMEDIATELY)
@@ -48,9 +49,9 @@ internal object NoOpPreferencesRepository : IUserPreferencesRepository {
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
     override suspend fun setFontScale(scale: FontScale) = Unit
     override suspend fun setTimezoneId(id: String) = Unit
-    override suspend fun setLeftHanded(value: Boolean) = Unit
     override suspend fun setAccentColor(color: AccentColor) = Unit
     override suspend fun setNoteCardStyle(style: NoteCardStyle) = Unit
+    override suspend fun setTableLayoutMode(mode: TableLayoutMode) = Unit
     override suspend fun setProtectVaultRecentPreviews(value: Boolean) = Unit
     override suspend fun setLockVaultOnBackground(value: Boolean) = Unit
     override suspend fun setVaultAutoLockTimeout(timeout: VaultAutoLockTimeout) = Unit

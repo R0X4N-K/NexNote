@@ -82,7 +82,7 @@ object MarkdownParser {
         buildAnnotatedString {
             text.withNormalizedHardBreaks().split("\n").forEachIndexed { index, line ->
                 if (index > 0) append("\n")
-                appendMarkdownLine(line, colors)
+                appendMarkdownLine(line, colors, lineIndex = index)
             }
         }
 

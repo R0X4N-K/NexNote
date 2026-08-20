@@ -10,6 +10,7 @@ import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
@@ -22,8 +23,8 @@ import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtec
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveLeftHandedUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTimezoneIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAndroidCredentialUnlockUseCase
@@ -35,8 +36,8 @@ import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProt
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SetLeftHandedUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SetTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetTimezoneIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAndroidCredentialUnlockUseCase
@@ -56,9 +57,9 @@ data class SettingsUiState(
     val fontScale:          FontScale     = FontScale.NORMAL,
     val timezoneId:         String        = "",
     val availableTimezones: List<String>  = emptyList(),
-    val isLeftHanded:       Boolean       = false,
     val accentColor:        AccentColor   = AccentColor.VIOLET,
     val noteCardStyle:      NoteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
+    val tableLayoutMode:    TableLayoutMode = TableLayoutMode.FIT_SCREEN,
     val vaultState:         VaultState    = VaultState.NOT_CONFIGURED,
     val protectVaultRecentPreviews: Boolean = true,
     val lockVaultOnBackground: Boolean = true,
@@ -115,9 +116,9 @@ class SettingsViewModel(
     private val observeThemeMode: ObserveThemeModeUseCase,
     private val observeFontScale: ObserveFontScaleUseCase,
     private val observeTimezoneId: ObserveTimezoneIdUseCase,
-    private val observeLeftHanded: ObserveLeftHandedUseCase,
     private val observeAccentColor: ObserveAccentColorUseCase,
     private val observeNoteCardStyle: ObserveNoteCardStyleUseCase,
+    private val observeTableLayoutMode: ObserveTableLayoutModeUseCase,
     private val observeVaultState: ObserveVaultStateUseCase,
     private val observeVaultRecentPreviewsProtection: ObserveVaultRecentPreviewsProtectionUseCase,
     private val observeVaultLockOnBackground: ObserveVaultLockOnBackgroundUseCase,
@@ -133,9 +134,9 @@ class SettingsViewModel(
     private val setThemeModeUseCase: SetThemeModeUseCase,
     private val setFontScaleUseCase: SetFontScaleUseCase,
     private val setTimezoneIdUseCase: SetTimezoneIdUseCase,
-    private val setLeftHandedUseCase: SetLeftHandedUseCase,
     private val setAccentColorUseCase: SetAccentColorUseCase,
     private val setNoteCardStyleUseCase: SetNoteCardStyleUseCase,
+    private val setTableLayoutModeUseCase: SetTableLayoutModeUseCase,
     private val setVaultRecentPreviewsProtectionUseCase: SetVaultRecentPreviewsProtectionUseCase,
     private val setVaultLockOnBackgroundUseCase: SetVaultLockOnBackgroundUseCase,
     private val setVaultAutoLockTimeoutUseCase: SetVaultAutoLockTimeoutUseCase,
@@ -147,9 +148,9 @@ class SettingsViewModel(
             themeMode = observeThemeMode(),
             fontScale = observeFontScale(),
             timezoneId = observeTimezoneId(),
-            isLeftHanded = observeLeftHanded(),
             accentColor = observeAccentColor(),
             noteCardStyle = observeNoteCardStyle(),
+            tableLayoutMode = observeTableLayoutMode(),
             vaultState = observeVaultState(),
             protectVaultRecentPreviews = observeVaultRecentPreviewsProtection(),
             lockVaultOnBackground = observeVaultLockOnBackground(),
@@ -182,16 +183,16 @@ class SettingsViewModel(
         viewModelScope.launch { setTimezoneIdUseCase(id) }
     }
 
-    fun setLeftHanded(value: Boolean) {
-        viewModelScope.launch { setLeftHandedUseCase(value) }
-    }
-
     fun setAccentColor(color: AccentColor) {
         viewModelScope.launch { setAccentColorUseCase(color) }
     }
 
     fun setNoteCardStyle(style: NoteCardStyle) {
         viewModelScope.launch { setNoteCardStyleUseCase(style) }
+    }
+
+    fun setTableLayoutMode(mode: TableLayoutMode) {
+        viewModelScope.launch { setTableLayoutModeUseCase(mode) }
     }
 
     fun setProtectVaultRecentPreviews(value: Boolean) {
@@ -570,9 +571,9 @@ class SettingsViewModel(
                     observeThemeMode = preferences.observeThemeMode,
                     observeFontScale = preferences.observeFontScale,
                     observeTimezoneId = preferences.observeTimezoneId,
-                    observeLeftHanded = preferences.observeLeftHanded,
                     observeAccentColor = preferences.observeAccentColor,
                     observeNoteCardStyle = preferences.observeNoteCardStyle,
+                    observeTableLayoutMode = preferences.observeTableLayoutMode,
                     observeVaultState = vault.observeVaultState,
                     observeVaultRecentPreviewsProtection =
                         preferences.observeVaultRecentPreviewsProtection,
@@ -590,9 +591,9 @@ class SettingsViewModel(
                     setThemeModeUseCase = preferences.setThemeMode,
                     setFontScaleUseCase = preferences.setFontScale,
                     setTimezoneIdUseCase = preferences.setTimezoneId,
-                    setLeftHandedUseCase = preferences.setLeftHanded,
                     setAccentColorUseCase = preferences.setAccentColor,
                     setNoteCardStyleUseCase = preferences.setNoteCardStyle,
+                    setTableLayoutModeUseCase = preferences.setTableLayoutMode,
                     setVaultRecentPreviewsProtectionUseCase =
                         preferences.setVaultRecentPreviewsProtection,
                     setVaultLockOnBackgroundUseCase = preferences.setVaultLockOnBackground,

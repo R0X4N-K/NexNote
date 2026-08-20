@@ -3,14 +3,15 @@ package io.github.r0x4nk.nexnote.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
@@ -39,9 +40,9 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         val THEME_MODE_KEY       = stringPreferencesKey("theme_mode")
         val FONT_SCALE_KEY       = stringPreferencesKey("font_scale")
         val TIMEZONE_KEY         = stringPreferencesKey("timezone_id")
-        val LEFT_HANDED_KEY      = booleanPreferencesKey("is_left_handed")
         val ACCENT_COLOR_KEY     = stringPreferencesKey("accent_color")
         val NOTE_CARD_STYLE_KEY  = stringPreferencesKey("note_card_style")
+        val TABLE_LAYOUT_MODE_KEY = stringPreferencesKey("table_layout_mode")
         val VAULT_RECENT_PREVIEWS_PROTECTED_KEY =
             booleanPreferencesKey("vault_recent_previews_protected")
         val VAULT_LOCK_ON_BACKGROUND_KEY =
@@ -65,15 +66,14 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         .safe
         .map { prefs -> prefs[TIMEZONE_KEY] ?: "" }
 
-    override val isLeftHanded: Flow<Boolean> = context.dataStore.data
-        .safe
-        .map { prefs -> prefs[LEFT_HANDED_KEY] ?: false }
-
     override val accentColor: Flow<AccentColor> =
         context.dataStore.data.observeEnum(ACCENT_COLOR_KEY, AccentColor.VIOLET)
 
     override val noteCardStyle: Flow<NoteCardStyle> =
         context.dataStore.data.observeEnum(NOTE_CARD_STYLE_KEY, NoteCardStyle.TITLE_AND_PREVIEW)
+
+    override val tableLayoutMode: Flow<TableLayoutMode> =
+        context.dataStore.data.observeEnum(TABLE_LAYOUT_MODE_KEY, TableLayoutMode.FIT_SCREEN)
 
     override val protectVaultRecentPreviews: Flow<Boolean> = context.dataStore.data
         .safe
@@ -105,16 +105,16 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         context.dataStore.edit { prefs -> prefs[TIMEZONE_KEY] = id }
     }
 
-    override suspend fun setLeftHanded(value: Boolean) {
-        context.dataStore.edit { prefs -> prefs[LEFT_HANDED_KEY] = value }
-    }
-
     override suspend fun setAccentColor(color: AccentColor) {
         context.dataStore.edit { prefs -> prefs[ACCENT_COLOR_KEY] = color.name }
     }
 
     override suspend fun setNoteCardStyle(style: NoteCardStyle) {
         context.dataStore.edit { prefs -> prefs[NOTE_CARD_STYLE_KEY] = style.name }
+    }
+
+    override suspend fun setTableLayoutMode(mode: TableLayoutMode) {
+        context.dataStore.edit { prefs -> prefs[TABLE_LAYOUT_MODE_KEY] = mode.name }
     }
 
     override suspend fun setProtectVaultRecentPreviews(value: Boolean) {

@@ -11,6 +11,7 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
@@ -265,9 +266,9 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
     private val _fontScale = MutableStateFlow(FontScale.NORMAL)
     private val _timezoneId = MutableStateFlow("")
-    private val _isLeftHanded = MutableStateFlow(false)
     private val _accentColor = MutableStateFlow(AccentColor.VIOLET)
     private val _noteCardStyle = MutableStateFlow(NoteCardStyle.TITLE_AND_PREVIEW)
+    private val _tableLayoutMode = MutableStateFlow(TableLayoutMode.FIT_SCREEN)
     private val _protectVaultRecentPreviews = MutableStateFlow(true)
     private val _lockVaultOnBackground = MutableStateFlow(true)
     private val _vaultAutoLockTimeout =
@@ -279,9 +280,9 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
     override val themeMode: Flow<ThemeMode> = _themeMode
     override val fontScale: Flow<FontScale> = _fontScale
     override val timezoneId: Flow<String> = _timezoneId
-    override val isLeftHanded: Flow<Boolean> = _isLeftHanded
     override val accentColor: Flow<AccentColor> = _accentColor
     override val noteCardStyle: Flow<NoteCardStyle> = _noteCardStyle
+    override val tableLayoutMode: Flow<TableLayoutMode> = _tableLayoutMode
     override val protectVaultRecentPreviews: Flow<Boolean> = _protectVaultRecentPreviews
     override val lockVaultOnBackground: Flow<Boolean> = _lockVaultOnBackground
     override val vaultAutoLockTimeout: Flow<VaultAutoLockTimeout> = _vaultAutoLockTimeout
@@ -301,16 +302,16 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
         _timezoneId.value = id
     }
 
-    override suspend fun setLeftHanded(value: Boolean) {
-        _isLeftHanded.value = value
-    }
-
     override suspend fun setAccentColor(color: AccentColor) {
         _accentColor.value = color
     }
 
     override suspend fun setNoteCardStyle(style: NoteCardStyle) {
         _noteCardStyle.value = style
+    }
+
+    override suspend fun setTableLayoutMode(mode: TableLayoutMode) {
+        _tableLayoutMode.value = mode
     }
 
     override suspend fun setProtectVaultRecentPreviews(value: Boolean) {

@@ -14,6 +14,7 @@ private const val RENDERED_NEST_INDENT = "    "
 private const val CHECKBOX_UNCHECKED_MARKER = "☐ "
 private const val CHECKBOX_CHECKED_MARKER = "☑ "
 private const val UNORDERED_LIST_MARKER = "• "
+internal const val MARKDOWN_TASK_LIST_ANNOTATION_TAG = "NEXNOTE_TASK_LIST"
 
 private data class HeadingMarker(
     val prefix: String,
@@ -29,12 +30,28 @@ private val headingMarkers = listOf(
     HeadingMarker("# ", 28.sp)
 )
 
-internal fun AnnotatedString.Builder.appendMarkdownLine(line: String, colors: MarkdownColors) {
+internal fun AnnotatedString.Builder.appendMarkdownLine(
+    line: String,
+    colors: MarkdownColors,
+    lineIndex: Int
+) {
     val heading = headingMarkers.firstOrNull { line.startsWith(it.prefix) }
     when {
         heading != null -> appendHeading(line, heading, colors)
-        appendCheckboxLine(line, MarkdownPatterns.CHECKBOX_UNCHECKED, false, colors) -> Unit
-        appendCheckboxLine(line, MarkdownPatterns.CHECKBOX_CHECKED, true, colors) -> Unit
+        appendCheckboxLine(
+            line,
+            MarkdownPatterns.CHECKBOX_UNCHECKED,
+            false,
+            colors,
+            lineIndex
+        ) -> Unit
+        appendCheckboxLine(
+            line,
+            MarkdownPatterns.CHECKBOX_CHECKED,
+            true,
+            colors,
+            lineIndex
+        ) -> Unit
         appendBulletLine(line, colors) -> Unit
         appendOrderedListLine(line, colors) -> Unit
         else -> appendInlineSpans(line, colors)
@@ -55,12 +72,21 @@ private fun AnnotatedString.Builder.appendCheckboxLine(
     line: String,
     pattern: Regex,
     checked: Boolean,
-    colors: MarkdownColors
+    colors: MarkdownColors,
+    lineIndex: Int
 ): Boolean {
     val match = pattern.find(line) ?: return false
-    appendNestedIndent(match.groupValues[1])
-    append(if (checked) CHECKBOX_CHECKED_MARKER else CHECKBOX_UNCHECKED_MARKER)
-    appendCheckboxContent(line.substring(match.value.length), checked, colors)
+    pushStringAnnotation(
+        tag = MARKDOWN_TASK_LIST_ANNOTATION_TAG,
+        annotation = lineIndex.toString()
+    )
+    try {
+        appendNestedIndent(match.groupValues[1])
+        append(if (checked) CHECKBOX_CHECKED_MARKER else CHECKBOX_UNCHECKED_MARKER)
+        appendCheckboxContent(line.substring(match.value.length), checked, colors)
+    } finally {
+        pop()
+    }
     return true
 }
 

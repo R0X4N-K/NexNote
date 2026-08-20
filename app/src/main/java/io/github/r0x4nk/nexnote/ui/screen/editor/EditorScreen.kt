@@ -343,6 +343,7 @@ fun EditorScreen(
             applyMarkdownEdit = applyMarkdownEdit,
             onNoteLinkAutocompleteSelected = replaceNoteLinkAutocomplete,
             onPreviewNoteLinkClick = openNoteFromPreviewLink,
+            onPreviewTaskListItemClick = viewModel::togglePreviewTaskListItem,
             onToggleColorPicker = toggleColorPicker,
             onBackgroundColorChange = viewModel::onBackgroundColorChange,
             onTitleChange = viewModel::onTitleChange,

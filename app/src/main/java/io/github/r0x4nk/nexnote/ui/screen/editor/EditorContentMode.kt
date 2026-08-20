@@ -69,7 +69,8 @@ internal fun ColumnScope.EditorContentModeBox(
     onContentEdited: () -> Unit,
     onContentSelectionChange: (TextRange) -> Unit,
     onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
-    onPreviewNoteLinkClick: (Long) -> Unit
+    onPreviewNoteLinkClick: (Long) -> Unit,
+    onPreviewTaskListItemClick: (Int) -> Unit = {}
 ) {
     val density = LocalDensity.current
     val previewWarmupKey = uiState.directPreviewWarmupKey(MaterialTheme.colorScheme.primary)
@@ -136,7 +137,8 @@ internal fun ColumnScope.EditorContentModeBox(
                         imageFileProvider = imageFileProvider,
                         vaultImageByteProvider = vaultImageByteProvider,
                         state = state,
-                        onPreviewNoteLinkClick = onPreviewNoteLinkClick
+                        onPreviewNoteLinkClick = onPreviewNoteLinkClick,
+                        onPreviewTaskListItemClick = onPreviewTaskListItemClick
                     )
                 }
                 EditorContentTarget.Edit -> {
@@ -212,7 +214,8 @@ private fun EditorMarkdownPreview(
     imageFileProvider: (String) -> File,
     vaultImageByteProvider: (suspend (String) -> ByteArray?)?,
     state: EditorScreenState,
-    onPreviewNoteLinkClick: (Long) -> Unit
+    onPreviewNoteLinkClick: (Long) -> Unit,
+    onPreviewTaskListItemClick: (Int) -> Unit
 ) {
     MarkdownPreview(
         markdown = uiState.content,
@@ -228,7 +231,8 @@ private fun EditorMarkdownPreview(
         highlightRanges = state.visibleContentHighlightRanges(),
         activeHighlightRange = state.activeContentHighlightRange(),
         contentBottomPadding = fadeBottomPadding,
-        onNoteLinkClick = onPreviewNoteLinkClick
+        onNoteLinkClick = onPreviewNoteLinkClick,
+        onTaskListItemClick = onPreviewTaskListItemClick
     )
 }
 
@@ -265,7 +269,8 @@ private fun EditorContentField(
                 end = EditorContentHorizontalPadding,
                 bottom = editorContentBottomPadding(
                     keyboardToolbarVisible = keyboardToolbarVisible,
-                    keyboardToolbarHeight = toolbarBottomPadding
+                    keyboardToolbarHeight = toolbarBottomPadding,
+                    bottomFadeVisible = bottomFadeVisible
                 )
             )
             .testTag(EDITOR_CONTENT_FIELD_TAG)
@@ -275,18 +280,21 @@ private fun EditorContentField(
 
 private fun editorContentBottomPadding(
     keyboardToolbarVisible: Boolean,
-    keyboardToolbarHeight: Dp
+    keyboardToolbarHeight: Dp,
+    bottomFadeVisible: Boolean
 ): Dp {
     val toolbarPadding = editorKeyboardToolbarBottomPadding(
         keyboardToolbarVisible = keyboardToolbarVisible,
         keyboardToolbarHeight = keyboardToolbarHeight
     )
-
-    return if (toolbarPadding > 0.dp) {
+    val basePadding = if (toolbarPadding > 0.dp) {
         toolbarPadding
     } else {
         EditorContentDefaultBottomPadding
     }
+    val fadeClearance = if (bottomFadeVisible) EditorBottomFadeHeight else 0.dp
+
+    return basePadding + fadeClearance
 }
 
 private fun editorKeyboardToolbarBottomPadding(

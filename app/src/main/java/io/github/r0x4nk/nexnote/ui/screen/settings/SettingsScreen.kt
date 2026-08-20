@@ -29,7 +29,7 @@ fun SettingsScreen(
         onAccentColorChange = viewModel::setAccentColor,
         onFontScaleChange = viewModel::setFontScale,
         onNoteCardStyleChange = viewModel::setNoteCardStyle,
-        onLeftHandedChange = viewModel::setLeftHanded,
+        onTableLayoutModeChange = viewModel::setTableLayoutMode,
         onTimezoneChange = viewModel::setTimezoneId,
         onOpenVault = onOpenVault,
         onLockVault = viewModel::lockVault,

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
+import io.github.r0x4nk.nexnote.util.findMarkdownTaskListMarkerOffset
 
 private const val PREVIEW_END_ANCHOR_KEY = "markdown_preview_end_anchor"
 private const val PREVIEW_END_ANCHOR_CONTENT_TYPE = "preview_end_anchor"
@@ -80,6 +81,7 @@ private fun RenderedMarkdownBlock(
         is MarkdownBlock.TableBlock -> MarkdownTableBlock(
             table           = block,
             style           = config.style,
+            layoutMode      = config.tableLayoutMode,
             onNoteLinkClick = config.onNoteLinkClick
         )
     }
@@ -100,7 +102,11 @@ private fun RenderMarkdownTextBlock(
         highlightRanges      = config.highlightRanges,
         activeHighlightRange = config.activeHighlightRange,
         highlightColor       = state.highlightColor,
-        onNoteLinkClick      = config.onNoteLinkClick
+        onNoteLinkClick      = config.onNoteLinkClick,
+        onTaskListItemClick  = { lineIndex ->
+            config.resolveTaskListMarkerOffset(sourceRange, lineIndex)
+                ?.let(config.onTaskListItemClick)
+        }
     )
 }
 
@@ -141,6 +147,21 @@ private fun RenderMarkdownBlockquote(
         highlightRanges      = config.highlightRanges,
         activeHighlightRange = config.activeHighlightRange,
         highlightColor       = state.highlightColor,
-        onNoteLinkClick      = config.onNoteLinkClick
+        onNoteLinkClick      = config.onNoteLinkClick,
+        onTaskListItemClick  = { lineIndex ->
+            config.resolveTaskListMarkerOffset(sourceRange, lineIndex)
+                ?.let(config.onTaskListItemClick)
+        }
     )
 }
+
+private fun MarkdownPreviewContentConfig.resolveTaskListMarkerOffset(
+    sourceRange: MarkdownSourceRange,
+    lineIndex: Int
+): Int? =
+    findMarkdownTaskListMarkerOffset(
+        markdown = markdown,
+        sourceStart = sourceRange.start,
+        sourceEnd = sourceRange.end,
+        lineIndex = lineIndex
+    )

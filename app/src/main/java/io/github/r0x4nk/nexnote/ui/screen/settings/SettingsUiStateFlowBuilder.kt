@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.ui.screen.settings
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
@@ -18,9 +19,9 @@ internal data class SettingsUiStateFlows(
     val themeMode: Flow<ThemeMode>,
     val fontScale: Flow<FontScale>,
     val timezoneId: Flow<String>,
-    val isLeftHanded: Flow<Boolean>,
     val accentColor: Flow<AccentColor>,
     val noteCardStyle: Flow<NoteCardStyle>,
+    val tableLayoutMode: Flow<TableLayoutMode>,
     val vaultState: Flow<VaultState>,
     val protectVaultRecentPreviews: Flow<Boolean>,
     val lockVaultOnBackground: Flow<Boolean>,
@@ -34,10 +35,10 @@ private data class SettingsDisplayPreferences(
     val timezoneId: String
 )
 
-private data class SettingsInteractionPreferences(
-    val isLeftHanded: Boolean,
+private data class SettingsAppearancePreferences(
     val accentColor: AccentColor,
-    val noteCardStyle: NoteCardStyle
+    val noteCardStyle: NoteCardStyle,
+    val tableLayoutMode: TableLayoutMode
 )
 
 private data class SettingsVaultPreferences(
@@ -55,10 +56,10 @@ internal fun buildSettingsUiStateFlow(
     return combine(
         combine(flows.themeMode, flows.fontScale, flows.timezoneId, ::SettingsDisplayPreferences),
         combine(
-            flows.isLeftHanded,
             flows.accentColor,
             flows.noteCardStyle,
-            ::SettingsInteractionPreferences
+            flows.tableLayoutMode,
+            ::SettingsAppearancePreferences
         ),
         combine(
             flows.vaultState,
@@ -68,8 +69,8 @@ internal fun buildSettingsUiStateFlow(
             flows.unlockVaultWithAndroidCredential,
             ::SettingsVaultPreferences
         )
-    ) { display, interaction, vault ->
-        buildSettingsUiState(display, interaction, vault)
+    ) { display, appearance, vault ->
+        buildSettingsUiState(display, appearance, vault)
     }.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -79,7 +80,7 @@ internal fun buildSettingsUiStateFlow(
 
 private fun buildSettingsUiState(
     display: SettingsDisplayPreferences,
-    interaction: SettingsInteractionPreferences,
+    appearance: SettingsAppearancePreferences,
     vault: SettingsVaultPreferences
 ): SettingsUiState {
     return SettingsUiState(
@@ -87,9 +88,9 @@ private fun buildSettingsUiState(
         fontScale = display.fontScale,
         timezoneId = display.timezoneId,
         availableTimezones = TimeZone.getAvailableIDs().toList().sorted(),
-        isLeftHanded = interaction.isLeftHanded,
-        accentColor = interaction.accentColor,
-        noteCardStyle = interaction.noteCardStyle,
+        accentColor = appearance.accentColor,
+        noteCardStyle = appearance.noteCardStyle,
+        tableLayoutMode = appearance.tableLayoutMode,
         vaultState = vault.vaultState,
         protectVaultRecentPreviews = vault.protectRecentPreviews,
         lockVaultOnBackground = vault.lockOnBackground,

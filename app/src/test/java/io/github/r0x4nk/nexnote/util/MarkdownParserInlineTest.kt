@@ -290,6 +290,19 @@ class MarkdownParserInlineTest {
     }
 
     @Test
+    fun checkbox_annotationIdentifiesItsSourceLine() {
+        val result = parse("intro\n- [ ] pending")
+        val annotation = result.getStringAnnotations(
+            tag = MARKDOWN_TASK_LIST_ANNOTATION_TAG,
+            start = 0,
+            end = result.length
+        ).single()
+
+        assertEquals("1", annotation.item)
+        assertEquals("☐ pending", result.substring(annotation.start, annotation.end))
+    }
+
+    @Test
     fun escape_asterisk_emitsLiteralAsterisk() {
         val result = parse("""\*not italic\*""")
         assertEquals("*not italic*", result.text)

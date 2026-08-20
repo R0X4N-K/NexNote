@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.ui.component.NexSectionLabel
 
@@ -74,6 +75,27 @@ internal fun NoteCardStylePicker(
                 selected = selected == style,
                 onClick = { onSelect(style) },
                 shape = SegmentedButtonDefaults.itemShape(index, styles.size),
+                colors = settingsSegmentedButtonColors(),
+                label = { Text(labels[index]) }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun TableLayoutModePicker(
+    selected: TableLayoutMode,
+    onSelect: (TableLayoutMode) -> Unit
+) {
+    val modes = TableLayoutMode.entries
+    val labels = listOf("Wrap text", "Scroll")
+
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        modes.forEachIndexed { index, mode ->
+            SegmentedButton(
+                selected = selected == mode,
+                onClick = { onSelect(mode) },
+                shape = SegmentedButtonDefaults.itemShape(index, modes.size),
                 colors = settingsSegmentedButtonColors(),
                 label = { Text(labels[index]) }
             )
