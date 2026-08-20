@@ -9,12 +9,14 @@ Features:
 * Browse notes by date in the agenda view.
 * Create and reuse templates.
 * Move deleted notes to trash before permanent deletion.
+* Put selected notes and their images in a PIN-protected encrypted Vault.
 * Export notes and share generated files through Android's system share flow.
 * Customize theme, accent color, font scale, timezone, and left-handed layout preference.
 
 Privacy:
 
 * Notes are stored locally on the device.
+* Android cloud backup and device-to-device transfer are disabled; export data before uninstalling or changing devices.
 * No account is required.
 * No Firebase, Google Play Services, analytics, ads, or remote backend are included.
 

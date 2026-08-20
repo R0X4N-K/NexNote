@@ -3,18 +3,25 @@
 [![Build](https://github.com/R0X4N-K/NexNote/actions/workflows/build.yml/badge.svg)](https://github.com/R0X4N-K/NexNote/actions/workflows/build.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-NexNote is a local-first Android note-taking app built with Kotlin, Jetpack Compose, Material 3, Room, DataStore, Coroutines, and Flow.
-
-The project is prepared as a single-module Android repository for solo development, with GitHub Actions, F-Droid metadata, GPL-3.0-only licensing, privacy documentation, contribution templates, and release-signing guidance.
+NexNote is an offline, local-first Android note-taking app built with Kotlin,
+Jetpack Compose, Material 3, Room, DataStore, Coroutines, and Flow.
 
 ## Features
 
 - Local notes stored on device with Room.
 - Markdown-oriented editing and preview.
 - Tags, note search, agenda view, templates, and trash.
+- An encrypted Vault for selected notes and their images.
 - PDF/export flow with Android FileProvider sharing.
 - Theme, accent color, font scale, timezone, and left-handed preferences.
 - No account, analytics, Firebase, Google Play Services, or remote backend.
+
+Ordinary notes are protected by Android's private app sandbox. Vault note fields
+and images are additionally encrypted at rest with a PIN-derived key. Android
+backup and device-to-device transfer are disabled, so users must export data they
+want to keep before uninstalling or moving devices. See
+[`docs/vault-and-backup.md`](docs/vault-and-backup.md) for the exact guarantees
+and limitations.
 
 ## Android Package
 
@@ -32,7 +39,7 @@ NexNote/
 |-- gradle/libs.versions.toml     Version Catalog
 |-- fastlane/metadata/android/    Store metadata for F-Droid/IzzyOnDroid
 |-- .github/workflows/            CI and release workflows
-|-- docs/                         Maintainer notes and F-Droid checklist
+|-- docs/                         Project and distribution documentation
 |-- signature/                    Release signing notes
 ```
 
@@ -49,21 +56,36 @@ Useful commands:
 
 ```bash
 ./gradlew clean assembleDebug
+./gradlew assembleRelease
 ./gradlew testDebugUnitTest
-./gradlew lintDebug
+./gradlew compileDebugAndroidTestKotlin
+./gradlew lintDebug lintRelease
+./gradlew lintRelease --offline
 ```
 
 On Windows PowerShell:
 
 ```powershell
 .\gradlew.bat clean assembleDebug
+.\gradlew.bat assembleRelease
 .\gradlew.bat testDebugUnitTest
-.\gradlew.bat lintDebug
+.\gradlew.bat compileDebugAndroidTestKotlin
+.\gradlew.bat lintDebug lintRelease
+.\gradlew.bat lintRelease --offline
 ```
+
+The Android-test command compiles instrumentation tests; running them requires a
+connected device or AVD. Dependency lock state and strict checksum verification
+are committed in `app/gradle.lockfile`, `settings-gradle.lockfile`, and
+`gradle/verification-metadata.xml`. Distribution license material is generated
+into each APK under `assets/legal/` from `LICENSE` and
+`THIRD_PARTY_NOTICES.md`.
 
 ## Release
 
-Releases are tag-driven. Push a semantic tag such as:
+The release workflow is designed to run from a semantic tag such as `v1.0.0`.
+Creating or pushing that tag is a maintainer action and is not part of a local
+build:
 
 ```bash
 git tag v1.0.0
@@ -79,18 +101,24 @@ The release workflow expects these GitHub Secrets:
 
 Keep the production signing key stable forever once the app is distributed. Never commit keystores or signing property files.
 
-## F-Droid Readiness
+## F-Droid Status
 
-This repository includes:
+NexNote is not currently published on F-Droid. The repository includes the
+source-side material intended to support a future submission:
 
-- GPL-3.0-only license.
-- F-Droid/IzzyOnDroid Fastlane metadata in `fastlane/metadata/android/en-US/`.
-- Version Catalog based Gradle setup.
-- No proprietary runtime services.
-- GitHub CI for build, tests, and lint.
-- Tag-based release workflow.
+- GPL-3.0-only license;
+- localized Fastlane metadata in `fastlane/metadata/android/en-US/`;
+- a source-build metadata template in `docs/fdroid-submission-template.yml`;
+- Gradle dependency locking and strict artifact checksum verification;
+- no proprietary runtime services;
+- GitHub CI for build, tests, and lint;
+- a tag-triggered release workflow.
 
-Before submitting to F-Droid official, follow `docs/fdroid-readiness.md`, verify a clean clone build, publish a signed release, and open the future metadata PR in `fdroiddata`.
+The metadata template is not a completed F-Droid submission. Before submitting
+a release, the maintainer must select an immutable public commit or tag, replace
+the release-reference placeholder, and validate a clean source build from that
+exact ref. See [`docs/fdroid-readiness.md`](docs/fdroid-readiness.md) for the
+repository preparation status and remaining submission steps.
 
 ## Privacy
 

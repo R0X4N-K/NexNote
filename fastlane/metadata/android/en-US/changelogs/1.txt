@@ -1,1 +1,1 @@
-Initial private GitHub-ready release setup with Compose UI, local Room storage, tags, templates, agenda, export flow, F-Droid metadata, GPL-3.0-only license, and CI/release workflows.
+Initial release with local Room storage, Markdown editing, tags, templates, agenda, trash, export, and an encrypted Vault. Includes GPL-3.0-only licensing and reproducible source-build controls; automatic Android backup and device transfer are disabled.

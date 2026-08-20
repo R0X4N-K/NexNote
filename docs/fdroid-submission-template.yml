@@ -1,0 +1,25 @@
+# Submission template only. Do not copy into fdroiddata until the remaining
+# REQUIRED release-ref placeholder has been replaced with a verified public
+# full commit hash.
+Categories:
+  - Writing
+License: GPL-3.0-only
+AuthorName: R0X4N-K
+SourceCode: https://github.com/R0X4N-K/NexNote
+IssueTracker: https://github.com/R0X4N-K/NexNote/issues
+
+RepoType: git
+Repo: https://github.com/R0X4N-K/NexNote.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: REQUIRED_FULL_PUBLIC_RELEASE_COMMIT_SHA
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags ^v[0-9]+(?:\.[0-9]+){2}$
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1
