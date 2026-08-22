@@ -8,15 +8,10 @@ Only F-Droid maintainers can accept the final `fdroiddata` merge request.
 
 ## Verdict
 
-NexNote's application source and local source build are ready for an F-Droid
-review. The release is **not yet eligible for submission** because two external
-release requirements remain incomplete:
-
-1. `https://github.com/R0X4N-K/NexNote` is not anonymously accessible. It
-   returned HTTP 404 during this audit. F-Droid requires a publicly accessible
-   source repository.
-2. No immutable public `v1.0.0` tag exists. The local metadata template
-   therefore still contains `REQUIRED_FULL_PUBLIC_RELEASE_COMMIT_SHA`.
+NexNote's application source, public repository, metadata, and local source
+build are ready for an F-Droid review. The release is **not yet ready to submit**
+because no immutable public `v1.0.0` tag exists. The local metadata template
+therefore still contains `REQUIRED_FULL_PUBLIC_RELEASE_COMMIT_SHA`.
 
 An `fdroiddata` merge request has not been created, and the project has not been
 built inside F-Droid's own build environment. Do not describe NexNote as
@@ -57,7 +52,7 @@ working directory.
 |---|---|---|
 | FLOSS application license | Pass | Project is `GPL-3.0-only`; `LICENSE` is tracked. |
 | FLOSS dependencies and toolchain | Pass | Runtime dependencies are AndroidX/Kotlin FLOSS components; plugins and artifacts resolve only from Google Maven and Maven Central; F-Droid must provide OpenJDK 21. |
-| Public source | **Blocked** | Anonymous access to the GitHub source returned HTTP 404 on the audit date. |
+| Public source | Pass | The repository and `main` ref are anonymously accessible with Git credentials disabled. GitHub also labels the signed-out repository view as public. |
 | Unique application id | Pass | Release id is `io.github.r0x4nk.nexnote`; no conflicting indexed package was found during the audit. Final acceptance remains F-Droid's decision. |
 | No proprietary runtime service | Pass | No Firebase, Google Play Services, proprietary analytics, ads, crash reporting, account, or remote backend. |
 | No network tracking | Pass | The release manifest does not request `android.permission.INTERNET`; the only permission in the built APK is AndroidX's package-scoped dynamic-receiver permission. |
@@ -154,12 +149,12 @@ description requirements are documented in
 
 ## Required maintainer actions
 
-### 1. Make the source repository public
+### 1. Recheck public source access
 
-Change the GitHub repository visibility to public, then verify the repository,
-license, issues, release source, and tag are accessible in a private browser
-window without signing in. Do not rely on access from an authenticated GitHub
-session.
+The GitHub repository is public. Before submission, verify again that the
+repository, license, issues, release source, and tag are accessible in a private
+browser window without signing in. Do not rely on access from an authenticated
+GitHub session.
 
 PowerShell verification:
 
