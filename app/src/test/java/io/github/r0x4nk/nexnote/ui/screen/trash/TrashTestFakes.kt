@@ -51,6 +51,11 @@ internal class FakeNoteDao(
         _deletedNotes.value = notes
     }
 
+    override fun observeAllNormalNoteCount(): Flow<Int> =
+        MutableStateFlow((_allNotes.value + _deletedNotes.value).count { !it.isInVault })
+
+    override fun observeAllVaultNoteCount(): Flow<Int> = MutableStateFlow(0)
+
     override fun getAllNotes(): Flow<List<NoteEntity>> = _allNotes
     override fun getAllNotesSortedAsc(): Flow<List<NoteEntity>> = _allNotes
     override fun getDeletedNotes(): Flow<List<NoteEntity>> = _deletedNotes
@@ -66,8 +71,16 @@ internal class FakeNoteDao(
     override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
+    override suspend fun getAllNormalNotesForWipeOnce(): List<NoteEntity> =
+        _allNotes.value + _deletedNotes.value
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun deleteAllVaultNotes(): Int = 0
+    override suspend fun deleteAllNormalNotes(): Int {
+        val count = _allNotes.value.size + _deletedNotes.value.size
+        _allNotes.value = emptyList()
+        _deletedNotes.value = emptyList()
+        return count
+    }
     override fun searchNotes(query: String): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override fun getNotesByDateRange(
         startMs: Long,
@@ -77,6 +90,7 @@ internal class FakeNoteDao(
     override suspend fun insertNote(note: NoteEntity): Long = 0L
     override suspend fun updateNote(note: NoteEntity) = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
+    override suspend fun moveToTrash(ids: List<Long>, deletedDate: Long): Int = 0
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
@@ -84,6 +98,11 @@ internal class FakeNoteDao(
     override suspend fun restoreFromTrash(id: Long) {
         restoredCount++
         lastRestoredId = id
+    }
+
+    override suspend fun restoreFromTrash(ids: List<Long>): Int {
+        ids.forEach { id -> restoreFromTrash(id) }
+        return ids.size
     }
 
     override suspend fun deleteNotePermanently(id: Long): Int {

@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -47,15 +49,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NoteStatisticsIndexState
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 
 internal const val SETTINGS_VAULT_CURRENT_PIN_FIELD_TAG = "settings_vault_current_pin_field"
 internal const val SETTINGS_VAULT_NEW_PIN_FIELD_TAG = "settings_vault_new_pin_field"
@@ -70,6 +75,12 @@ internal const val SETTINGS_VAULT_RESET_CONFIRM_BUTTON_TAG =
     "settings_vault_reset_confirm_button"
 internal const val SETTINGS_VAULT_RESET_CANCEL_BUTTON_TAG =
     "settings_vault_reset_cancel_button"
+internal const val SETTINGS_DELETE_ALL_NOTES_ROW_TAG = "settings_delete_all_notes_row"
+internal const val SETTINGS_DELETE_ALL_NOTES_PIN_FIELD_TAG =
+    "settings_delete_all_notes_pin_field"
+internal const val SETTINGS_DELETE_ALL_NOTES_CONFIRM_BUTTON_TAG =
+    "settings_delete_all_notes_confirm_button"
+internal const val SETTINGS_LIST_TAG = "settings_list"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,12 +88,16 @@ internal fun SettingsScreenContent(
     uiState: SettingsUiState,
     vaultPinChangeState: SettingsVaultPinChangeUiState = SettingsVaultPinChangeUiState(),
     vaultResetState: SettingsVaultResetUiState = SettingsVaultResetUiState(),
+    deleteAllNotesState: SettingsDeleteAllNotesUiState = SettingsDeleteAllNotesUiState(),
+    statisticsIndexState: NoteStatisticsIndexState = NoteStatisticsIndexState(),
+    floatingBottomPadding: Dp = 0.dp,
     onThemeModeChange: (ThemeMode) -> Unit,
     onAccentColorChange: (AccentColor) -> Unit,
     onFontScaleChange: (FontScale) -> Unit,
     onNoteCardStyleChange: (NoteCardStyle) -> Unit,
     onTableLayoutModeChange: (TableLayoutMode) -> Unit,
     onTimezoneChange: (String) -> Unit,
+    onRebuildStatisticsIndex: () -> Unit = {},
     onOpenVault: () -> Unit = {},
     onLockVault: () -> Unit = {},
     onProtectVaultRecentPreviewsChange: (Boolean) -> Unit = {},
@@ -94,8 +109,13 @@ internal fun SettingsScreenContent(
     onRequestVaultReset: () -> Unit = {},
     onCancelVaultReset: () -> Unit = {},
     onConfirmVaultReset: () -> Unit = {},
-    onClearVaultResetFeedback: () -> Unit = {}
+    onClearVaultResetFeedback: () -> Unit = {},
+    onRequestDeleteAllNotes: () -> Unit = {},
+    onCancelDeleteAllNotes: () -> Unit = {},
+    onConfirmDeleteAllNotes: (CharArray) -> Unit = {},
+    onClearDeleteAllNotesFeedback: () -> Unit = {}
 ) {
+    val listState = rememberLazyListState()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -109,33 +129,61 @@ internal fun SettingsScreenContent(
             )
         }
     ) { innerPadding ->
-        SettingsList(
-            uiState = uiState,
-            vaultPinChangeState = vaultPinChangeState,
-            vaultResetState = vaultResetState,
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            onThemeModeChange = onThemeModeChange,
-            onAccentColorChange = onAccentColorChange,
-            onFontScaleChange = onFontScaleChange,
-            onNoteCardStyleChange = onNoteCardStyleChange,
-            onTableLayoutModeChange = onTableLayoutModeChange,
-            onTimezoneChange = onTimezoneChange,
-            onOpenVault = onOpenVault,
-            onLockVault = onLockVault,
-            onProtectVaultRecentPreviewsChange = onProtectVaultRecentPreviewsChange,
-            onLockVaultOnBackgroundChange = onLockVaultOnBackgroundChange,
-            onVaultAutoLockTimeoutChange = onVaultAutoLockTimeoutChange,
-            onUnlockVaultWithAndroidCredentialChange =
-                onUnlockVaultWithAndroidCredentialChange,
-            onChangeVaultPin = onChangeVaultPin,
-            onClearVaultPinChangeFeedback = onClearVaultPinChangeFeedback,
-            onRequestVaultReset = onRequestVaultReset,
-            onCancelVaultReset = onCancelVaultReset,
-            onConfirmVaultReset = onConfirmVaultReset,
-            onClearVaultResetFeedback = onClearVaultResetFeedback
-        )
+                .padding(innerPadding)
+        ) {
+            SettingsList(
+                uiState = uiState,
+                vaultPinChangeState = vaultPinChangeState,
+                vaultResetState = vaultResetState,
+                deleteAllNotesState = deleteAllNotesState,
+                statisticsIndexState = statisticsIndexState,
+                listState = listState,
+                bottomContentPadding = floatingBottomPadding,
+                modifier = Modifier.fillMaxSize(),
+                onThemeModeChange = onThemeModeChange,
+                onAccentColorChange = onAccentColorChange,
+                onFontScaleChange = onFontScaleChange,
+                onNoteCardStyleChange = onNoteCardStyleChange,
+                onTableLayoutModeChange = onTableLayoutModeChange,
+                onTimezoneChange = onTimezoneChange,
+                onRebuildStatisticsIndex = onRebuildStatisticsIndex,
+                onOpenVault = onOpenVault,
+                onLockVault = onLockVault,
+                onProtectVaultRecentPreviewsChange = onProtectVaultRecentPreviewsChange,
+                onLockVaultOnBackgroundChange = onLockVaultOnBackgroundChange,
+                onVaultAutoLockTimeoutChange = onVaultAutoLockTimeoutChange,
+                onUnlockVaultWithAndroidCredentialChange =
+                    onUnlockVaultWithAndroidCredentialChange,
+                onChangeVaultPin = onChangeVaultPin,
+                onClearVaultPinChangeFeedback = onClearVaultPinChangeFeedback,
+                onRequestVaultReset = onRequestVaultReset,
+                onCancelVaultReset = onCancelVaultReset,
+                onConfirmVaultReset = onConfirmVaultReset,
+                onClearVaultResetFeedback = onClearVaultResetFeedback,
+                onRequestDeleteAllNotes = onRequestDeleteAllNotes,
+                onClearDeleteAllNotesFeedback = onClearDeleteAllNotesFeedback
+            )
+            ScrollToTopButton(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 16.dp,
+                        bottom = floatingBottomPadding + 16.dp
+                    )
+            )
+            if (deleteAllNotesState.isConfirmationVisible) {
+                DeleteAllNotesConfirmationDialog(
+                    state = deleteAllNotesState,
+                    onConfirm = onConfirmDeleteAllNotes,
+                    onDismiss = onCancelDeleteAllNotes,
+                    onClearFeedback = onClearDeleteAllNotesFeedback
+                )
+            }
+        }
     }
 }
 
@@ -144,6 +192,10 @@ private fun SettingsList(
     uiState: SettingsUiState,
     vaultPinChangeState: SettingsVaultPinChangeUiState,
     vaultResetState: SettingsVaultResetUiState,
+    deleteAllNotesState: SettingsDeleteAllNotesUiState,
+    statisticsIndexState: NoteStatisticsIndexState,
+    listState: LazyListState,
+    bottomContentPadding: Dp,
     modifier: Modifier,
     onThemeModeChange: (ThemeMode) -> Unit,
     onAccentColorChange: (AccentColor) -> Unit,
@@ -151,6 +203,7 @@ private fun SettingsList(
     onNoteCardStyleChange: (NoteCardStyle) -> Unit,
     onTableLayoutModeChange: (TableLayoutMode) -> Unit,
     onTimezoneChange: (String) -> Unit,
+    onRebuildStatisticsIndex: () -> Unit,
     onOpenVault: () -> Unit,
     onLockVault: () -> Unit,
     onProtectVaultRecentPreviewsChange: (Boolean) -> Unit,
@@ -162,11 +215,19 @@ private fun SettingsList(
     onRequestVaultReset: () -> Unit,
     onCancelVaultReset: () -> Unit,
     onConfirmVaultReset: () -> Unit,
-    onClearVaultResetFeedback: () -> Unit
+    onClearVaultResetFeedback: () -> Unit,
+    onRequestDeleteAllNotes: () -> Unit,
+    onClearDeleteAllNotesFeedback: () -> Unit
 ) {
     LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+        state = listState,
+        modifier = modifier.testTag(SETTINGS_LIST_TAG),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 12.dp,
+            end = 16.dp,
+            bottom = bottomContentPadding + 12.dp
+        )
     ) {
         appearanceSection(uiState.themeMode, onThemeModeChange)
         accentColorSection(uiState.accentColor, onAccentColorChange)
@@ -198,7 +259,76 @@ private fun SettingsList(
             onConfirmReset = onConfirmVaultReset,
             onClearResetFeedback = onClearVaultResetFeedback
         )
+        statisticsIndexSection(statisticsIndexState, onRebuildStatisticsIndex)
+        storedNotesSection(
+            state = deleteAllNotesState,
+            onRequestDeleteAllNotes = onRequestDeleteAllNotes,
+            onClearFeedback = onClearDeleteAllNotesFeedback
+        )
+        developerToolsSection()
         timezoneSection(uiState, onTimezoneChange)
+    }
+}
+
+private fun LazyListScope.storedNotesSection(
+    state: SettingsDeleteAllNotesUiState,
+    onRequestDeleteAllNotes: () -> Unit,
+    onClearFeedback: () -> Unit
+) {
+    item {
+        SettingsSectionSurface {
+            SettingsSectionHeader("Storage")
+            Spacer(Modifier.height(6.dp))
+            DeleteAllNotesRow(
+                state = state,
+                onClick = onRequestDeleteAllNotes
+            )
+            DeleteAllNotesFeedback(
+                state = state,
+                onClearFeedback = onClearFeedback
+            )
+        }
+    }
+}
+
+private fun LazyListScope.statisticsIndexSection(
+    state: NoteStatisticsIndexState,
+    onRebuild: () -> Unit
+) {
+    item {
+        SettingsSectionSurface {
+            SettingsSectionHeader("Indexing")
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = when {
+                    state.isRetryingAfterError ->
+                        "Indexing was interrupted. Retrying in background…"
+                    state.isIndexing ->
+                        "Indexing ${state.indexedNotes} of ${state.totalNotes} notes in background."
+                    else ->
+                        "Up to date · ${state.totalNotes} notes processed"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(10.dp))
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onRebuild,
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                if (state.isIndexing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f)
+                    )
+                    Text("  Restart indexing")
+                } else {
+                    Text("Reindex notes")
+                }
+            }
+        }
     }
 }
 
@@ -829,6 +959,164 @@ private fun SettingsVaultResetError.message(): String = when (this) {
 }
 
 @Composable
+private fun DeleteAllNotesRow(
+    state: SettingsDeleteAllNotesUiState,
+    onClick: () -> Unit
+) {
+    val hasNotes = state.totalNoteCount > 0
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = hasNotes && !state.isBusy, onClick = onClick)
+            .testTag(SETTINGS_DELETE_ALL_NOTES_ROW_TAG)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
+        ) {
+            Text(
+                text = "Delete all notes",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (hasNotes) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Text(
+                text = when {
+                    !hasNotes -> "There are no notes to delete."
+                    state.vaultNoteCount > 0 ->
+                        "${state.totalNoteCount} notes, including trash and Vault."
+                    else -> "${state.totalNoteCount} notes, including trash."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (state.isBusy) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.error
+            )
+        } else if (hasNotes) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeleteAllNotesFeedback(
+    state: SettingsDeleteAllNotesUiState,
+    onClearFeedback: () -> Unit
+) {
+    val message = when {
+        state.error != null -> state.error.message()
+        state.isSuccessful -> "All notes were permanently deleted."
+        else -> null
+    } ?: return
+    Text(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClearFeedback)
+            .padding(vertical = 4.dp),
+        text = message,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (state.error != null) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
+    )
+}
+
+@Composable
+private fun DeleteAllNotesConfirmationDialog(
+    state: SettingsDeleteAllNotesUiState,
+    onConfirm: (CharArray) -> Unit,
+    onDismiss: () -> Unit,
+    onClearFeedback: () -> Unit
+) {
+    var vaultPin by remember { mutableStateOf("") }
+    LaunchedEffect(state.isConfirmationVisible) {
+        if (!state.isConfirmationVisible) vaultPin = ""
+    }
+    AlertDialog(
+        onDismissRequest = { if (!state.isBusy) onDismiss() },
+        title = { Text("Delete all notes?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "This permanently deletes all normal notes and all notes in " +
+                        "the trash. Templates and settings are preserved."
+                )
+                if (state.requiresVaultAuthentication) {
+                    Text(
+                        "${state.vaultNoteCount} Vault notes will also be deleted. " +
+                            "Enter the Vault PIN to authorize this action."
+                    )
+                    SettingsVaultPinField(
+                        value = vaultPin,
+                        label = "Vault PIN",
+                        enabled = !state.isBusy,
+                        isError = state.error == SettingsDeleteAllNotesError.EMPTY_VAULT_PIN ||
+                            state.error == SettingsDeleteAllNotesError.WRONG_VAULT_PIN,
+                        imeAction = ImeAction.Done,
+                        modifier = Modifier.testTag(SETTINGS_DELETE_ALL_NOTES_PIN_FIELD_TAG),
+                        onValueChange = {
+                            vaultPin = it
+                            onClearFeedback()
+                        },
+                        onDone = {
+                            if (!state.isBusy) onConfirm(vaultPin.toCharArray())
+                        }
+                    )
+                }
+                state.error?.let { error ->
+                    Text(
+                        text = error.message(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                modifier = Modifier.testTag(SETTINGS_DELETE_ALL_NOTES_CONFIRM_BUTTON_TAG),
+                enabled = !state.isBusy,
+                onClick = { onConfirm(vaultPin.toCharArray()) }
+            ) {
+                Text("Delete permanently")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                enabled = !state.isBusy,
+                onClick = onDismiss
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+private fun SettingsDeleteAllNotesError.message(): String = when (this) {
+    SettingsDeleteAllNotesError.EMPTY_VAULT_PIN -> "Enter the Vault PIN."
+    SettingsDeleteAllNotesError.WRONG_VAULT_PIN -> "Incorrect Vault PIN."
+    SettingsDeleteAllNotesError.OPERATION_FAILED -> "Could not delete all notes."
+}
+
+@Composable
 private fun VaultChangePinForm(
     state: SettingsVaultPinChangeUiState,
     onChangePin: (CharArray, CharArray, CharArray) -> Unit,
@@ -1022,7 +1310,7 @@ private fun LazyListScope.timezoneSection(
 }
 
 @Composable
-private fun SettingsSectionSurface(content: @Composable () -> Unit) {
+internal fun SettingsSectionSurface(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()

@@ -74,8 +74,8 @@ interface VaultRepository {
      *
      * Normal notes (active or in the trash) must be left untouched. User
      * preferences such as Android screen-lock unlock enablement or auto-lock
-     * timeout are not modified by this contract; coordinating those is the
-     * responsibility of the caller in subsequent steps.
+     * timeout are not modified by this contract; callers coordinate those
+     * settings around the reset operation.
      */
     suspend fun resetVault(): ResetVaultResult
 

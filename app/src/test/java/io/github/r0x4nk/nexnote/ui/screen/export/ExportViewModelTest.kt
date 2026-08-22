@@ -223,6 +223,12 @@ private class FakeNoteDao : NoteDao {
         _notes.value = _notes.value + note
     }
 
+    override fun observeAllNormalNoteCount(): Flow<Int> =
+        _notes.map { list -> list.count { !it.isInVault } }
+
+    override fun observeAllVaultNoteCount(): Flow<Int> =
+        _notes.map { list -> list.count { it.isInVault } }
+
     override fun getAllNotes(): Flow<List<NoteEntity>> =
         _notes.map { list -> list.filter { !it.isDeleted } }
 
@@ -272,6 +278,9 @@ private class FakeNoteDao : NoteDao {
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         _notes.value.filter { it.isInVault }
 
+    override suspend fun getAllNormalNotesForWipeOnce(): List<NoteEntity> =
+        _notes.value.filterNot { it.isInVault }
+
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? =
         _notes.value.find { it.id == id && it.isInVault && it.isDeleted }
 
@@ -281,12 +290,20 @@ private class FakeNoteDao : NoteDao {
         return removed
     }
 
+    override suspend fun deleteAllNormalNotes(): Int {
+        val removed = _notes.value.count { !it.isInVault }
+        _notes.value = _notes.value.filter { it.isInVault }
+        return removed
+    }
+
     override suspend fun insertNote(note: NoteEntity): Long         = 0L
     override suspend fun updateNote(note: NoteEntity)               = Unit
     override suspend fun moveToTrash(id: Long, deletedDate: Long)   = Unit
+    override suspend fun moveToTrash(ids: List<Long>, deletedDate: Long): Int = 0
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreVaultNoteFromTrash(id: Long): Int   = 0
     override suspend fun restoreFromTrash(id: Long)                 = Unit
+    override suspend fun restoreFromTrash(ids: List<Long>): Int = 0
     override suspend fun deleteNotePermanently(id: Long): Int       = 0
     override suspend fun deleteVaultNotePermanently(id: Long): Int  = 0
     override suspend fun emptyTrash(): Int                          = 0

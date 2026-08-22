@@ -26,6 +26,7 @@ import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
+import io.github.r0x4nk.nexnote.ui.component.NoteSearchFiltersSheet
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
@@ -46,6 +47,7 @@ fun AgendaScreen(
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    var showSearchFilters by rememberSaveable { mutableStateOf(false) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
     }
@@ -58,6 +60,7 @@ fun AgendaScreen(
         viewModel = viewModel,
         onNoteClick = onNoteClick,
         onNewNote = onNewNote,
+        onOpenSearchFilters = { showSearchFilters = true },
         onRequestNoteActions = { note ->
             if (!selectionState.isActive) {
                 activeActionsNote = note
@@ -150,6 +153,9 @@ fun AgendaScreen(
         ),
         actions = actions
     )
+    LaunchedEffect(uiState.isSearchActive) {
+        if (!uiState.isSearchActive) showSearchFilters = false
+    }
 
     AgendaScreenLayout(
         layoutState = AgendaLayoutState(
@@ -166,6 +172,20 @@ fun AgendaScreen(
         ),
         actions = actions
     )
+
+    if (showSearchFilters && uiState.isSearchActive) {
+        NoteSearchFiltersSheet(
+            searchScope = uiState.searchScope,
+            pinnedFilter = uiState.pinnedFilter,
+            selectedTagFilters = uiState.selectedTagFilters,
+            availableTagNames = uiState.availableTagNames,
+            onSearchScopeChange = actions.onSearchScopeChange,
+            onPinnedFilterChange = actions.onPinnedFilterChange,
+            onToggleTagFilter = actions.onToggleTagFilter,
+            onClearTagFilters = actions.onClearTagFilters,
+            onDismiss = { showSearchFilters = false }
+        )
+    }
 
     NoteActionsSheet(
         note = activeActionsNote,

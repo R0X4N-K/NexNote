@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
+import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.TagEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -145,6 +146,18 @@ interface TagDao {
         HAVING COUNT(DISTINCT r.tagName) = :tagCount
     """)
     fun getNoteIdsWithAllTags(tagNames: List<String>, tagCount: Int): Flow<List<Long>>
+
+    /** Active normal notes for one tag, without materialising unrelated notes. */
+    @Query("""
+        SELECT n.*
+        FROM note_tag_cross_ref r
+        INNER JOIN notes n ON n.id = r.noteId
+        WHERE r.tagName = :tagName
+          AND n.isDeleted = 0
+          AND n.isInVault = 0
+        ORDER BY n.isPinned DESC, n.lastModifiedDate DESC, n.id DESC
+    """)
+    fun observeNotesForTag(tagName: String): Flow<List<NoteEntity>>
 
     /** All cross-refs for a note; used during re-indexing to diff old vs. new tags. */
     @Query("SELECT * FROM note_tag_cross_ref WHERE noteId = :noteId")

@@ -4,6 +4,9 @@ import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.Template
@@ -410,6 +413,43 @@ class VaultNotesViewModelTest {
         }
 
     @Test
+    fun `advanced search applies scope pinned filter and title ordering in memory`() =
+        runViewModelTest {
+            val pinnedTitle = noteFixture(
+                id = 1L,
+                title = "Zulu alpha",
+                content = "private",
+                isPinned = true
+            )
+            val contentOnly = noteFixture(
+                id = 2L,
+                title = "Alpha Java",
+                content = "alpha body"
+            )
+            val titleMatch = noteFixture(
+                id = 3L,
+                title = "Beta alpha",
+                content = "private"
+            )
+            fakeNotesRepo.emit(listOf(pinnedTitle, contentOnly, titleMatch))
+            fakeVaultRepo.setState(VaultState.UNLOCKED)
+            advanceUntilIdle()
+
+            viewModel.onSearchToggle(true)
+            viewModel.setSearchScope(NoteSearchScope.TITLE)
+            viewModel.setPinnedFilter(NotePinnedFilter.UNPINNED)
+            viewModel.setSearchSort(NoteSearchSort.TITLE_ASC)
+            viewModel.onSearchQueryChange("alpha")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf(2L, 3L), state.notes.map { note -> note.id })
+            assertEquals(NoteSearchScope.TITLE, state.searchScope)
+            assertEquals(NotePinnedFilter.UNPINNED, state.pinnedFilter)
+            assertEquals(NoteSearchSort.TITLE_ASC, state.searchSort)
+        }
+
+    @Test
     fun `closing search clears query and restores all unlocked vault notes`() =
         runViewModelTest {
             val alpha = noteFixture(id = 1L, title = "Alpha")
@@ -429,6 +469,9 @@ class VaultNotesViewModelTest {
             assertFalse(viewModel.uiState.value.isSearchActive)
             assertEquals("", viewModel.uiState.value.searchQuery)
             assertEquals(listOf(alpha, beta), viewModel.uiState.value.notes)
+            assertEquals(NoteSearchScope.TITLE_AND_CONTENT, viewModel.uiState.value.searchScope)
+            assertEquals(NotePinnedFilter.ALL, viewModel.uiState.value.pinnedFilter)
+            assertEquals(NoteSearchSort.RELEVANCE, viewModel.uiState.value.searchSort)
         }
 
     @Test
@@ -621,6 +664,34 @@ class VaultNotesViewModelTest {
         assertTrue(viewModel.uiState.value.selectedTagFilters.isEmpty())
         assertTrue(viewModel.uiState.value.topTags.isEmpty())
         assertEquals(listOf(trashed), viewModel.uiState.value.notes)
+    }
+
+    @Test
+    fun `tag filters narrow vault trash notes after switching surfaces`() = runViewModelTest {
+        val alpha = noteFixture(
+            id = 2L,
+            title = "Alpha",
+            content = "#alpha",
+            isDeleted = true
+        )
+        val beta = noteFixture(
+            id = 3L,
+            title = "Beta",
+            content = "#beta",
+            isDeleted = true
+        )
+        fakeNotesRepo.emitTrashed(listOf(alpha, beta))
+        fakeVaultRepo.setState(VaultState.UNLOCKED)
+        advanceUntilIdle()
+
+        viewModel.toggleTrashVisibility()
+        advanceUntilIdle()
+        viewModel.toggleTagFilter("alpha")
+        advanceUntilIdle()
+
+        assertEquals(setOf("alpha"), viewModel.uiState.value.selectedTagFilters)
+        assertEquals(setOf("alpha", "beta"), viewModel.uiState.value.availableTagNames)
+        assertEquals(listOf(alpha), viewModel.uiState.value.notes)
     }
 
     @Test

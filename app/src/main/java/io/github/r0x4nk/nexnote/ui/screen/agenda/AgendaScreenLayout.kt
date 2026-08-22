@@ -19,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.buildNoteTagFolders
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteTagFolderExpansionState
@@ -137,19 +139,35 @@ private fun AgendaBody(
     params: AgendaBodyParams,
     modifier: Modifier = Modifier
 ) {
+    val scrollToTopBottomPadding = if (params.selectionState.isActive) {
+        params.floatingBottomPadding + 16.dp
+    } else {
+        RadialMenuOverlayDefaults.fabBottomClearance(params.floatingBottomPadding)
+    }
     Box(
         modifier = modifier.fillMaxSize()
     ) {
         AgendaLazyColumn(params)
+        ScrollToTopButton(
+            listState = params.listState,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+        )
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgendaLazyColumn(params: AgendaBodyParams) {
-    val tagDisplayItems = remember(params.uiState.notesForSelectedDate) {
-        params.uiState.notesForSelectedDate.map { note ->
-            ScoredNote(note, score = 0, titleRanges = emptyList(), contentRanges = emptyList())
+    val tagDisplayItems = remember(
+        params.uiState.notesForSelectedDate,
+        params.uiState.scoredResults
+    ) {
+        params.uiState.scoredResults.ifEmpty {
+            params.uiState.notesForSelectedDate.map { note ->
+                ScoredNote(note, score = 0, titleRanges = emptyList(), contentRanges = emptyList())
+            }
         }
     }
     val tagFolders = remember(tagDisplayItems) { buildNoteTagFolders(tagDisplayItems) }
@@ -165,6 +183,7 @@ private fun AgendaLazyColumn(params: AgendaBodyParams) {
         agendaHeaderItems(params)
         agendaNotesItems(
             notes = params.uiState.notesForSelectedDate,
+            displayItems = tagDisplayItems,
             viewMode = params.uiState.viewMode,
             noteCardStyle = params.noteCardStyle,
             selectionState = params.selectionState,
@@ -231,6 +250,8 @@ private fun AgendaStickyControlsRow(params: AgendaBodyParams) {
             viewMode = params.uiState.viewMode,
             isSearchActive = params.uiState.isSearchActive,
             searchQuery = params.uiState.searchQuery,
+            searchSort = params.uiState.searchSort,
+            hasActiveSearchFilters = params.uiState.hasActiveSearchFilters,
             searchFocusRequester = params.searchFocusRequester,
             selectedYear = params.uiState.selectedYear,
             selectedMonth = params.uiState.selectedMonth,

@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.data.db.NexNoteDatabase
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
@@ -188,6 +189,7 @@ private open class RecordingTagRepository : TagRepository {
     override fun getTagsForNote(noteId: Long): Flow<List<Tag>> = flowOf(emptyList())
     override fun getMostUsedTags(limit: Int): Flow<List<Tag>> = flowOf(emptyList())
     override fun getFilteredNoteIds(tagNames: Set<String>): Flow<Set<Long>> = flowOf(emptySet())
+    override fun observeNotesForTag(tagName: String): Flow<List<Note>> = flowOf(emptyList())
 
     override suspend fun indexNoteTags(noteId: Long, content: String) {
         indexed += noteId to content

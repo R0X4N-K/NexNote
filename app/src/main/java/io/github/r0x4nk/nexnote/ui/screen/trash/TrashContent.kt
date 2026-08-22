@@ -4,8 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.CircularProgressIndicator
@@ -15,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 
 /**
  * Trash screen body. Renders one of three states based on [uiState]:
@@ -32,6 +36,7 @@ internal fun TrashContent(
     onDeletePermanently: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
     Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> {
@@ -41,8 +46,17 @@ internal fun TrashContent(
             uiState.notes.isEmpty() -> TrashEmptyState()
             else -> TrashNotesList(
                 notes = uiState.notes,
+                listState = listState,
                 onRestore = onRestore,
                 onDeletePermanently = onDeletePermanently
+            )
+        }
+        if (uiState.notes.isNotEmpty()) {
+            ScrollToTopButton(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
             )
         }
     }
@@ -61,10 +75,12 @@ private fun TrashEmptyState() {
 @Composable
 private fun TrashNotesList(
     notes: List<Note>,
+    listState: LazyListState,
     onRestore: (Note) -> Unit,
     onDeletePermanently: (Note) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {

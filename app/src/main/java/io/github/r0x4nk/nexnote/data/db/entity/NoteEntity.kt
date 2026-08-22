@@ -13,13 +13,20 @@ import androidx.room.PrimaryKey
  * [creationDate]: user-editable (for the agenda calendar).
  * [lastModifiedDate]: managed exclusively by the app, not user-editable.
  *
- * The composite index on (isDeleted, isInVault, isPinned, lastModifiedDate) directly covers
- * the ORDER BY clause of getAllNotes() and its ascending variant, so those queries
- * avoid a full table scan even with thousands of notes.
+ * The two Home indexes cover newest and oldest ordering while preserving the
+ * pinned-first group. The creation-date index supports Agenda range queries.
  */
 @Entity(
     tableName = "notes",
-    indices = [Index(value = ["isDeleted", "isInVault", "isPinned", "lastModifiedDate"])]
+    indices = [
+        Index(value = ["isDeleted", "isInVault", "isPinned", "lastModifiedDate"]),
+        Index(
+            value = ["isDeleted", "isInVault", "isPinned", "lastModifiedDate"],
+            orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC],
+            name = "index_notes_active_pinned_modified_asc"
+        ),
+        Index(value = ["isDeleted", "isInVault", "creationDate"])
+    ]
 )
 data class NoteEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

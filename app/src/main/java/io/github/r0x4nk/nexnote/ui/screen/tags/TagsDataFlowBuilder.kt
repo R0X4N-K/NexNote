@@ -2,8 +2,7 @@ package io.github.r0x4nk.nexnote.ui.screen.tags
 
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesForTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 
 private const val TAGS_SEARCH_DEBOUNCE_MS = 300L
 
@@ -67,32 +65,13 @@ private fun buildSortedTagsFlow(
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun buildNotesForSelectedTagFlow(
     selectedTagName: Flow<String?>,
-    observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
-    observeAllNotes: ObserveAllNotesUseCase
+    observeNotesForTag: ObserveNotesForTagUseCase
 ): Flow<List<Note>> {
     return selectedTagName.flatMapLatest { tagName ->
         if (tagName == null) {
             flowOf(emptyList())
         } else {
-            buildNotesForTagFlow(tagName, observeFilteredNoteIds, observeAllNotes)
+            observeNotesForTag(tagName)
         }
     }
-}
-
-@OptIn(ExperimentalCoroutinesApi::class)
-private fun buildNotesForTagFlow(
-    tagName: String,
-    observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
-    observeAllNotes: ObserveAllNotesUseCase
-): Flow<List<Note>> {
-    return observeFilteredNoteIds(setOf(tagName))
-        .flatMapLatest { ids ->
-            if (ids.isEmpty()) {
-                flowOf(emptyList())
-            } else {
-                observeAllNotes().map { notes ->
-                    notes.filter { it.id in ids }
-                }
-            }
-        }
 }

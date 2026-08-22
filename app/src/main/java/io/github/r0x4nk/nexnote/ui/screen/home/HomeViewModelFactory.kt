@@ -10,16 +10,15 @@ internal fun homeViewModelFactory(): ViewModelProvider.Factory = viewModelFactor
         val app = requireAppDependencies()
         val useCases = app.useCases
         HomeViewModel(
-            searchNotesScored = useCases.notes.searchNotesScored,
-            observeAllNotesSortedAsc = useCases.notes.observeAllNotesSortedAsc,
-            observeAllNotes = useCases.notes.observeAllNotes,
+            observeHomeNotes = useCases.notes.observeHomeNotes,
+            observeHomeNoteIds = useCases.notes.observeHomeNoteIds,
+            observeActiveNoteCount = useCases.notes.observeActiveNoteCount,
             moveNoteToTrash = useCases.notes.moveNoteToTrash,
             restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,
             toggleNotePin = useCases.notes.toggleNotePin,
             duplicateNoteUseCase = useCases.notes.duplicateNote,
             observeTemplates = useCases.templates.observeTemplates,
             observeMostUsedTags = useCases.tags.observeMostUsedTags,
-            observeFilteredNoteIds = useCases.tags.observeFilteredNoteIds,
             observeNoteCardStyle = useCases.preferences.observeNoteCardStyle
         )
     }

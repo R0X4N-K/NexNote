@@ -12,6 +12,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface NoteDao {
 
+    /** Count every normal note, including rows currently in the trash. */
+    @Query("SELECT COUNT(*) FROM notes WHERE isInVault = 0")
+    fun observeAllNormalNoteCount(): Flow<Int>
+
+    /** Count every Vault note without reading or decrypting its payload. */
+    @Query("SELECT COUNT(*) FROM notes WHERE isInVault = 1")
+    fun observeAllVaultNoteCount(): Flow<Int>
+
     /** Active notes: pinned first, then by last-modified date newest to oldest. */
     @Query(
         """
@@ -124,6 +132,10 @@ interface NoteDao {
     )
     suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity>
 
+    /** Complete normal-note snapshot used only to clean up image files before a full wipe. */
+    @Query("SELECT * FROM notes WHERE isInVault = 0")
+    suspend fun getAllNormalNotesForWipeOnce(): List<NoteEntity>
+
     /**
      * One soft-deleted Vault note row for single permanent-delete cleanup.
      * Callers must require an unlocked Vault before decrypting image paths.
@@ -148,6 +160,10 @@ interface NoteDao {
      */
     @Query("DELETE FROM notes WHERE isInVault = 1")
     suspend fun deleteAllVaultNotes(): Int
+
+    /** Hard-delete active and trashed normal notes, leaving every Vault row untouched. */
+    @Query("DELETE FROM notes WHERE isInVault = 0")
+    suspend fun deleteAllNormalNotes(): Int
 
     /**
      * Basic LIKE search on title and content.
@@ -214,6 +230,17 @@ interface NoteDao {
         """
         UPDATE notes
         SET isDeleted = 1, deletedDate = :deletedDate
+        WHERE id IN (:ids)
+          AND isInVault = 0
+          AND isDeleted = 0
+    """
+    )
+    suspend fun moveToTrash(ids: List<Long>, deletedDate: Long): Int
+
+    @Query(
+        """
+        UPDATE notes
+        SET isDeleted = 1, deletedDate = :deletedDate
         WHERE id = :id
           AND isInVault = 1
           AND isDeleted = 0
@@ -230,6 +257,17 @@ interface NoteDao {
     """
     )
     suspend fun restoreFromTrash(id: Long)
+
+    @Query(
+        """
+        UPDATE notes
+        SET isDeleted = 0, deletedDate = NULL
+        WHERE id IN (:ids)
+          AND isInVault = 0
+          AND isDeleted = 1
+    """
+    )
+    suspend fun restoreFromTrash(ids: List<Long>): Int
 
     @Query(
         """

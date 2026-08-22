@@ -26,8 +26,8 @@ internal object VaultTagAggregator {
 
     /**
      * Aggregate hashtags from the [notes] active Vault notes. Returns the same
-     * [Tag] domain model used by the normal tag pipeline so that the UI can
-     * eventually share components, without persisting anything.
+     * [Tag] domain model used by the normal tag pipeline so the UI can share
+     * components without persisting anything.
      *
      * Aggregation rules:
      * - Tag names come from [TagParser.extractTags] applied to note content;

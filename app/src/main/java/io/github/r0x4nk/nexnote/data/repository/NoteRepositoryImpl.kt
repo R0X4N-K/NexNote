@@ -1,9 +1,17 @@
 package io.github.r0x4nk.nexnote.data.repository
 
+import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import io.github.r0x4nk.nexnote.data.db.NoteDao
+import io.github.r0x4nk.nexnote.data.db.HomeNoteDao
+import io.github.r0x4nk.nexnote.data.db.NoteStatisticsDao
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.HomeNotesQuery
+import io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchScope
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchSort
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
@@ -12,13 +20,17 @@ import io.github.r0x4nk.nexnote.util.DateUtils
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import io.github.r0x4nk.nexnote.util.SearchUtils
+import io.github.r0x4nk.nexnote.domain.usecase.NoteStatisticsTextAnalyzer
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.withContext
 import java.io.IOException
 
 /**
@@ -30,7 +42,11 @@ import java.io.IOException
 class NoteRepositoryImpl(
     private val dao: NoteDao,
     private val imageStorage: NoteImageStorage,
-    appScope: CoroutineScope? = null
+    appScope: CoroutineScope? = null,
+    private val database: RoomDatabase? = null,
+    private val statisticsDao: NoteStatisticsDao? = null,
+    private val homeNoteDao: HomeNoteDao? = null,
+    private val statisticsComputationDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : NoteRepository {
 
     private val creationDateSnapshots: Flow<List<Long>> =
@@ -46,7 +62,10 @@ class NoteRepositoryImpl(
                 } ?: source
             }
 
-    /** Active notes: pinned first, then newest-modified first. */
+    /**
+     * Complete active-note snapshots for explicit full-data operations such as
+     * export. Home and Statistics use bounded or derived queries instead.
+     */
     override val allNotes: Flow<List<Note>> =
         dao.getAllNotes()
             .distinctUntilChanged()
@@ -56,6 +75,81 @@ class NoteRepositoryImpl(
                 }
             }
             .map { list -> list.map { it.toDomain() } }
+            .let { source ->
+                appScope?.let {
+                    source.shareIn(
+                        scope = it,
+                        started = SharingStarted.WhileSubscribed(FLOW_STOP_TIMEOUT_MS),
+                        replay = 1
+                    )
+                } ?: source
+            }
+
+    override val activeNoteCount: Flow<Int> =
+        homeNoteDao?.observeActiveNoteCount()
+            ?: allNotes.map { notes -> notes.size }
+
+    override val allNormalNoteCount: Flow<Int> =
+        dao.observeAllNormalNoteCount().distinctUntilChanged()
+
+    override fun observeHomeNotes(query: HomeNotesQuery): Flow<List<Note>> {
+        val boundedDao = homeNoteDao ?: return super.observeHomeNotes(query)
+        val ftsQuery = query.text.toFtsMatchQuery(query.searchScope)
+        val source = when {
+            query.text.isBlank() && query.tagNames.isEmpty() &&
+                query.pinnedFilter == io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter.ALL &&
+                query.sortAscending ->
+                boundedDao.observeOldestModifiedNotes(query.limit)
+            query.text.isBlank() && query.tagNames.isEmpty() &&
+                query.pinnedFilter == io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter.ALL ->
+                boundedDao.observeRecentNotes(query.limit)
+            ftsQuery != null -> boundedDao.observeSearchResults(
+                matchQuery = ftsQuery,
+                rawQuery = query.text,
+                sortMode = query.searchSort.daoValue,
+                pinnedFilter = query.pinnedFilter.daoValue,
+                tagNames = query.tagNames.sorted(),
+                tagCount = query.tagNames.size,
+                limit = query.limit
+            )
+            else -> boundedDao.observeFilteredHomeNotes(
+                query = query.text,
+                sortAscending = query.sortAscending,
+                sortMode = query.searchSort.daoValue,
+                searchScope = query.searchScope.daoValue,
+                pinnedFilter = query.pinnedFilter.daoValue,
+                tagNames = query.tagNames.sorted(),
+                tagCount = query.tagNames.size,
+                limit = query.limit
+            )
+        }
+        return source.map { entries -> entries.map { it.toDomain() } }
+    }
+
+    override fun observeHomeNoteIds(query: HomeNotesQuery): Flow<List<Long>> {
+        val boundedDao = homeNoteDao ?: return super.observeHomeNoteIds(query)
+        val ftsQuery = query.text.toFtsMatchQuery(query.searchScope)
+        return when {
+            query.text.isBlank() && query.tagNames.isEmpty() &&
+                query.pinnedFilter == HomePinnedFilter.ALL ->
+                boundedDao.observeActiveNoteIds()
+
+            ftsQuery != null -> boundedDao.observeSearchResultIds(
+                matchQuery = ftsQuery,
+                pinnedFilter = query.pinnedFilter.daoValue,
+                tagNames = query.tagNames.sorted(),
+                tagCount = query.tagNames.size
+            )
+
+            else -> boundedDao.observeFilteredHomeNoteIds(
+                query = query.text,
+                searchScope = query.searchScope.daoValue,
+                pinnedFilter = query.pinnedFilter.daoValue,
+                tagNames = query.tagNames.sorted(),
+                tagCount = query.tagNames.size
+            )
+        }
+    }
 
     /** Active notes: pinned first, then oldest-modified first. */
     override val allNotesSortedAsc: Flow<List<Note>> =
@@ -133,11 +227,36 @@ class NoteRepositoryImpl(
             "mode=${if (note.id == 0L) "insert" else "update"} " +
                 NexNoteDebugLog.noteSummary("note", note)
         }
-        val savedId = if (note.id == 0L) {
-            dao.insertNote(note.toEntity(lastModifiedDate = now))
+        val indexEntry = note.takeIf { statisticsDao != null && !it.isInVault }?.let {
+            withContext(statisticsComputationDispatcher) {
+                NoteStatisticsTextAnalyzer.analyze(
+                    noteId = note.id,
+                    content = note.content,
+                    creationDate = note.creationDate,
+                    lastModifiedDate = now
+                )
+            }
+        }
+        val persist: suspend () -> Long = {
+            val savedId = if (note.id == 0L) {
+                dao.insertNote(note.toEntity(lastModifiedDate = now))
+            } else {
+                dao.updateNote(note.toEntity(lastModifiedDate = now))
+                note.id
+            }
+            if (statisticsDao != null) {
+                if (indexEntry != null) {
+                    statisticsDao.upsert(indexEntry.copy(noteId = savedId).toEntity())
+                } else {
+                    statisticsDao.delete(savedId)
+                }
+            }
+            savedId
+        }
+        val savedId = if (database != null && statisticsDao != null) {
+            database.withTransaction { persist() }
         } else {
-            dao.updateNote(note.toEntity(lastModifiedDate = now))
-            note.id
+            persist()
         }
         val storedNote = dao.getNoteById(savedId)?.toDomain()
         NexNoteDebugLog.repository(event = "saveNoteStored") {
@@ -149,8 +268,31 @@ class NoteRepositoryImpl(
     override suspend fun moveToTrash(id: Long) =
         dao.moveToTrash(id, System.currentTimeMillis())
 
+    override suspend fun moveToTrash(ids: Collection<Long>) {
+        val noteIds = ids.asSequence().filter { it > 0L }.distinct().toList()
+        if (noteIds.isEmpty()) return
+        val deletedDate = System.currentTimeMillis()
+        val update: suspend () -> Unit = {
+            noteIds.chunked(SQLITE_ID_BATCH_SIZE).forEach { chunk ->
+                dao.moveToTrash(chunk, deletedDate)
+            }
+        }
+        database?.withTransaction { update() } ?: update()
+    }
+
     override suspend fun restoreFromTrash(id: Long) =
         dao.restoreFromTrash(id)
+
+    override suspend fun restoreFromTrash(ids: Collection<Long>) {
+        val noteIds = ids.asSequence().filter { it > 0L }.distinct().toList()
+        if (noteIds.isEmpty()) return
+        val update: suspend () -> Unit = {
+            noteIds.chunked(SQLITE_ID_BATCH_SIZE).forEach { chunk ->
+                dao.restoreFromTrash(chunk)
+            }
+        }
+        database?.withTransaction { update() } ?: update()
+    }
 
     /**
      * Permanently deletes a trashed note and cleans up its internal image files.
@@ -172,6 +314,27 @@ class NoteRepositoryImpl(
         dao.emptyTrash()
     }
 
+    override suspend fun deleteAllNormalNotesPermanently(): Int {
+        val (removedRows, imagePaths) = if (database != null) {
+            database.withTransaction {
+                val paths = dao.getAllNormalNotesForWipeOnce()
+                    .flatMap { entity -> entity.imagePaths() }
+                dao.deleteAllNormalNotes() to paths
+            }
+        } else {
+            val paths = dao.getAllNormalNotesForWipeOnce()
+                .flatMap { entity -> entity.imagePaths() }
+            dao.deleteAllNormalNotes() to paths
+        }
+        runCatchingPreservingCancellation { deleteImages(imagePaths) }
+            .onFailure { error ->
+                NexNoteDebugLog.repositoryWarning(event = "normalNoteWipeImageCleanupFailed") {
+                    NexNoteDebugLog.throwableSummary(error)
+                }
+            }
+        return removedRows
+    }
+
     override suspend fun setPinned(id: Long, isPinned: Boolean) =
         dao.setPinned(id, isPinned)
 
@@ -179,23 +342,6 @@ class NoteRepositoryImpl(
         dao.setPreviewMode(id, isPreviewMode)
 
     // ── Mapping ──────────────────────────────────────────────────────────────
-
-    private fun NoteEntity.toDomain(): Note = Note(
-        id = id,
-        title = title,
-        content = content,
-        isMarkdown = isMarkdown,
-        creationDate = creationDate,
-        lastModifiedDate = lastModifiedDate,
-        timezone = timezone,
-        isDeleted = isDeleted,
-        deletedDate = deletedDate,
-        isInVault = isInVault,
-        isPinned = isPinned,
-        imagePaths = imagePaths(),
-        backgroundColor = backgroundColor,
-        isPreviewMode = isPreviewMode
-    )
 
     private fun NoteLinkCandidateProjection.toDomain(): NoteLinkCandidate =
         NoteLinkCandidate(
@@ -282,8 +428,67 @@ class NoteRepositoryImpl(
         private const val MS_PER_DAY = 86_400_000L
         private const val FLOW_STOP_TIMEOUT_MS = 5_000L
         private const val IMAGE_DELETE_MAX_ATTEMPTS = 3
+        private const val SQLITE_ID_BATCH_SIZE = 500
     }
 }
 
+/** Compiles user text into safe implicit-AND FTS prefix terms. */
+private fun String.toFtsMatchQuery(scope: HomeSearchScope): String? {
+    val qualifier = when (scope) {
+        HomeSearchScope.TITLE_AND_CONTENT -> ""
+        HomeSearchScope.TITLE -> "title:"
+        HomeSearchScope.CONTENT -> "content:"
+    }
+    val terms = SEARCH_TOKEN_PATTERN.findAll(this)
+        .map { match -> match.value.lowercase(java.util.Locale.ROOT) }
+        .distinct()
+        .toList()
+    return terms.takeIf(List<String>::isNotEmpty)
+        ?.joinToString(" ") { term -> "$qualifier$term*" }
+}
+
+private val SEARCH_TOKEN_PATTERN = Regex("""[\p{L}\p{N}]+""")
+
+private val HomeSearchSort.daoValue: Int
+    get() = when (this) {
+        HomeSearchSort.RELEVANCE -> 0
+        HomeSearchSort.MODIFIED_DESC -> 1
+        HomeSearchSort.MODIFIED_ASC -> 2
+        HomeSearchSort.TITLE_ASC -> 3
+        HomeSearchSort.TITLE_DESC -> 4
+    }
+
+private val HomeSearchScope.daoValue: Int
+    get() = when (this) {
+        HomeSearchScope.TITLE_AND_CONTENT -> 0
+        HomeSearchScope.TITLE -> 1
+        HomeSearchScope.CONTENT -> 2
+    }
+
+private val HomePinnedFilter.daoValue: Int
+    get() = when (this) {
+        HomePinnedFilter.ALL -> 0
+        HomePinnedFilter.PINNED -> 1
+        HomePinnedFilter.UNPINNED -> 2
+    }
+
 internal class ImageCleanupException(failedFileCount: Int) :
     IOException("Could not delete $failedFileCount internal image file(s)")
+
+/** Maps the shared Room note representation into the domain model. */
+internal fun NoteEntity.toDomain(): Note = Note(
+    id = id,
+    title = title,
+    content = content,
+    isMarkdown = isMarkdown,
+    creationDate = creationDate,
+    lastModifiedDate = lastModifiedDate,
+    timezone = timezone,
+    isDeleted = isDeleted,
+    deletedDate = deletedDate,
+    isInVault = isInVault,
+    isPinned = isPinned,
+    imagePaths = imagePathsRaw.split('\n').filter(String::isNotBlank),
+    backgroundColor = backgroundColor,
+    isPreviewMode = isPreviewMode
+)

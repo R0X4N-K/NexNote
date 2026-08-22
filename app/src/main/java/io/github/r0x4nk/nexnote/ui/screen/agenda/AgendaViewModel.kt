@@ -8,6 +8,9 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
@@ -50,6 +53,9 @@ class AgendaViewModel(
     private val _searchQuery      = MutableStateFlow("")
     private val _isSearchActive   = MutableStateFlow(false)
     private val _sortOrder        = MutableStateFlow(SortOrder.MODIFIED_DESC)
+    private val _searchSort       = MutableStateFlow(NoteSearchSort.RELEVANCE)
+    private val _searchScope      = MutableStateFlow(NoteSearchScope.TITLE_AND_CONTENT)
+    private val _pinnedFilter     = MutableStateFlow(NotePinnedFilter.ALL)
     private val _viewMode         = MutableStateFlow(NoteListViewMode.LIST)
     private val _selectedTagFilters = MutableStateFlow<Set<String>>(emptySet())
 
@@ -103,12 +109,15 @@ class AgendaViewModel(
      * Notes after applying tag filter, search filter, and sort order.
      * Debounced 300 ms so rapid typing does not cause excessive recomputations.
      */
-    private val processedNotes: Flow<List<Note>> =
+    private val processedNotes: Flow<AgendaProcessedNotes> =
         buildAgendaProcessedNotesFlow(
             rawNotesForDay = rawNotesForDay,
             filteredNoteIds = filteredNoteIds,
             searchQuery = _searchQuery,
             sortOrder = _sortOrder,
+            searchSort = _searchSort,
+            searchScope = _searchScope,
+            pinnedFilter = _pinnedFilter,
             searchDebounceMs = SEARCH_DEBOUNCE_MS
         )
 
@@ -128,6 +137,9 @@ class AgendaViewModel(
             searchQuery = _searchQuery,
             isSearchActive = _isSearchActive,
             sortOrder = _sortOrder,
+            searchSort = _searchSort,
+            searchScope = _searchScope,
+            pinnedFilter = _pinnedFilter,
             viewMode = _viewMode,
             selectedTagFilters = _selectedTagFilters
         ),
@@ -176,6 +188,10 @@ class AgendaViewModel(
         noteListActions.undoPendingTrash(noteId)
     }
 
+    fun undoPendingTrash(noteIds: Collection<Long>) {
+        noteListActions.undoPendingTrash(noteIds)
+    }
+
     fun togglePin(note: Note) {
         noteListActions.togglePin(note)
     }
@@ -192,7 +208,24 @@ class AgendaViewModel(
 
     fun onSearchToggle(active: Boolean) {
         _isSearchActive.update { active }
-        if (!active) _searchQuery.update { "" }
+        if (!active) {
+            _searchQuery.value = ""
+            _searchSort.value = NoteSearchSort.RELEVANCE
+            _searchScope.value = NoteSearchScope.TITLE_AND_CONTENT
+            _pinnedFilter.value = NotePinnedFilter.ALL
+        }
+    }
+
+    fun setSearchSort(sort: NoteSearchSort) {
+        _searchSort.value = sort
+    }
+
+    fun setSearchScope(scope: NoteSearchScope) {
+        _searchScope.value = scope
+    }
+
+    fun setPinnedFilter(filter: NotePinnedFilter) {
+        _pinnedFilter.value = filter
     }
 
     // ── Sort & view mode ──────────────────────────────────────────────────────

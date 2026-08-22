@@ -32,7 +32,7 @@ import androidx.room.Index
             onDelete      = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["tagName"])]
+    indices = [Index(value = ["tagName", "noteId"])]
 )
 data class NoteTagCrossRef(
     val noteId: Long,

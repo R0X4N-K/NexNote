@@ -5,16 +5,18 @@ import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchScope
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchSort
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveActiveNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveHomeNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveHomeNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveMostUsedTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SearchNotesScoredUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
 import io.github.r0x4nk.nexnote.testing.NoOpNoteImageStorage
 import io.github.r0x4nk.nexnote.testing.NoOpPreferencesRepository
@@ -57,9 +59,9 @@ class HomeViewModelTest {
         val imageStorage = NoOpNoteImageStorage()
         val repository = NoteRepositoryImpl(fakeDao, imageStorage)
         viewModel = HomeViewModel(
-            searchNotesScored = SearchNotesScoredUseCase(repository),
-            observeAllNotesSortedAsc = ObserveAllNotesSortedAscUseCase(repository),
-            observeAllNotes = ObserveAllNotesUseCase(repository),
+            observeHomeNotes = ObserveHomeNotesUseCase(repository),
+            observeHomeNoteIds = ObserveHomeNoteIdsUseCase(repository),
+            observeActiveNoteCount = ObserveActiveNoteCountUseCase(repository),
             moveNoteToTrash = MoveNoteToTrashUseCase(repository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),
             toggleNotePin = ToggleNotePinUseCase(repository),
@@ -70,7 +72,6 @@ class HomeViewModelTest {
             ),
             observeTemplates = ObserveTemplatesUseCase(NoOpTemplateRepository),
             observeMostUsedTags = ObserveMostUsedTagsUseCase(NoOpTagRepository),
-            observeFilteredNoteIds = ObserveFilteredNoteIdsUseCase(NoOpTagRepository),
             observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository)
         )
     }
@@ -88,11 +89,10 @@ class HomeViewModelTest {
         block()
     }
 
-    // ── M8: Search with scoring ──────────────────────────────────────────────
+    // ── Search scoring ───────────────────────────────────────────────────────
 
     @Test
     fun `search emits scoredResults when query is not blank`() = runViewModelTest {
-        // Popola le note nel dao
         fakeDao.emitAllNotes(listOf(
             NoteEntity(id = 1L, title = "Kotlin tips", content = "Hello"),
             NoteEntity(id = 2L, title = "Java basics", content = "Kotlin intro")
@@ -103,17 +103,62 @@ class HomeViewModelTest {
         ))
         advanceUntilIdle()
 
-        // Activate search and type query
         viewModel.onSearchToggle(true)
         viewModel.onSearchQueryChange("Kotlin")
-        advanceTimeBy(350) // debounce 300ms
+        advanceTimeBy(350)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertTrue("scoredResults should not be empty", state.scoredResults.isNotEmpty())
-        // The note with "Kotlin" in the title must have a higher score
         assertEquals(1L, state.scoredResults.first().note.id)
         assertTrue(state.scoredResults[0].score > state.scoredResults[1].score)
+    }
+
+    @Test
+    fun `selection candidates include every note beyond the bounded Home window`() =
+        runViewModelTest {
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.selectionCandidateIds.collect {}
+            }
+            val notes = (1L..200L).map { id ->
+                NoteEntity(id = id, title = "Note $id", content = "Body $id")
+            }
+
+            fakeDao.emitAllNotes(notes)
+            advanceUntilIdle()
+
+            assertEquals(64, viewModel.uiState.value.notes.size)
+            assertEquals(notes.map { it.id }.toSet(), viewModel.selectionCandidateIds.value)
+        }
+
+    @Test
+    fun `bulk trash accepts ids that are not materialised in the Home window`() =
+        runViewModelTest {
+            val ids = (1L..200L).toList()
+            fakeDao.emitAllNotes(
+                ids.map { id -> NoteEntity(id = id, title = "Note $id") }
+            )
+            val event = async { viewModel.trashEvents.first() }
+
+            viewModel.requestTrashByIds(ids)
+            advanceUntilIdle()
+
+            assertEquals(ids, fakeDao.lastBatchTrashedIds)
+            assertEquals(ids, event.await().noteIds)
+            assertTrue(fakeDao.getAllNotes().first().isEmpty())
+        }
+
+    @Test
+    fun `home exposes the total active note count`() = runViewModelTest {
+        fakeDao.emitAllNotes(
+            listOf(
+                NoteEntity(id = 1L, title = "First"),
+                NoteEntity(id = 2L, title = "Second")
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.totalNoteCount)
     }
 
     @Test
@@ -171,6 +216,48 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(NoteListViewMode.LIST, viewModel.uiState.value.viewMode)
+    }
+
+    @Test
+    fun `search controls filter and order bounded results`() = runViewModelTest {
+        fakeDao.emitAllNotes(
+            listOf(
+                NoteEntity(id = 1L, title = "Zebra", content = "shared", isPinned = true),
+                NoteEntity(id = 2L, title = "Alpha", content = "shared"),
+                NoteEntity(id = 3L, title = "Shared title", content = "other")
+            )
+        )
+        viewModel.onSearchToggle(true)
+        viewModel.onSearchQueryChange("shared")
+        viewModel.setSearchScope(HomeSearchScope.CONTENT)
+        viewModel.setPinnedFilter(HomePinnedFilter.ALL)
+        viewModel.setSearchSort(HomeSearchSort.TITLE_ASC)
+        advanceTimeBy(350)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(1L, 2L),
+            viewModel.uiState.value.scoredResults.map { result -> result.note.id }
+        )
+        assertEquals(HomeSearchScope.CONTENT, viewModel.uiState.value.searchScope)
+        assertEquals(HomeSearchSort.TITLE_ASC, viewModel.uiState.value.searchSort)
+    }
+
+    @Test
+    fun `closing search resets search-only controls`() = runViewModelTest {
+        viewModel.onSearchToggle(true)
+        viewModel.setSearchScope(HomeSearchScope.TITLE)
+        viewModel.setPinnedFilter(HomePinnedFilter.PINNED)
+        viewModel.setSearchSort(HomeSearchSort.MODIFIED_ASC)
+        advanceUntilIdle()
+
+        viewModel.onSearchToggle(false)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(HomeSearchScope.TITLE_AND_CONTENT, state.searchScope)
+        assertEquals(HomePinnedFilter.ALL, state.pinnedFilter)
+        assertEquals(HomeSearchSort.RELEVANCE, state.searchSort)
     }
 
     // ── Undo trash ──────────────────────────────────────────────────────────
@@ -260,9 +347,15 @@ private class FakeNoteDao : NoteDao {
 
     var lastRestoredId: Long? = null
     var lastTrashedId: Long? = null
+    var lastBatchTrashedIds: List<Long> = emptyList()
 
     fun emitAllNotes(notes: List<NoteEntity>) { _allNotes.value = notes }
     fun emitSearchNotes(notes: List<NoteEntity>) { _searchNotes.value = notes }
+
+    override fun observeAllNormalNoteCount(): Flow<Int> =
+        _allNotes.map { active -> active.count { !it.isInVault } + _deletedNotes.value.size }
+
+    override fun observeAllVaultNoteCount(): Flow<Int> = MutableStateFlow(0)
 
     override fun getAllNotes(): Flow<List<NoteEntity>> = _allNotes
     override fun getAllNotesSortedAsc(): Flow<List<NoteEntity>> = _allNotes
@@ -282,8 +375,16 @@ private class FakeNoteDao : NoteDao {
     override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()
+    override suspend fun getAllNormalNotesForWipeOnce(): List<NoteEntity> =
+        _allNotes.value + _deletedNotes.value
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun deleteAllVaultNotes(): Int = 0
+    override suspend fun deleteAllNormalNotes(): Int {
+        val count = _allNotes.value.size + _deletedNotes.value.size
+        _allNotes.value = emptyList()
+        _deletedNotes.value = emptyList()
+        return count
+    }
     override fun searchNotes(query: String): Flow<List<NoteEntity>> = _searchNotes
     override fun getNotesByDateRange(startMs: Long, endMs: Long): Flow<List<NoteEntity>> =
         MutableStateFlow(emptyList())
@@ -298,6 +399,11 @@ private class FakeNoteDao : NoteDao {
         _allNotes.value = _allNotes.value.filterNot { it.id == id }
         _deletedNotes.value = _deletedNotes.value + trashedNote
     }
+    override suspend fun moveToTrash(ids: List<Long>, deletedDate: Long): Int {
+        lastBatchTrashedIds = ids
+        ids.forEach { id -> moveToTrash(id, deletedDate) }
+        return ids.size
+    }
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) {
@@ -307,6 +413,10 @@ private class FakeNoteDao : NoteDao {
             ?: return
         _deletedNotes.value = _deletedNotes.value.filterNot { it.id == id }
         _allNotes.value = _allNotes.value + restoredNote
+    }
+    override suspend fun restoreFromTrash(ids: List<Long>): Int {
+        ids.forEach { id -> restoreFromTrash(id) }
+        return ids.size
     }
     override suspend fun deleteNotePermanently(id: Long): Int = 0
     override suspend fun deleteVaultNotePermanently(id: Long): Int = 0

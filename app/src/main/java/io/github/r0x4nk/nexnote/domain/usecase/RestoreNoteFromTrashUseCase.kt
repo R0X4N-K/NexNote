@@ -8,4 +8,8 @@ class RestoreNoteFromTrashUseCase(
     suspend operator fun invoke(noteId: Long) {
         repository.restoreFromTrash(noteId)
     }
+
+    suspend operator fun invoke(noteIds: Collection<Long>) {
+        repository.restoreFromTrash(noteIds)
+    }
 }

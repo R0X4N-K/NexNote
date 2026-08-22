@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.data.repository
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
 import io.github.r0x4nk.nexnote.data.db.NoteDao
+import io.github.r0x4nk.nexnote.data.db.NoteStatisticsDao
 import io.github.r0x4nk.nexnote.data.db.TagDao
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
@@ -22,6 +23,7 @@ import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.VaultLockedException
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
+import io.github.r0x4nk.nexnote.domain.usecase.NoteStatisticsTextAnalyzer
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.TagParser
 import io.github.r0x4nk.nexnote.util.rewriteMappedPaths
@@ -105,9 +107,9 @@ internal sealed interface VaultNoteImageEncryptionResult {
  * encrypted note row, the note flow or any UI state: it only transforms the
  * bytes of files already referenced by a known Vault note id.
  *
- * Exposed only inside the data package so future steps can wire it to save,
- * move and editor flows without leaking the Vault [SecretKey] into the domain
- * contracts. Implementations must require the Vault to be currently unlocked.
+ * The contract remains inside the data package so save, move, and editor flows
+ * can use it without exposing the Vault [SecretKey] through domain APIs.
+ * Implementations must require the Vault to be currently unlocked.
  */
 internal interface VaultNoteImageEncryptor {
     /**
@@ -130,8 +132,12 @@ internal class VaultNoteRepositoryImpl(
     private val imageStorage: NoteImageStorage,
     private val fieldCipher: VaultFieldCipher = VaultFieldCipher(),
     private val vaultImageFileStorage: VaultImageFileStorage =
-        VaultImageFileStorage(imageStorage = imageStorage)
+        VaultImageFileStorage(imageStorage = imageStorage),
+    private val statisticsDao: NoteStatisticsDao? = null
 ) : VaultNoteRepository, VaultNoteRewrapper, VaultNoteWiper, VaultNoteImageEncryptor {
+
+    override val allVaultNoteCount: Flow<Int> =
+        dao.observeAllVaultNoteCount().distinctUntilChanged()
 
     override val vaultNotes: Flow<List<Note>> =
         combine(
@@ -200,6 +206,7 @@ internal class VaultNoteRepositoryImpl(
                     dao.updateNote(encryptedEntity)
                     vaultNote.id
                 }
+                statisticsDao?.delete(savedId)
 
                 // A Vault row must never commit while it points at a plaintext
                 // image file. Missing files remain non-fatal because there is
@@ -284,6 +291,14 @@ internal class VaultNoteRepositoryImpl(
                     .copy(isInVault = false, isDeleted = false, deletedDate = null)
 
                 dao.updateNote(normalNote.toPlainEntity(lastModifiedDate = now))
+                statisticsDao?.upsert(
+                    NoteStatisticsTextAnalyzer.analyze(
+                        noteId = id,
+                        content = normalNote.content,
+                        creationDate = normalNote.creationDate,
+                        lastModifiedDate = now
+                    ).toEntity()
+                )
                 reindexNormalTags(noteId = id, content = normalNote.content, now = now)
                 normalNote.imagePaths
             } ?: return@withUnlockedVaultKey false
@@ -329,6 +344,8 @@ internal class VaultNoteRepositoryImpl(
             }
             deletedRows > 0
         } ?: throw VaultLockedException()
+
+    override suspend fun deleteAllVaultNotesPermanently(): Int = wipeAllVaultNotes()
 
     override suspend fun rewrapAllVaultNotesWith(
         currentKey: SecretKey,
@@ -606,6 +623,7 @@ internal class VaultNoteRepositoryImpl(
                         .toEncryptedEntity(key = key, lastModifiedDate = now)
 
                     dao.updateNote(encryptedEntity)
+                    statisticsDao?.delete(id)
                     tagDao.deleteAllCrossRefsForNote(id)
                     tagDao.pruneOrphanTags()
                     MoveNoteToVaultResult.Success

@@ -344,6 +344,12 @@ class FakeEditorNoteDao : NoteDao {
         notes[entity.id] = entity
     }
 
+    override fun observeAllNormalNoteCount(): Flow<Int> =
+        MutableStateFlow(notes.values.count { !it.isInVault })
+
+    override fun observeAllVaultNoteCount(): Flow<Int> =
+        MutableStateFlow(notes.values.count { it.isInVault })
+
     override fun getAllNotes(): Flow<List<NoteEntity>> =
         MutableStateFlow(notes.values.filter { !it.isDeleted }.toList())
 
@@ -381,11 +387,20 @@ class FakeEditorNoteDao : NoteDao {
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         notes.values.filter { it.isInVault }.toList()
 
+    override suspend fun getAllNormalNotesForWipeOnce(): List<NoteEntity> =
+        notes.values.filterNot { it.isInVault }.toList()
+
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? =
         notes[id]?.takeIf { it.isInVault && it.isDeleted }
 
     override suspend fun deleteAllVaultNotes(): Int {
         val toRemove = notes.values.filter { it.isInVault }.map { it.id }
+        toRemove.forEach { notes.remove(it) }
+        return toRemove.size
+    }
+
+    override suspend fun deleteAllNormalNotes(): Int {
+        val toRemove = notes.values.filterNot { it.isInVault }.map { it.id }
         toRemove.forEach { notes.remove(it) }
         return toRemove.size
     }
@@ -414,9 +429,11 @@ class FakeEditorNoteDao : NoteDao {
     }
 
     override suspend fun moveToTrash(id: Long, deletedDate: Long) = Unit
+    override suspend fun moveToTrash(ids: List<Long>, deletedDate: Long): Int = 0
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) = Unit
+    override suspend fun restoreFromTrash(ids: List<Long>): Int = 0
     override suspend fun deleteNotePermanently(id: Long): Int = 0
     override suspend fun deleteVaultNotePermanently(id: Long): Int = 0
     override suspend fun emptyTrash(): Int = 0

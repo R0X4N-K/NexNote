@@ -38,6 +38,16 @@ internal fun Collection<Note>.toTrashedNoteEvent(): TrashedNoteEvent? {
     )
 }
 
+internal fun trashedNoteEventForIds(noteIds: Collection<Long>): TrashedNoteEvent? {
+    val ids = noteIds.asSequence().filter { it > 0L }.distinct().toList()
+    if (ids.isEmpty()) return null
+    return TrashedNoteEvent(
+        noteId = ids.first(),
+        noteLabel = UNTITLED_NOTE_LABEL,
+        additionalNoteIds = ids.drop(1)
+    )
+}
+
 internal fun Note.displayLabel(maxLength: Int = NOTE_LABEL_MAX_LENGTH): String {
     val rawLabel = title.cleanOneLine().ifBlank {
         content.firstMeaningfulLine() ?: UNTITLED_NOTE_LABEL

@@ -57,7 +57,7 @@ class TemplatesViewModelTest {
         block()
     }
 
-    // ── Stato iniziale ────────────────────────────────────────────────────────
+    // ── Initial state ─────────────────────────────────────────────────────────
 
     @Test
     fun `initial dialog state is None`() = runViewModelTest {

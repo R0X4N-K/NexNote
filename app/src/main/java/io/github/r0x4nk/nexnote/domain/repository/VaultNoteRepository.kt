@@ -3,11 +3,17 @@ package io.github.r0x4nk.nexnote.domain.repository
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 
 interface VaultNoteRepository {
     val vaultNotes: Flow<List<Note>>
     val vaultTrashedNotes: Flow<List<Note>>
     val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>>
+    val allVaultNoteCount: Flow<Int>
+        get() = combine(vaultNotes, vaultTrashedNotes) { active, deleted ->
+            active.size + deleted.size
+        }
 
     suspend fun getVaultNoteById(id: Long): Note?
     suspend fun saveVaultNote(note: Note): Long
@@ -17,6 +23,14 @@ interface VaultNoteRepository {
     suspend fun moveVaultNoteToTrash(id: Long): Boolean
     suspend fun restoreVaultNoteFromTrash(id: Long): Boolean
     suspend fun deleteVaultNotePermanently(id: Long): Boolean
+    suspend fun deleteAllVaultNotesPermanently(): Int {
+        val activeIds = vaultNotes.first().map(Note::id)
+        val deletedIds = vaultTrashedNotes.first().map(Note::id)
+        activeIds.forEach { id -> moveVaultNoteToTrash(id) }
+        val ids = (activeIds + deletedIds).distinct()
+        ids.forEach { id -> deleteVaultNotePermanently(id) }
+        return ids.size
+    }
 
     /**
      * Decrypt the physical image file at [relativePath] and return the raw

@@ -2,11 +2,13 @@ package io.github.r0x4nk.nexnote.ui.screen.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
@@ -283,11 +285,52 @@ class SettingsScreenContentTest {
         assertFalse(confirmed)
     }
 
+    @Test
+    fun deleteAllNotesRow_invokesRequestWhenNotesExist() {
+        var requested = false
+        composeRule.setSettingsContent(
+            vaultState = VaultState.NOT_CONFIGURED,
+            deleteAllNotesState = SettingsDeleteAllNotesUiState(normalNoteCount = 5),
+            onRequestDeleteAllNotes = { requested = true }
+        )
+
+        composeRule.onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(SETTINGS_DELETE_ALL_NOTES_ROW_TAG))
+        composeRule.onNodeWithTag(SETTINGS_DELETE_ALL_NOTES_ROW_TAG)
+            .assertIsDisplayed()
+            .performClick()
+
+        assertTrue(requested)
+    }
+
+    @Test
+    fun deleteAllNotesConfirmation_requiresAndSubmitsVaultPinWhenVaultNotesExist() {
+        var submittedPin: String? = null
+        composeRule.setSettingsContent(
+            vaultState = VaultState.LOCKED,
+            deleteAllNotesState = SettingsDeleteAllNotesUiState(
+                normalNoteCount = 3,
+                vaultNoteCount = 2,
+                isConfirmationVisible = true
+            ),
+            onConfirmDeleteAllNotes = { pin -> submittedPin = pin.concatToString() }
+        )
+
+        composeRule.onNodeWithText("Delete all notes?").assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_DELETE_ALL_NOTES_PIN_FIELD_TAG)
+            .performTextInput("1234")
+        composeRule.onNodeWithTag(SETTINGS_DELETE_ALL_NOTES_CONFIRM_BUTTON_TAG)
+            .performClick()
+
+        assertEquals("1234", submittedPin)
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setSettingsContent(
         vaultState: VaultState,
         unlockVaultWithAndroidCredential: Boolean = false,
         vaultAutoLockTimeout: VaultAutoLockTimeout = VaultAutoLockTimeout.IMMEDIATELY,
         vaultResetState: SettingsVaultResetUiState = SettingsVaultResetUiState(),
+        deleteAllNotesState: SettingsDeleteAllNotesUiState = SettingsDeleteAllNotesUiState(),
         onChangeVaultPin: (CharArray, CharArray, CharArray) -> Unit = { _, _, _ -> },
         onUnlockVaultWithAndroidCredentialChange: (Boolean) -> Unit = {},
         onVaultAutoLockTimeoutChange: (VaultAutoLockTimeout) -> Unit = {},
@@ -295,7 +338,9 @@ class SettingsScreenContentTest {
         onRequestVaultReset: () -> Unit = {},
         onCancelVaultReset: () -> Unit = {},
         onConfirmVaultReset: () -> Unit = {},
-        onClearVaultResetFeedback: () -> Unit = {}
+        onClearVaultResetFeedback: () -> Unit = {},
+        onRequestDeleteAllNotes: () -> Unit = {},
+        onConfirmDeleteAllNotes: (CharArray) -> Unit = {}
     ) {
         setContent {
             NexNoteTheme {
@@ -315,6 +360,7 @@ class SettingsScreenContentTest {
                     ),
                     vaultPinChangeState = SettingsVaultPinChangeUiState(),
                     vaultResetState = vaultResetState,
+                    deleteAllNotesState = deleteAllNotesState,
                     onThemeModeChange = {},
                     onAccentColorChange = {},
                     onFontScaleChange = {},
@@ -328,7 +374,9 @@ class SettingsScreenContentTest {
                     onRequestVaultReset = onRequestVaultReset,
                     onCancelVaultReset = onCancelVaultReset,
                     onConfirmVaultReset = onConfirmVaultReset,
-                    onClearVaultResetFeedback = onClearVaultResetFeedback
+                    onClearVaultResetFeedback = onClearVaultResetFeedback,
+                    onRequestDeleteAllNotes = onRequestDeleteAllNotes,
+                    onConfirmDeleteAllNotes = onConfirmDeleteAllNotes
                 )
             }
         }

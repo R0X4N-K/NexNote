@@ -62,7 +62,7 @@ class TrashViewModelTest {
         block()
     }
 
-    // ── Stato iniziale ────────────────────────────────────────────────────────
+    // ── Initial state ─────────────────────────────────────────────────────────
 
     @Test
     fun `initial state - noteToDelete is null and dialog hidden`() = runViewModelTest {

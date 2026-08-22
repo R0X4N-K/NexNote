@@ -48,12 +48,20 @@ internal class NoteListActionsDelegate(
         noteMutations.requestTrash(notes)
     }
 
+    fun requestTrashByIds(noteIds: Collection<Long>) {
+        noteMutations.requestTrashByIds(noteIds)
+    }
+
     fun confirmTrash() {
         noteMutations.confirmTrash()
     }
 
     fun undoPendingTrash(noteId: Long) {
         noteMutations.undoPendingTrash(noteId)
+    }
+
+    fun undoPendingTrash(noteIds: Collection<Long>) {
+        noteMutations.undoPendingTrash(noteIds)
     }
 
     fun togglePin(note: Note) {
@@ -110,7 +118,15 @@ internal class NoteMutationActions(
     fun requestTrash(notes: Collection<Note>) {
         val event = notes.toTrashedNoteEvent() ?: return
         scope.launch {
-            event.noteIds.forEach { noteId -> moveNoteToTrash(noteId) }
+            moveNoteToTrash(event.noteIds)
+            trashEvents.trySend(event)
+        }
+    }
+
+    fun requestTrashByIds(noteIds: Collection<Long>) {
+        val event = trashedNoteEventForIds(noteIds) ?: return
+        scope.launch {
+            moveNoteToTrash(event.noteIds)
             trashEvents.trySend(event)
         }
     }
@@ -121,6 +137,10 @@ internal class NoteMutationActions(
 
     fun undoPendingTrash(noteId: Long) {
         scope.launch { restoreNoteFromTrash(noteId) }
+    }
+
+    fun undoPendingTrash(noteIds: Collection<Long>) {
+        scope.launch { restoreNoteFromTrash(noteIds) }
     }
 
     fun duplicateNote(note: Note) {

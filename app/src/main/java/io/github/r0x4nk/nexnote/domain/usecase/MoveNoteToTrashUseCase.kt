@@ -8,4 +8,8 @@ class MoveNoteToTrashUseCase(
     suspend operator fun invoke(noteId: Long) {
         repository.moveToTrash(noteId)
     }
+
+    suspend operator fun invoke(noteIds: Collection<Long>) {
+        repository.moveToTrash(noteIds)
+    }
 }

@@ -18,6 +18,7 @@ import io.github.r0x4nk.nexnote.ui.screen.editor.EditorScreen
 import io.github.r0x4nk.nexnote.ui.screen.export.ExportScreen
 import io.github.r0x4nk.nexnote.ui.screen.home.HomeScreen
 import io.github.r0x4nk.nexnote.ui.screen.settings.SettingsScreen
+import io.github.r0x4nk.nexnote.ui.screen.statistics.StatisticsScreen
 import io.github.r0x4nk.nexnote.ui.screen.tags.TagsScreen
 import io.github.r0x4nk.nexnote.ui.screen.templates.TemplatesScreen
 import io.github.r0x4nk.nexnote.ui.screen.trash.TrashScreen
@@ -50,7 +51,7 @@ private fun NavGraphBuilder.bottomNavDestinations(
     agendaDestination(navController, floatingBottomPadding)
     tagsDestination(navController, floatingBottomPadding)
     templatesDestination(navController, floatingBottomPadding)
-    settingsDestination(navController)
+    settingsDestination(navController, floatingBottomPadding)
 }
 
 private fun NavGraphBuilder.backStackDestinations(
@@ -58,6 +59,7 @@ private fun NavGraphBuilder.backStackDestinations(
     floatingBottomPadding: Dp
 ) {
     trashDestination(navController)
+    statisticsDestination(navController)
     vaultDestination(navController, floatingBottomPadding)
     exportDestination(navController)
     editorDestination(navController)
@@ -81,6 +83,9 @@ private fun NavGraphBuilder.homeDestination(
             onOpenTrash = {
                 navController.navigate(Screen.Trash.route)
             },
+            onOpenStatistics = {
+                navController.navigate(Screen.Statistics.route)
+            },
             onOpenVault = {
                 navController.navigate(Screen.Vault.route())
             },
@@ -89,6 +94,18 @@ private fun NavGraphBuilder.homeDestination(
             },
             floatingBottomPadding = floatingBottomPadding
         )
+    }
+}
+
+private fun NavGraphBuilder.statisticsDestination(navController: NavHostController) {
+    composable(
+        route              = Screen.Statistics.route,
+        enterTransition    = { forwardEnterTransition() },
+        exitTransition     = { forwardExitTransition() },
+        popEnterTransition = { backwardEnterTransition() },
+        popExitTransition  = { forwardExitTransition() }
+    ) {
+        StatisticsScreen(onBack = { navController.popBackStack() })
     }
 }
 
@@ -145,12 +162,16 @@ private fun NavGraphBuilder.templatesDestination(
     }
 }
 
-private fun NavGraphBuilder.settingsDestination(navController: NavHostController) {
+private fun NavGraphBuilder.settingsDestination(
+    navController: NavHostController,
+    floatingBottomPadding: Dp
+) {
     composable(Screen.Settings.route) {
         SettingsScreen(
             onOpenVault = {
                 navController.navigate(Screen.Vault.route())
-            }
+            },
+            floatingBottomPadding = floatingBottomPadding
         )
     }
 }

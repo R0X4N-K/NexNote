@@ -3,17 +3,20 @@ package io.github.r0x4nk.nexnote.di
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
+import io.github.r0x4nk.nexnote.domain.repository.NoteStatisticsRepository
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import io.github.r0x4nk.nexnote.domain.repository.TemplateRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultAndroidCredentialRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.BuildNoteStatisticsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ConfigureVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DeleteAllStoredNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
@@ -34,6 +37,13 @@ import io.github.r0x4nk.nexnote.domain.usecase.MoveVaultNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNormalNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllVaultNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveActiveNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveHomeNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveHomeNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveIndexedNoteStatisticsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteStatisticsIndexStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDeletedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
@@ -43,6 +53,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesForTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
@@ -65,6 +76,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.RemoveNoteFromVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
@@ -91,16 +103,19 @@ internal class AppUseCases(
     tagRepository: TagRepository,
     templateRepository: TemplateRepository,
     preferencesRepository: IUserPreferencesRepository,
+    statisticsRepository: NoteStatisticsRepository,
     imageStorage: NoteImageStorage,
     vaultRepository: VaultRepository,
     vaultAndroidCredentialRepository: VaultAndroidCredentialRepository,
     vaultNoteRepository: VaultNoteRepository
 ) {
     val notes = NoteUseCases(noteRepository, tagRepository, imageStorage)
+    val statistics = StatisticsUseCases(statisticsRepository)
     val tags = TagUseCases(tagRepository)
     val templates = TemplateUseCases(templateRepository)
     val preferences = PreferencesUseCases(preferencesRepository)
     val images = ImageUseCases(imageStorage)
+    val storedNotes = StoredNotesUseCases(noteRepository, vaultNoteRepository)
     val vault = VaultUseCases(
         vaultRepository = vaultRepository,
         vaultAndroidCredentialRepository = vaultAndroidCredentialRepository,
@@ -113,9 +128,13 @@ internal class NoteUseCases internal constructor(
     tagRepository: TagRepository,
     imageStorage: NoteImageStorage
 ) {
+    val buildNoteStatistics = BuildNoteStatisticsUseCase()
     val getNoteById = GetNoteByIdUseCase(noteRepository)
     val searchNotesScored = SearchNotesScoredUseCase(noteRepository)
     val observeAllNotes = ObserveAllNotesUseCase(noteRepository)
+    val observeHomeNotes = ObserveHomeNotesUseCase(noteRepository)
+    val observeHomeNoteIds = ObserveHomeNoteIdsUseCase(noteRepository)
+    val observeActiveNoteCount = ObserveActiveNoteCountUseCase(noteRepository)
     val observeAllNotesSortedAsc = ObserveAllNotesSortedAscUseCase(noteRepository)
     val observeNoteLinkCandidates = ObserveNoteLinkCandidatesUseCase(noteRepository)
     val observeDeletedNotes = ObserveDeletedNotesUseCase(noteRepository)
@@ -131,6 +150,23 @@ internal class NoteUseCases internal constructor(
     val setNotePreviewMode = SetNotePreviewModeUseCase(noteRepository)
 }
 
+internal class StoredNotesUseCases internal constructor(
+    noteRepository: NoteRepository,
+    vaultNoteRepository: VaultNoteRepository
+) {
+    val observeAllNormalNoteCount = ObserveAllNormalNoteCountUseCase(noteRepository)
+    val observeAllVaultNoteCount = ObserveAllVaultNoteCountUseCase(vaultNoteRepository)
+    val deleteAll = DeleteAllStoredNotesUseCase(noteRepository, vaultNoteRepository)
+}
+
+internal class StatisticsUseCases internal constructor(
+    repository: NoteStatisticsRepository
+) {
+    val observeIndexedNotes = ObserveIndexedNoteStatisticsUseCase(repository)
+    val observeIndexState = ObserveNoteStatisticsIndexStateUseCase(repository)
+    val rebuildIndex = RebuildNoteStatisticsIndexUseCase(repository)
+}
+
 internal class TagUseCases internal constructor(
     tagRepository: TagRepository
 ) {
@@ -141,6 +177,7 @@ internal class TagUseCases internal constructor(
     val observeTagsForNote = ObserveTagsForNoteUseCase(tagRepository)
     val observeMostUsedTags = ObserveMostUsedTagsUseCase(tagRepository)
     val observeFilteredNoteIds = ObserveFilteredNoteIdsUseCase(tagRepository)
+    val observeNotesForTag = ObserveNotesForTagUseCase(tagRepository)
     val searchTags = SearchTagsUseCase(tagRepository)
     val indexNoteTags = IndexNoteTagsUseCase(tagRepository)
     val deleteTag = DeleteTagUseCase(tagRepository)

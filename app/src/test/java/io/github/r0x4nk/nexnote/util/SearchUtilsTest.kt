@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.util
 
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -59,6 +60,33 @@ class SearchUtilsTest {
         // threeMatches: title(3) + prefix(5) + content(3*1 = 3) = 11
         assertEquals(2L, results.first().note.id)
         assertTrue(results[0].score > results[1].score)
+    }
+
+    @Test
+    fun `multiple query terms may match different fields`() {
+        val results = SearchUtils.scoreAndRank(
+            listOf(note(1, title = "Kotlin guide", content = "Room database")),
+            "kotlin room"
+        )
+
+        assertEquals(1, results.size)
+        assertEquals(1, results.single().titleRanges.size)
+        assertEquals(1, results.single().contentRanges.size)
+    }
+
+    @Test
+    fun `title scope excludes content-only matches and highlighting`() {
+        val results = SearchUtils.scoreInOrder(
+            listOf(
+                note(1, title = "Kotlin guide", content = "Kotlin details"),
+                note(2, title = "Other", content = "Kotlin details")
+            ),
+            query = "kotlin",
+            scope = HomeSearchScope.TITLE
+        )
+
+        assertEquals(listOf(1L), results.map { it.note.id })
+        assertTrue(results.single().contentRanges.isEmpty())
     }
 
     // ── scoreAndRank: filtering ──────────────────────────────────────────────

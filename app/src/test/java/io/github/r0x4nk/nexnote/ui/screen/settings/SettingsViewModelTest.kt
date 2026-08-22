@@ -3,6 +3,11 @@ package io.github.r0x4nk.nexnote.ui.screen.settings
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
+import io.github.r0x4nk.nexnote.domain.model.ScoredNote
+import io.github.r0x4nk.nexnote.domain.model.IndexedNoteStatistics
+import io.github.r0x4nk.nexnote.domain.model.NoteStatisticsIndexState
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
@@ -10,13 +15,21 @@ import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
+import io.github.r0x4nk.nexnote.domain.repository.NoteStatisticsRepository
+import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
+import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
+import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
+import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNormalNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllVaultNoteCountUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteStatisticsIndexStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTimezoneIdUseCase
@@ -28,8 +41,11 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DeleteAllStoredNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UnlockVaultWithPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
@@ -44,6 +60,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -66,6 +84,8 @@ class SettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeRepo: FakePreferencesRepository
     private lateinit var fakeVaultRepo: FakeVaultRepository
+    private lateinit var fakeStoredNoteRepo: FakeStoredNoteRepository
+    private lateinit var fakeStoredVaultNoteRepo: FakeStoredVaultNoteRepository
     private lateinit var viewModel: SettingsViewModel
 
     @Before
@@ -73,6 +93,9 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRepo  = FakePreferencesRepository()
         fakeVaultRepo = FakeVaultRepository()
+        fakeStoredNoteRepo = FakeStoredNoteRepository()
+        fakeStoredVaultNoteRepo = FakeStoredVaultNoteRepository()
+        val statisticsRepository = FakeNoteStatisticsRepository()
         viewModel = SettingsViewModel(
             observeThemeMode = ObserveThemeModeUseCase(fakeRepo),
             observeFontScale = ObserveFontScaleUseCase(fakeRepo),
@@ -87,9 +110,22 @@ class SettingsViewModelTest {
             observeVaultAutoLockTimeout = ObserveVaultAutoLockTimeoutUseCase(fakeRepo),
             observeVaultAndroidCredentialUnlock =
                 ObserveVaultAndroidCredentialUnlockUseCase(fakeRepo),
+            observeStatisticsIndexState =
+                ObserveNoteStatisticsIndexStateUseCase(statisticsRepository),
+            rebuildStatisticsIndexUseCase =
+                RebuildNoteStatisticsIndexUseCase(statisticsRepository),
             lockVaultUseCase = LockVaultUseCase(fakeVaultRepo),
             changeVaultPinUseCase = ChangeVaultPinUseCase(fakeVaultRepo),
             resetVaultUseCase = ResetVaultUseCase(fakeVaultRepo),
+            observeAllNormalNoteCount =
+                ObserveAllNormalNoteCountUseCase(fakeStoredNoteRepo),
+            observeAllVaultNoteCount =
+                ObserveAllVaultNoteCountUseCase(fakeStoredVaultNoteRepo),
+            unlockVaultWithPinUseCase = UnlockVaultWithPinUseCase(fakeVaultRepo),
+            deleteAllStoredNotesUseCase = DeleteAllStoredNotesUseCase(
+                fakeStoredNoteRepo,
+                fakeStoredVaultNoteRepo
+            ),
             refreshVaultAndroidCredentialProtectedMaterialUseCase =
                 RefreshVaultAndroidCredentialProtectedMaterialUseCase(fakeVaultRepo),
             clearVaultAndroidCredentialProtectedMaterialUseCase =
@@ -983,9 +1019,149 @@ class SettingsViewModelTest {
         assertNull(viewModel.vaultResetState.value.error)
     }
 
+    // ── Delete all stored notes ──────────────────────────────────────────────
+
+    @Test
+    fun `delete all normal notes does not require Vault authentication`() =
+        runViewModelTest {
+            fakeStoredNoteRepo.setCount(4)
+            advanceUntilIdle()
+
+            viewModel.requestDeleteAllNotes()
+            viewModel.confirmDeleteAllNotes(CharArray(0))
+            advanceUntilIdle()
+
+            assertEquals(1, fakeStoredNoteRepo.deleteAllCalls)
+            assertEquals(0, fakeStoredVaultNoteRepo.deleteAllCalls)
+            assertTrue(viewModel.deleteAllNotesState.value.isSuccessful)
+            assertEquals(0, viewModel.deleteAllNotesState.value.totalNoteCount)
+        }
+
+    @Test
+    fun `wrong Vault PIN prevents deletion of normal and Vault notes`() =
+        runViewModelTest {
+            fakeVaultRepo.configureStoredPin("1234".toCharArray())
+            fakeStoredNoteRepo.setCount(3)
+            fakeStoredVaultNoteRepo.setCount(2)
+            advanceUntilIdle()
+            viewModel.requestDeleteAllNotes()
+            val wrongPin = "0000".toCharArray()
+
+            viewModel.confirmDeleteAllNotes(wrongPin)
+            advanceUntilIdle()
+
+            assertCleared(wrongPin)
+            assertEquals(0, fakeStoredNoteRepo.deleteAllCalls)
+            assertEquals(0, fakeStoredVaultNoteRepo.deleteAllCalls)
+            assertEquals(
+                SettingsDeleteAllNotesError.WRONG_VAULT_PIN,
+                viewModel.deleteAllNotesState.value.error
+            )
+            assertTrue(viewModel.deleteAllNotesState.value.isConfirmationVisible)
+        }
+
+    @Test
+    fun `correct Vault PIN deletes both note stores and preserves Vault configuration`() =
+        runViewModelTest {
+            fakeVaultRepo.configureStoredPin("1234".toCharArray())
+            fakeStoredNoteRepo.setCount(3)
+            fakeStoredVaultNoteRepo.setCount(2)
+            advanceUntilIdle()
+            viewModel.requestDeleteAllNotes()
+            val pin = "1234".toCharArray()
+
+            viewModel.confirmDeleteAllNotes(pin)
+            advanceUntilIdle()
+
+            assertCleared(pin)
+            assertEquals(1, fakeStoredNoteRepo.deleteAllCalls)
+            assertEquals(1, fakeStoredVaultNoteRepo.deleteAllCalls)
+            assertTrue(viewModel.deleteAllNotesState.value.isSuccessful)
+            assertEquals(VaultState.LOCKED, fakeVaultRepo.state.first())
+            assertEquals(1, fakeVaultRepo.lockCallCount)
+        }
+
     private fun assertCleared(pin: CharArray) {
         assertTrue(pin.all { it == '\u0000' })
     }
+}
+
+private class FakeStoredNoteRepository : NoteRepository {
+    private val normalCount = MutableStateFlow(0)
+
+    override val allNotes: Flow<List<Note>> = flowOf(emptyList())
+    override val allNotesSortedAsc: Flow<List<Note>> = flowOf(emptyList())
+    override val deletedNotes: Flow<List<Note>> = flowOf(emptyList())
+    override val noteLinkCandidates: Flow<List<NoteLinkCandidate>> = flowOf(emptyList())
+    override val distinctActiveDays: Flow<Set<Long>> = flowOf(emptySet())
+    override val distinctLocalDays: Flow<Set<Long>> = flowOf(emptySet())
+    override val allNormalNoteCount: Flow<Int> = normalCount
+    var deleteAllCalls = 0
+        private set
+
+    fun setCount(value: Int) {
+        normalCount.value = value
+    }
+
+    override fun searchNotes(query: String): Flow<List<Note>> = flowOf(emptyList())
+    override fun searchNotesScored(query: String): Flow<List<ScoredNote>> = flowOf(emptyList())
+    override fun getNotesByDateRange(startMs: Long, endMs: Long): Flow<List<Note>> =
+        flowOf(emptyList())
+    override suspend fun getNoteById(id: Long): Note? = null
+    override suspend fun saveNote(note: Note): Long = note.id
+    override suspend fun moveToTrash(id: Long) = Unit
+    override suspend fun restoreFromTrash(id: Long) = Unit
+    override suspend fun deleteNotePermanently(id: Long) = Unit
+    override suspend fun emptyTrash() = Unit
+    override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
+    override suspend fun setPreviewMode(id: Long, isPreviewMode: Boolean) = Unit
+    override suspend fun deleteAllNormalNotesPermanently(): Int {
+        deleteAllCalls += 1
+        val deleted = normalCount.value
+        normalCount.value = 0
+        return deleted
+    }
+}
+
+private class FakeStoredVaultNoteRepository : VaultNoteRepository {
+    private val vaultCount = MutableStateFlow(0)
+
+    override val vaultNotes: Flow<List<Note>> = flowOf(emptyList())
+    override val vaultTrashedNotes: Flow<List<Note>> = flowOf(emptyList())
+    override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> = flowOf(emptyList())
+    override val allVaultNoteCount: Flow<Int> = vaultCount
+    var deleteAllCalls = 0
+        private set
+
+    fun setCount(value: Int) {
+        vaultCount.value = value
+    }
+
+    override suspend fun getVaultNoteById(id: Long): Note? = null
+    override suspend fun saveVaultNote(note: Note): Long = note.id
+    override suspend fun duplicateVaultNote(id: Long): DuplicateVaultNoteResult =
+        DuplicateVaultNoteResult.NotFound
+    override suspend fun moveNormalNoteToVault(id: Long): MoveNoteToVaultResult =
+        MoveNoteToVaultResult.NotFound
+    override suspend fun removeNoteFromVault(id: Long): Boolean = false
+    override suspend fun moveVaultNoteToTrash(id: Long): Boolean = false
+    override suspend fun restoreVaultNoteFromTrash(id: Long): Boolean = false
+    override suspend fun deleteVaultNotePermanently(id: Long): Boolean = false
+    override suspend fun decryptVaultImageBytes(relativePath: String): ByteArray? = null
+    override suspend fun deleteAllVaultNotesPermanently(): Int {
+        deleteAllCalls += 1
+        val deleted = vaultCount.value
+        vaultCount.value = 0
+        return deleted
+    }
+}
+
+private class FakeNoteStatisticsRepository : NoteStatisticsRepository {
+    override val indexedNotes: Flow<List<IndexedNoteStatistics>> = flowOf(emptyList())
+    override val indexState: Flow<NoteStatisticsIndexState> =
+        flowOf(NoteStatisticsIndexState())
+
+    override suspend fun rebuildIndex() = Unit
 }
 
 // ── Fake ─────────────────────────────────────────────────────────────────────

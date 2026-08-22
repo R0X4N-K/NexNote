@@ -6,6 +6,7 @@ import io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage
 import io.github.r0x4nk.nexnote.data.preferences.UserPreferencesRepository
 import io.github.r0x4nk.nexnote.data.security.AndroidVaultCredentialRepository
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
+import io.github.r0x4nk.nexnote.data.repository.NoteStatisticsRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TagRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.VaultNoteRepositoryImpl
@@ -53,6 +54,16 @@ internal class NexNoteApp : Application(), AppDependencies {
         NoteRepositoryImpl(
             dao = database.noteDao(),
             imageStorage = noteImageStorage,
+            appScope = appScope,
+            database = database,
+            statisticsDao = database.noteStatisticsDao(),
+            homeNoteDao = database.homeNoteDao()
+        )
+    }
+
+    private val statisticsRepository: NoteStatisticsRepositoryImpl by lazy {
+        NoteStatisticsRepositoryImpl(
+            dao = database.noteStatisticsDao(),
             appScope = appScope
         )
     }
@@ -76,7 +87,8 @@ internal class NexNoteApp : Application(), AppDependencies {
             dao = database.noteDao(),
             tagDao = database.tagDao(),
             keyProvider = keyRepository,
-            imageStorage = noteImageStorage
+            imageStorage = noteImageStorage,
+            statisticsDao = database.noteStatisticsDao()
         )
         keyRepository.bindNoteMaintenance(
             rewrapper = noteRepository,
@@ -113,6 +125,7 @@ internal class NexNoteApp : Application(), AppDependencies {
             tagRepository = tagRepository,
             templateRepository = templateRepository,
             preferencesRepository = userPreferencesRepository,
+            statisticsRepository = statisticsRepository,
             imageStorage = noteImageStorage,
             vaultRepository = vaultRepository,
             vaultAndroidCredentialRepository = vaultAndroidCredentialRepository,
@@ -122,6 +135,7 @@ internal class NexNoteApp : Application(), AppDependencies {
 
     override fun onCreate() {
         super.onCreate()
+        statisticsRepository.start()
         appScope.launch(Dispatchers.IO) {
             ExportCache(cacheDir).cleanupExpired()
         }

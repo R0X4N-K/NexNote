@@ -89,18 +89,124 @@ class NexNoteDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migration7To8AddsEmptyStatisticsIndexAndPreservesData() {
+        val name = "migration-7-8"
+        createSeededDatabase(name, 7)
+
+        val migrated = helper.runMigrationsAndValidate(
+            name,
+            8,
+            true,
+            NexNoteDatabase.MIGRATION_7_8
+        )
+
+        migrated.use {
+            assertRepresentativeData(it, expectVaultColumn = true)
+            assertEquals(0, it.longQuery("SELECT COUNT(*) FROM note_statistics_index"))
+            assertEquals(
+                setOf("index_note_statistics_index_sourceLastModifiedDate"),
+                it.userIndexNames("note_statistics_index")
+            )
+        }
+    }
+
+    @Test
+    fun migration5To8RunsCompleteVerifiedChain() {
+        val name = "migration-5-8"
+        createSeededDatabase(name, 5)
+
+        helper.runMigrationsAndValidate(
+            name,
+            8,
+            true,
+            NexNoteDatabase.MIGRATION_5_6,
+            NexNoteDatabase.MIGRATION_6_7,
+            NexNoteDatabase.MIGRATION_7_8
+        ).use {
+            assertRepresentativeData(it, expectVaultColumn = true)
+            assertEquals(0, it.longQuery("SELECT COUNT(*) FROM note_statistics_index"))
+        }
+    }
+
+    @Test
+    fun migration8To9AddsFilteredSearchAndCoveringTagIndex() {
+        val name = "migration-8-9"
+        createSeededDatabase(name, 8)
+
+        val migrated = helper.runMigrationsAndValidate(
+            name,
+            9,
+            true,
+            NexNoteDatabase.MIGRATION_8_9
+        )
+
+        migrated.use {
+            assertEquals(1, it.ftsMatchCount("normal*"))
+            assertEquals(0, it.ftsMatchCount("deleted*"))
+            assertEquals(0, it.ftsMatchCount("encrypted*"))
+            assertEquals(
+                11L,
+                it.longQuery(
+                    "SELECT rowid FROM notes_fts WHERE notes_fts MATCH 'normal*'"
+                )
+            )
+            assertEquals(
+                setOf("index_note_tag_cross_ref_tagName_noteId"),
+                it.userIndexNames("note_tag_cross_ref")
+            )
+            assertEquals(
+                setOf(
+                    "index_notes_isDeleted_isInVault_isPinned_lastModifiedDate",
+                    "index_notes_active_pinned_modified_asc",
+                    "index_notes_isDeleted_isInVault_creationDate"
+                ),
+                it.userIndexNames("notes")
+            )
+            assertTrue(it.userIndexNames("note_statistics_index").isEmpty())
+
+            it.execSQL("UPDATE notes SET isDeleted = 1 WHERE id = 11")
+            assertEquals(0, it.ftsMatchCount("normal*"))
+            it.execSQL("UPDATE notes SET isDeleted = 0 WHERE id = 11")
+            assertEquals(1, it.ftsMatchCount("normal*"))
+            it.execSQL("UPDATE notes SET isInVault = 1 WHERE id = 11")
+            assertEquals(0, it.ftsMatchCount("normal*"))
+        }
+    }
+
+    @Test
+    fun migration5To9RunsCompleteVerifiedChain() {
+        val name = "migration-5-9"
+        createSeededDatabase(name, 5)
+
+        helper.runMigrationsAndValidate(
+            name,
+            9,
+            true,
+            NexNoteDatabase.MIGRATION_5_6,
+            NexNoteDatabase.MIGRATION_6_7,
+            NexNoteDatabase.MIGRATION_7_8,
+            NexNoteDatabase.MIGRATION_8_9
+        ).use {
+            assertRepresentativeData(it, expectVaultColumn = true)
+            assertEquals(1, it.ftsMatchCount("normal*"))
+        }
+    }
+
     private fun createSeededDatabase(name: String, version: Int) {
         InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
         helper.createDatabase(name, version).use { database ->
+            val vaultColumn = if (version >= 7) ", isInVault" else ""
+            val vaultPlaceholder = if (version >= 7) ", ?" else ""
             database.execSQL(
                 """
                 INSERT INTO notes (
                     id, title, content, isMarkdown, creationDate, lastModifiedDate,
                     timezone, isDeleted, deletedDate, isPinned, imagePathsRaw,
-                    backgroundColor, isPreviewMode
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    backgroundColor, isPreviewMode$vaultColumn
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?$vaultPlaceholder)
                 """.trimIndent(),
-                arrayOf<Any?>(
+                mutableListOf<Any?>(
                     11L,
                     "Normal title",
                     "Normal body #alpha",
@@ -114,17 +220,29 @@ class NexNoteDatabaseMigrationTest {
                     "[\"images/note_11_img_1.jpg\"]",
                     0x102030,
                     1
-                )
+                ).apply { if (version >= 7) add(0) }.toTypedArray()
             )
+            if (version >= 7) {
+                database.execSQL(
+                    """
+                    INSERT INTO notes (
+                        id, title, content, isMarkdown, creationDate, lastModifiedDate,
+                        timezone, isDeleted, deletedDate, isPinned, imagePathsRaw,
+                        backgroundColor, isPreviewMode, isInVault
+                    ) VALUES (13, 'Encrypted title', 'Encrypted Vault body', 1, 500, 600,
+                        'UTC', 0, NULL, 0, '', NULL, 0, 1)
+                    """.trimIndent()
+                )
+            }
             database.execSQL(
                 """
                 INSERT INTO notes (
                     id, title, content, isMarkdown, creationDate, lastModifiedDate,
                     timezone, isDeleted, deletedDate, isPinned, imagePathsRaw,
-                    backgroundColor, isPreviewMode
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    backgroundColor, isPreviewMode$vaultColumn
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?$vaultPlaceholder)
                 """.trimIndent(),
-                arrayOf<Any?>(
+                mutableListOf<Any?>(
                     12L,
                     "Deleted title",
                     "Deleted body",
@@ -138,7 +256,7 @@ class NexNoteDatabaseMigrationTest {
                     "[\"images/note_12_img_2.png\"]",
                     null,
                     0
-                )
+                ).apply { if (version >= 7) add(0) }.toTypedArray()
             )
             database.execSQL(
                 """
@@ -165,7 +283,7 @@ class NexNoteDatabaseMigrationTest {
             "SELECT title, content, isDeleted, deletedDate, imagePathsRaw, " +
                 "backgroundColor, isPreviewMode" +
                 (if (expectVaultColumn) ", isInVault" else "") +
-                " FROM notes ORDER BY id"
+                " FROM notes WHERE id IN (11, 12) ORDER BY id"
         ).use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("Normal title", cursor.getString(0))
@@ -213,6 +331,10 @@ class NexNoteDatabaseMigrationTest {
 
     private fun SupportSQLiteDatabase.longQuery(sql: String): Long =
         query(sql).use { cursor -> cursor.singleLong() }
+
+    private fun SupportSQLiteDatabase.ftsMatchCount(matchQuery: String): Long =
+        query("SELECT COUNT(*) FROM notes_fts WHERE notes_fts MATCH ?", arrayOf(matchQuery))
+            .use { cursor -> cursor.singleLong() }
 
     private fun Cursor.singleLong(): Long {
         assertTrue(moveToFirst())

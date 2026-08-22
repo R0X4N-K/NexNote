@@ -15,6 +15,12 @@ class AgendaFakeNoteDao : NoteDao {
         notes.value = notes.value + note
     }
 
+    override fun observeAllNormalNoteCount(): Flow<Int> =
+        notes.map { list -> list.count { !it.isInVault } }
+
+    override fun observeAllVaultNoteCount(): Flow<Int> =
+        notes.map { list -> list.count { it.isInVault } }
+
     override fun getAllNotes(): Flow<List<NoteEntity>> =
         notes.map { list -> list.filter { !it.isDeleted } }
 
@@ -64,12 +70,21 @@ class AgendaFakeNoteDao : NoteDao {
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> =
         notes.value.filter { it.isInVault }
 
+    override suspend fun getAllNormalNotesForWipeOnce(): List<NoteEntity> =
+        notes.value.filterNot { it.isInVault }
+
     override suspend fun getDeletedVaultNoteById(id: Long): NoteEntity? =
         notes.value.find { it.id == id && it.isInVault && it.isDeleted }
 
     override suspend fun deleteAllVaultNotes(): Int {
         val removed = notes.value.count { it.isInVault }
         notes.value = notes.value.filterNot { it.isInVault }
+        return removed
+    }
+
+    override suspend fun deleteAllNormalNotes(): Int {
+        val removed = notes.value.count { !it.isInVault }
+        notes.value = notes.value.filter { it.isInVault }
         return removed
     }
 
@@ -84,6 +99,16 @@ class AgendaFakeNoteDao : NoteDao {
             }
         }
     }
+    override suspend fun moveToTrash(ids: List<Long>, deletedDate: Long): Int {
+        val idSet = ids.toSet()
+        val changed = notes.value.count { it.id in idSet && !it.isInVault && !it.isDeleted }
+        notes.value = notes.value.map { note ->
+            if (note.id in idSet && !note.isInVault && !note.isDeleted) {
+                note.copy(isDeleted = true, deletedDate = deletedDate)
+            } else note
+        }
+        return changed
+    }
     override suspend fun moveVaultNoteToTrash(id: Long, deletedDate: Long): Int = 0
     override suspend fun restoreVaultNoteFromTrash(id: Long): Int = 0
     override suspend fun restoreFromTrash(id: Long) {
@@ -94,6 +119,16 @@ class AgendaFakeNoteDao : NoteDao {
                 note
             }
         }
+    }
+    override suspend fun restoreFromTrash(ids: List<Long>): Int {
+        val idSet = ids.toSet()
+        val changed = notes.value.count { it.id in idSet && !it.isInVault && it.isDeleted }
+        notes.value = notes.value.map { note ->
+            if (note.id in idSet && !note.isInVault && note.isDeleted) {
+                note.copy(isDeleted = false, deletedDate = null)
+            } else note
+        }
+        return changed
     }
     override suspend fun deleteNotePermanently(id: Long): Int = 0
     override suspend fun deleteVaultNotePermanently(id: Long): Int = 0

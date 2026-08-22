@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,7 +19,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -32,8 +35,11 @@ import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderCollection
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 @Composable
 internal fun HomeContent(
@@ -48,6 +54,7 @@ internal fun HomeContent(
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
     onClearTagFilters: () -> Unit,
+    onLoadMoreNotes: () -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
@@ -70,6 +77,7 @@ internal fun HomeContent(
             onToggleTagFilter = onToggleTagFilter,
             onRemoveTagFilter = onRemoveTagFilter,
             onClearTagFilters = onClearTagFilters,
+            onLoadMoreNotes = onLoadMoreNotes,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
             onRequestNoteActions = onRequestNoteActions,
@@ -103,6 +111,7 @@ private fun HomeLoadedContent(
     onToggleTagFilter: (String) -> Unit,
     onRemoveTagFilter: (String) -> Unit,
     onClearTagFilters: () -> Unit,
+    onLoadMoreNotes: () -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
@@ -114,27 +123,53 @@ private fun HomeLoadedContent(
         enabled = vaultPullEnabled,
         onOpenVault = onOpenVault
     )
+    val scrollToTopBottomPadding = if (selectionState.isActive) {
+        floatingBottomPadding + 16.dp
+    } else {
+        RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
+    }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .homeVaultPullAccess(vaultPullState)
     ) {
-        HomeVaultPullAccessIndicator(vaultPullState)
-        HomeFilterBars(uiState, onToggleTagFilter, onRemoveTagFilter, onClearTagFilters)
-        HomeNotesBody(
-            uiState = uiState,
-            noteCardStyle = noteCardStyle,
-            listState = listState,
-            gridState = gridState,
-            selectionState = selectionState,
-            onNoteClick = onNoteClick,
-            onTogglePin = onTogglePin,
-            onRequestTrash = onRequestTrash,
-            onRequestNoteActions = onRequestNoteActions,
-            onToggleNoteSelection = onToggleNoteSelection,
-            bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            HomeVaultPullAccessIndicator(vaultPullState)
+            HomeFilterBars(uiState, onToggleTagFilter, onRemoveTagFilter, onClearTagFilters)
+            HomeNotesBody(
+                uiState = uiState,
+                noteCardStyle = noteCardStyle,
+                listState = listState,
+                gridState = gridState,
+                selectionState = selectionState,
+                onNoteClick = onNoteClick,
+                onTogglePin = onTogglePin,
+                onRequestTrash = onRequestTrash,
+                onRequestNoteActions = onRequestNoteActions,
+                onToggleNoteSelection = onToggleNoteSelection,
+                onLoadMoreNotes = onLoadMoreNotes,
+                bottomContentPadding =
+                    RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
+            )
+        }
+        if (uiState.notes.isNotEmpty()) {
+            when (uiState.viewMode) {
+                NoteListViewMode.GRID -> ScrollToTopButton(
+                    gridState = gridState,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+                )
+                NoteListViewMode.LIST,
+                NoteListViewMode.TAGS -> ScrollToTopButton(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+                )
+            }
+        }
     }
 }
 
@@ -185,6 +220,7 @@ private fun HomeNotesBody(
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
+    onLoadMoreNotes: () -> Unit,
     bottomContentPadding: Dp
 ) {
     if (uiState.notes.isEmpty()) {
@@ -207,6 +243,7 @@ private fun HomeNotesBody(
             onRequestTrash = onRequestTrash,
             onRequestNoteActions = onRequestNoteActions,
             onToggleNoteSelection = onToggleNoteSelection,
+            onLoadMoreNotes = onLoadMoreNotes,
             bottomContentPadding = bottomContentPadding
         )
     }
@@ -224,9 +261,18 @@ private fun HomeNoteCollection(
     onRequestTrash: (Note) -> Unit,
     onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
+    onLoadMoreNotes: () -> Unit,
     bottomContentPadding: Dp
 ) {
     val displayItems = rememberDisplayItems(uiState)
+    HomeLoadMoreEffect(
+        viewMode = uiState.viewMode,
+        itemCount = displayItems.size,
+        hasMore = uiState.hasMoreNotes,
+        listState = listState,
+        gridState = gridState,
+        onLoadMoreNotes = onLoadMoreNotes
+    )
 
     when (uiState.viewMode) {
         NoteListViewMode.GRID -> {
@@ -273,6 +319,34 @@ private fun HomeNoteCollection(
         }
     }
 }
+
+@Composable
+private fun HomeLoadMoreEffect(
+    viewMode: NoteListViewMode,
+    itemCount: Int,
+    hasMore: Boolean,
+    listState: LazyListState,
+    gridState: LazyStaggeredGridState,
+    onLoadMoreNotes: () -> Unit
+) {
+    LaunchedEffect(viewMode, itemCount, hasMore, listState, gridState) {
+        if (itemCount == 0 || !hasMore) return@LaunchedEffect
+        snapshotFlow {
+            when (viewMode) {
+                NoteListViewMode.GRID ->
+                    gridState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: -1
+                NoteListViewMode.LIST,
+                NoteListViewMode.TAGS ->
+                    listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            }
+        }
+            .distinctUntilChanged()
+            .filter { lastVisibleIndex -> lastVisibleIndex >= itemCount - LOAD_AHEAD_ITEMS }
+            .collect { onLoadMoreNotes() }
+    }
+}
+
+private const val LOAD_AHEAD_ITEMS = 24
 
 @Composable
 private fun rememberDisplayItems(uiState: HomeUiState): List<ScoredNote> =

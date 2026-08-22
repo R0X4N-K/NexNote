@@ -251,6 +251,7 @@ private class FakeNoteListTagRepository : TagRepository {
     override fun getTagsForNote(noteId: Long): Flow<List<Tag>> = flowOf(emptyList())
     override fun getMostUsedTags(limit: Int): Flow<List<Tag>> = flowOf(emptyList())
     override fun getFilteredNoteIds(tagNames: Set<String>): Flow<Set<Long>> = flowOf(emptySet())
+    override fun observeNotesForTag(tagName: String): Flow<List<Note>> = flowOf(emptyList())
 
     override suspend fun indexNoteTags(noteId: Long, content: String) {
         indexedNotes += noteId to content

@@ -1,6 +1,9 @@
 package io.github.r0x4nk.nexnote.ui.screen.home
 
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchScope
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchSort
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.Template
@@ -10,13 +13,17 @@ import io.github.r0x4nk.nexnote.ui.common.SortOrder
 internal data class HomeNotesData(
     val allNotes: List<Note>,
     val allScored: List<ScoredNote>,
-    val filteredIds: Set<Long>
+    val totalNoteCount: Int,
+    val hasMore: Boolean
 )
 
 internal data class HomeSearchData(
     val query: String,
     val isActive: Boolean,
-    val selectedTagFilters: Set<String>
+    val selectedTagFilters: Set<String>,
+    val resultSort: HomeSearchSort,
+    val scope: HomeSearchScope,
+    val pinnedFilter: HomePinnedFilter
 )
 
 internal data class HomeSortViewData(
@@ -36,15 +43,17 @@ internal fun buildHomeUiState(
     templatePickerData: HomeTemplatePickerData,
     topTags: List<Tag>
 ): HomeUiState {
-    val notes = filterNotesByIds(notesData.allNotes, notesData.filteredIds)
-    val scored = filterScoredByIds(notesData.allScored, notesData.filteredIds)
-
     return HomeUiState(
-        notes = notes,
+        notes = notesData.allNotes,
+        totalNoteCount = notesData.totalNoteCount,
+        hasMoreNotes = notesData.hasMore,
         searchQuery = searchData.query,
         isSearchActive = searchData.isActive,
         isLoading = false,
-        scoredResults = scored,
+        scoredResults = notesData.allScored,
+        searchSort = searchData.resultSort,
+        searchScope = searchData.scope,
+        pinnedFilter = searchData.pinnedFilter,
         sortOrder = sortViewData.sortOrder,
         viewMode = sortViewData.viewMode,
         showTemplatePicker = templatePickerData.showPicker,
@@ -52,16 +61,4 @@ internal fun buildHomeUiState(
         selectedTagFilters = searchData.selectedTagFilters,
         topTags = topTags
     )
-}
-
-private fun filterNotesByIds(notes: List<Note>, filteredIds: Set<Long>): List<Note> {
-    return if (filteredIds.isEmpty()) notes else notes.filter { it.id in filteredIds }
-}
-
-private fun filterScoredByIds(
-    scoredResults: List<ScoredNote>,
-    filteredIds: Set<Long>
-): List<ScoredNote> {
-    return if (filteredIds.isEmpty()) scoredResults
-    else scoredResults.filter { it.note.id in filteredIds }
 }

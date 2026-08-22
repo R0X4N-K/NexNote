@@ -10,6 +10,7 @@ import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NoteStatisticsIndexState
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
@@ -20,10 +21,14 @@ import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialP
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtectedMaterialUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DeleteAllStoredNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNormalNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllVaultNoteCountUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteStatisticsIndexStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTableLayoutModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTimezoneIdUseCase
@@ -34,6 +39,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultRecentPreviewsProtect
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
@@ -44,10 +50,13 @@ import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAndroidCredentialUnlockUs
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAutoLockTimeoutUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultLockOnBackgroundUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultRecentPreviewsProtectionUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UnlockVaultWithPinUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -107,6 +116,28 @@ data class SettingsVaultResetUiState(
     val isSuccessful: Boolean = false
 )
 
+enum class SettingsDeleteAllNotesError {
+    EMPTY_VAULT_PIN,
+    WRONG_VAULT_PIN,
+    OPERATION_FAILED
+}
+
+@Immutable
+data class SettingsDeleteAllNotesUiState(
+    val normalNoteCount: Int = 0,
+    val vaultNoteCount: Int = 0,
+    val isConfirmationVisible: Boolean = false,
+    val isBusy: Boolean = false,
+    val error: SettingsDeleteAllNotesError? = null,
+    val isSuccessful: Boolean = false
+) {
+    val totalNoteCount: Int
+        get() = normalNoteCount + vaultNoteCount
+
+    val requiresVaultAuthentication: Boolean
+        get() = vaultNoteCount > 0
+}
+
 private enum class SettingsAndroidCredentialRefreshReason {
     ENABLE_UNLOCK,
     PIN_CHANGE
@@ -124,9 +155,15 @@ class SettingsViewModel(
     private val observeVaultLockOnBackground: ObserveVaultLockOnBackgroundUseCase,
     private val observeVaultAutoLockTimeout: ObserveVaultAutoLockTimeoutUseCase,
     private val observeVaultAndroidCredentialUnlock: ObserveVaultAndroidCredentialUnlockUseCase,
+    observeStatisticsIndexState: ObserveNoteStatisticsIndexStateUseCase,
+    private val rebuildStatisticsIndexUseCase: RebuildNoteStatisticsIndexUseCase,
     private val lockVaultUseCase: LockVaultUseCase,
     private val changeVaultPinUseCase: ChangeVaultPinUseCase,
     private val resetVaultUseCase: ResetVaultUseCase,
+    observeAllNormalNoteCount: ObserveAllNormalNoteCountUseCase,
+    observeAllVaultNoteCount: ObserveAllVaultNoteCountUseCase,
+    private val unlockVaultWithPinUseCase: UnlockVaultWithPinUseCase,
+    private val deleteAllStoredNotesUseCase: DeleteAllStoredNotesUseCase,
     private val refreshVaultAndroidCredentialProtectedMaterialUseCase:
         RefreshVaultAndroidCredentialProtectedMaterialUseCase,
     private val clearVaultAndroidCredentialProtectedMaterialUseCase:
@@ -142,6 +179,13 @@ class SettingsViewModel(
     private val setVaultAutoLockTimeoutUseCase: SetVaultAutoLockTimeoutUseCase,
     private val setVaultAndroidCredentialUnlockUseCase: SetVaultAndroidCredentialUnlockUseCase
 ) : ViewModel() {
+
+    val statisticsIndexState: StateFlow<NoteStatisticsIndexState> =
+        observeStatisticsIndexState().stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+            initialValue = NoteStatisticsIndexState()
+        )
 
     val uiState: StateFlow<SettingsUiState> = buildSettingsUiStateFlow(
         flows = SettingsUiStateFlows(
@@ -168,11 +212,36 @@ class SettingsViewModel(
     val vaultResetState: StateFlow<SettingsVaultResetUiState> =
         _vaultResetState.asStateFlow()
 
+    private val _deleteAllNotesState = MutableStateFlow(SettingsDeleteAllNotesUiState())
+    val deleteAllNotesState: StateFlow<SettingsDeleteAllNotesUiState> =
+        _deleteAllNotesState.asStateFlow()
+
     private var pendingAndroidCredentialRefreshReason:
         SettingsAndroidCredentialRefreshReason? = null
 
+    init {
+        viewModelScope.launch {
+            combine(
+                observeAllNormalNoteCount(),
+                observeAllVaultNoteCount()
+            ) { normalCount, vaultCount -> normalCount to vaultCount }
+                .collect { (normalCount, vaultCount) ->
+                    _deleteAllNotesState.update {
+                        it.copy(
+                            normalNoteCount = normalCount,
+                            vaultNoteCount = vaultCount
+                        )
+                    }
+                }
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { setThemeModeUseCase(mode) }
+    }
+
+    fun rebuildStatisticsIndex() {
+        viewModelScope.launch { rebuildStatisticsIndexUseCase() }
     }
 
     fun setFontScale(scale: FontScale) {
@@ -561,6 +630,96 @@ class SettingsViewModel(
         }
     }
 
+    fun requestDeleteAllNotes() {
+        val state = _deleteAllNotesState.value
+        if (state.isBusy || state.totalNoteCount == 0) return
+        _deleteAllNotesState.update {
+            it.copy(
+                isConfirmationVisible = true,
+                error = null,
+                isSuccessful = false
+            )
+        }
+    }
+
+    fun cancelDeleteAllNotes() {
+        if (_deleteAllNotesState.value.isBusy) return
+        _deleteAllNotesState.update {
+            it.copy(isConfirmationVisible = false, error = null)
+        }
+    }
+
+    fun confirmDeleteAllNotes(vaultPin: CharArray) {
+        val pinCopy = vaultPin.copyOf()
+        vaultPin.wipe()
+        val state = _deleteAllNotesState.value
+        if (!state.isConfirmationVisible || state.isBusy || state.totalNoteCount == 0) {
+            pinCopy.wipe()
+            return
+        }
+        if (state.requiresVaultAuthentication && pinCopy.isEmpty()) {
+            pinCopy.wipe()
+            _deleteAllNotesState.update {
+                it.copy(error = SettingsDeleteAllNotesError.EMPTY_VAULT_PIN)
+            }
+            return
+        }
+
+        val shouldRelockVault = state.requiresVaultAuthentication &&
+            uiState.value.vaultState != VaultState.UNLOCKED
+        _deleteAllNotesState.update {
+            it.copy(isBusy = true, error = null, isSuccessful = false)
+        }
+        viewModelScope.launch {
+            var vaultAuthenticated = false
+            try {
+                if (state.requiresVaultAuthentication) {
+                    vaultAuthenticated = unlockVaultWithPinUseCase(pinCopy)
+                    if (!vaultAuthenticated) {
+                        _deleteAllNotesState.update {
+                            it.copy(
+                                isBusy = false,
+                                error = SettingsDeleteAllNotesError.WRONG_VAULT_PIN
+                            )
+                        }
+                        return@launch
+                    }
+                }
+                deleteAllStoredNotesUseCase(
+                    includeVaultNotes = state.requiresVaultAuthentication
+                )
+                _deleteAllNotesState.update {
+                    it.copy(
+                        isConfirmationVisible = false,
+                        isBusy = false,
+                        error = null,
+                        isSuccessful = true
+                    )
+                }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                _deleteAllNotesState.update {
+                    it.copy(
+                        isBusy = false,
+                        error = SettingsDeleteAllNotesError.OPERATION_FAILED,
+                        isSuccessful = false
+                    )
+                }
+            } finally {
+                pinCopy.wipe()
+                if (shouldRelockVault && vaultAuthenticated) {
+                    lockVaultUseCase()
+                }
+            }
+        }
+    }
+
+    fun clearDeleteAllNotesFeedback() {
+        _deleteAllNotesState.update {
+            it.copy(error = null, isSuccessful = false)
+        }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -581,9 +740,17 @@ class SettingsViewModel(
                     observeVaultAutoLockTimeout = preferences.observeVaultAutoLockTimeout,
                     observeVaultAndroidCredentialUnlock =
                         preferences.observeVaultAndroidCredentialUnlock,
+                    observeStatisticsIndexState = app.useCases.statistics.observeIndexState,
+                    rebuildStatisticsIndexUseCase = app.useCases.statistics.rebuildIndex,
                     lockVaultUseCase = vault.lockVault,
                     changeVaultPinUseCase = vault.changeVaultPin,
                     resetVaultUseCase = vault.resetVault,
+                    observeAllNormalNoteCount =
+                        app.useCases.storedNotes.observeAllNormalNoteCount,
+                    observeAllVaultNoteCount =
+                        app.useCases.storedNotes.observeAllVaultNoteCount,
+                    unlockVaultWithPinUseCase = vault.unlockVaultWithPin,
+                    deleteAllStoredNotesUseCase = app.useCases.storedNotes.deleteAll,
                     refreshVaultAndroidCredentialProtectedMaterialUseCase =
                         vault.refreshVaultAndroidCredentialProtectedMaterial,
                     clearVaultAndroidCredentialProtectedMaterialUseCase =

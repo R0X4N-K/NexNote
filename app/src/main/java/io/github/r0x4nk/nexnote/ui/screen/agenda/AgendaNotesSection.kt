@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.MasonryGrid
@@ -26,6 +27,7 @@ import io.github.r0x4nk.nexnote.ui.component.noteTagFolderItems
 
 internal fun LazyListScope.agendaNotesItems(
     notes: List<Note>,
+    displayItems: List<ScoredNote>,
     viewMode: NoteListViewMode,
     noteCardStyle: NoteCardStyle,
     selectionState: SelectionUiState,
@@ -39,7 +41,7 @@ internal fun LazyListScope.agendaNotesItems(
     } else {
         when (viewMode) {
             NoteListViewMode.GRID -> {
-                item { AgendaNotesGrid(notes, noteCardStyle, selectionState, actions) }
+                item { AgendaNotesGrid(displayItems, noteCardStyle, selectionState, actions) }
             }
             NoteListViewMode.TAGS -> {
                 noteTagFolderItems(
@@ -48,7 +50,7 @@ internal fun LazyListScope.agendaNotesItems(
                     horizontalPadding = 16.dp
                 ) { scored, modifier ->
                     AgendaNoteCard(
-                        note = scored.note,
+                        scored = scored,
                         noteCardStyle = noteCardStyle,
                         selectionState = selectionState,
                         actions = actions,
@@ -57,9 +59,9 @@ internal fun LazyListScope.agendaNotesItems(
                 }
             }
             NoteListViewMode.LIST -> {
-                items(notes, key = { it.id }) { note ->
+                items(displayItems, key = { it.note.id }) { scored ->
                     AgendaNoteCard(
-                        note = note,
+                        scored = scored,
                         noteCardStyle = noteCardStyle,
                         selectionState = selectionState,
                         actions = actions,
@@ -75,7 +77,7 @@ internal fun LazyListScope.agendaNotesItems(
 
 @Composable
 private fun AgendaNotesGrid(
-    notes: List<Note>,
+    displayItems: List<ScoredNote>,
     noteCardStyle: NoteCardStyle,
     selectionState: SelectionUiState,
     actions: AgendaActions
@@ -88,9 +90,9 @@ private fun AgendaNotesGrid(
         horizontalSpacing = 8.dp,
         verticalSpacing = 8.dp
     ) {
-        notes.forEach { note ->
-            key(note.id) {
-                AgendaGridNoteCard(note, noteCardStyle, selectionState, actions)
+        displayItems.forEach { scored ->
+            key(scored.note.id) {
+                AgendaGridNoteCard(scored, noteCardStyle, selectionState, actions)
             }
         }
     }
@@ -98,11 +100,12 @@ private fun AgendaNotesGrid(
 
 @Composable
 private fun AgendaGridNoteCard(
-    note: Note,
+    scored: ScoredNote,
     noteCardStyle: NoteCardStyle,
     selectionState: SelectionUiState,
     actions: AgendaActions
 ) {
+    val note = scored.note
     NoteCard(
         note = note,
         onClick = {
@@ -113,6 +116,8 @@ private fun AgendaGridNoteCard(
             }
         },
         noteCardStyle = noteCardStyle,
+        titleHighlightRanges = scored.titleRanges,
+        contentHighlightRanges = scored.contentRanges,
         onPin = { actions.onTogglePin(note) },
         onLongPress = { actions.onToggleNoteSelection(note) },
         onActions = if (selectionState.isActive) {
@@ -128,12 +133,13 @@ private fun AgendaGridNoteCard(
 
 @Composable
 private fun AgendaNoteCard(
-    note: Note,
+    scored: ScoredNote,
     noteCardStyle: NoteCardStyle,
     selectionState: SelectionUiState,
     actions: AgendaActions,
     modifier: Modifier = Modifier
 ) {
+    val note = scored.note
     NoteCard(
         note = note,
         onClick = {
@@ -144,6 +150,8 @@ private fun AgendaNoteCard(
             }
         },
         noteCardStyle = noteCardStyle,
+        titleHighlightRanges = scored.titleRanges,
+        contentHighlightRanges = scored.contentRanges,
         onPin = { actions.onTogglePin(note) },
         onLongPress = { actions.onToggleNoteSelection(note) },
         onActions = if (selectionState.isActive) {

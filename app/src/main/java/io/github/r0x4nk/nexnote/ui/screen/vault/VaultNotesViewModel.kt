@@ -9,6 +9,9 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.Template
@@ -68,12 +71,16 @@ data class VaultNotesUiState(
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val sortOrder: SortOrder = SortOrder.MODIFIED_DESC,
+    val searchSort: NoteSearchSort = NoteSearchSort.RELEVANCE,
+    val searchScope: NoteSearchScope = NoteSearchScope.TITLE_AND_CONTENT,
+    val pinnedFilter: NotePinnedFilter = NotePinnedFilter.ALL,
     val viewMode: NoteListViewMode = NoteListViewMode.LIST,
     val isTrashVisible: Boolean = false,
     val notePendingPermanentDeleteId: Long? = null,
     val totalNoteCount: Int = 0,
     val selectedTagFilters: Set<String> = emptySet(),
     val topTags: List<Tag> = emptyList(),
+    val availableTagNames: Set<String> = emptySet(),
     val showTemplatePicker: Boolean = false,
     val templates: List<Template> = emptyList(),
     /**
@@ -86,7 +93,12 @@ data class VaultNotesUiState(
      * outside the unlocked branch.
      */
     val isLoading: Boolean = true
-)
+) {
+    val hasActiveSearchFilters: Boolean
+        get() = searchScope != NoteSearchScope.TITLE_AND_CONTENT ||
+            pinnedFilter != NotePinnedFilter.ALL ||
+            selectedTagFilters.isNotEmpty()
+}
 
 class VaultNotesViewModel(
     observeVaultState: ObserveVaultStateUseCase,
@@ -106,6 +118,9 @@ class VaultNotesViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _isSearchActive = MutableStateFlow(false)
     private val _sortOrder = MutableStateFlow(SortOrder.MODIFIED_DESC)
+    private val _searchSort = MutableStateFlow(NoteSearchSort.RELEVANCE)
+    private val _searchScope = MutableStateFlow(NoteSearchScope.TITLE_AND_CONTENT)
+    private val _pinnedFilter = MutableStateFlow(NotePinnedFilter.ALL)
     private val _viewMode = MutableStateFlow(NoteListViewMode.LIST)
     private val _isTrashVisible = MutableStateFlow(false)
     private val _selectedTagFilters = MutableStateFlow<Set<String>>(emptySet())
@@ -200,6 +215,15 @@ class VaultNotesViewModel(
             .combine(_selectedTagFilters) { filterInput, selectedTagFilters ->
                 filterInput.copy(selectedTagFilters = selectedTagFilters)
             }
+            .combine(_searchSort) { filterInput, searchSort ->
+                filterInput.copy(searchSort = searchSort)
+            }
+            .combine(_searchScope) { filterInput, searchScope ->
+                filterInput.copy(searchScope = searchScope)
+            }
+            .combine(_pinnedFilter) { filterInput, pinnedFilter ->
+                filterInput.copy(pinnedFilter = pinnedFilter)
+            }
             .combine(_sortOrder) { filterInput, sortOrder ->
                 filterInput to sortOrder
             }
@@ -215,6 +239,9 @@ class VaultNotesViewModel(
                     // StateFlow value before any upstream emission.
                     VaultNotesUiState(
                         sortOrder = sortOrder,
+                        searchSort = filterInput.searchSort,
+                        searchScope = filterInput.searchScope,
+                        pinnedFilter = filterInput.pinnedFilter,
                         viewMode = viewMode,
                         isLoading = false
                     )
@@ -227,24 +254,19 @@ class VaultNotesViewModel(
                         isUnlocked = true,
                         isLoading = true,
                         sortOrder = sortOrder,
+                        searchSort = filterInput.searchSort,
+                        searchScope = filterInput.searchScope,
+                        pinnedFilter = filterInput.pinnedFilter,
                         viewMode = viewMode,
                         isTrashVisible = isTrashVisible
                     )
                 } else {
                     val effectiveQuery = if (filterInput.isSearchActive) filterInput.query else ""
-                    val effectiveTagFilters = if (isTrashVisible) {
-                        emptySet()
-                    } else {
-                        // Keep selected filters even if the current Vault tag
-                        // aggregate no longer contains them. This can happen
-                        // after editing/removing the last occurrence of a tag:
-                        // the filter chip must remain removable and the list
-                        // should show the tag-filter empty state instead of
-                        // silently showing every Vault note again. Lock/trash
-                        // transitions still clear filters via clearUnlockedUiState()
-                        // and toggleTrashVisibility().
-                        filterInput.selectedTagFilters
-                    }
+                    // Keep selected filters even if the current Vault source no
+                    // longer contains them. The selected chip must remain removable
+                    // and an unmatched filter must produce an empty result instead
+                    // of silently restoring every note.
+                    val effectiveTagFilters = filterInput.selectedTagFilters
                     val sourceNotes = if (isTrashVisible) {
                         source.trashedNotes
                     } else {
@@ -253,21 +275,35 @@ class VaultNotesViewModel(
                     val filteredNotes = filterVaultNotes(
                         notes = sourceNotes,
                         query = effectiveQuery,
-                        selectedTagFilters = effectiveTagFilters
+                        selectedTagFilters = effectiveTagFilters,
+                        searchScope = filterInput.searchScope,
+                        pinnedFilter = filterInput.pinnedFilter,
+                        searchSort = filterInput.searchSort
                     )
                     VaultNotesUiState(
                         isUnlocked = true,
                         isLoading = false,
-                        notes = filteredNotes.sortedForVault(sortOrder),
+                        notes = filteredNotes.sortedForVault(
+                            browseSortOrder = sortOrder,
+                            searchSort = filterInput.searchSort.takeIf {
+                                effectiveQuery.isNotBlank()
+                            } ?: NoteSearchSort.RELEVANCE
+                        ),
                         scoredResults = filteredNotes.scoredResults,
                         searchQuery = effectiveQuery,
                         isSearchActive = filterInput.isSearchActive,
                         sortOrder = sortOrder,
+                        searchSort = filterInput.searchSort,
+                        searchScope = filterInput.searchScope,
+                        pinnedFilter = filterInput.pinnedFilter,
                         viewMode = viewMode,
                         isTrashVisible = isTrashVisible,
                         totalNoteCount = sourceNotes.size,
                         selectedTagFilters = effectiveTagFilters,
-                        topTags = if (isTrashVisible) emptyList() else source.vaultTags
+                        topTags = if (isTrashVisible) emptyList() else source.vaultTags,
+                        availableTagNames = sourceNotes.asSequence()
+                            .flatMap { note -> TagParser.extractTags(note.content).asSequence() }
+                            .toSet()
                     )
                 }
             }
@@ -307,6 +343,18 @@ class VaultNotesViewModel(
         }
     }
 
+    fun setSearchSort(sort: NoteSearchSort) {
+        if (uiState.value.isUnlocked) _searchSort.value = sort
+    }
+
+    fun setSearchScope(scope: NoteSearchScope) {
+        if (uiState.value.isUnlocked) _searchScope.value = scope
+    }
+
+    fun setPinnedFilter(filter: NotePinnedFilter) {
+        if (uiState.value.isUnlocked) _pinnedFilter.value = filter
+    }
+
     fun toggleSortOrder() {
         _sortOrder.update { current ->
             if (current == SortOrder.MODIFIED_DESC) {
@@ -344,7 +392,7 @@ class VaultNotesViewModel(
 
     fun toggleTagFilter(tagName: String) {
         val state = uiState.value
-        if (!state.isUnlocked || state.isTrashVisible) return
+        if (!state.isUnlocked) return
 
         val normalizedTag = tagName.trim().lowercase()
         if (normalizedTag.isEmpty()) return
@@ -586,6 +634,9 @@ class VaultNotesViewModel(
     private fun clearSearchState() {
         _searchQuery.update { "" }
         _isSearchActive.update { false }
+        _searchSort.value = NoteSearchSort.RELEVANCE
+        _searchScope.value = NoteSearchScope.TITLE_AND_CONTENT
+        _pinnedFilter.value = NotePinnedFilter.ALL
     }
 
     private fun clearUnlockedUiState() {
@@ -645,7 +696,10 @@ private data class VaultNotesFilterInput(
     val source: VaultNotesSource,
     val query: String,
     val isSearchActive: Boolean,
-    val selectedTagFilters: Set<String>
+    val selectedTagFilters: Set<String>,
+    val searchSort: NoteSearchSort = NoteSearchSort.RELEVANCE,
+    val searchScope: NoteSearchScope = NoteSearchScope.TITLE_AND_CONTENT,
+    val pinnedFilter: NotePinnedFilter = NotePinnedFilter.ALL
 )
 
 private data class VaultFilteredNotes(
@@ -656,7 +710,10 @@ private data class VaultFilteredNotes(
 private fun filterVaultNotes(
     notes: List<Note>,
     query: String,
-    selectedTagFilters: Set<String>
+    selectedTagFilters: Set<String>,
+    searchScope: NoteSearchScope,
+    pinnedFilter: NotePinnedFilter,
+    searchSort: NoteSearchSort
 ): VaultFilteredNotes {
     val normalizedQuery = query.trim()
     val tagFilteredNotes = if (selectedTagFilters.isEmpty()) {
@@ -664,11 +721,23 @@ private fun filterVaultNotes(
     } else {
         notes.filter { note -> noteContainsAllVaultTags(note, selectedTagFilters) }
     }
+    val pinnedFilteredNotes = tagFilteredNotes.filter { note ->
+        when (pinnedFilter) {
+            NotePinnedFilter.ALL -> true
+            NotePinnedFilter.PINNED -> note.isPinned
+            NotePinnedFilter.UNPINNED -> !note.isPinned
+        }
+    }
     if (normalizedQuery.isEmpty()) {
-        return VaultFilteredNotes(notes = tagFilteredNotes, scoredResults = emptyList())
+        return VaultFilteredNotes(notes = pinnedFilteredNotes, scoredResults = emptyList())
     }
 
-    val scoredResults = SearchUtils.scoreAndRank(tagFilteredNotes, normalizedQuery)
+    val scoredResults = SearchUtils.searchAndSort(
+        notes = pinnedFilteredNotes,
+        query = normalizedQuery,
+        scope = searchScope,
+        sort = searchSort
+    )
     return VaultFilteredNotes(
         notes = scoredResults.map { it.note },
         scoredResults = scoredResults
@@ -684,9 +753,33 @@ private fun vaultTopTags(notes: List<Note>): List<Tag> =
     VaultTagAggregator.aggregate(notes)
         .take(TagRepository.DEFAULT_TOP_TAGS_LIMIT)
 
-private fun VaultFilteredNotes.sortedForVault(sortOrder: SortOrder): List<Note> {
+private fun VaultFilteredNotes.sortedForVault(
+    browseSortOrder: SortOrder,
+    searchSort: NoteSearchSort
+): List<Note> {
     if (scoredResults.isNotEmpty()) return notes
-    return sortVaultNotes(notes = notes, sortOrder = sortOrder)
+    if (searchSort == NoteSearchSort.TITLE_ASC) {
+        return notes.sortedWith(
+            compareByDescending<Note> { note -> note.isPinned }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { note -> note.title }
+                .thenBy { note -> note.id }
+        )
+    }
+    if (searchSort == NoteSearchSort.TITLE_DESC) {
+        return notes.sortedWith(
+            compareByDescending<Note> { note -> note.isPinned }
+                .thenByDescending(String.CASE_INSENSITIVE_ORDER) { note -> note.title }
+                .thenByDescending { note -> note.id }
+        )
+    }
+    val effectiveSortOrder = when (searchSort) {
+        NoteSearchSort.MODIFIED_ASC -> SortOrder.MODIFIED_ASC
+        NoteSearchSort.MODIFIED_DESC -> SortOrder.MODIFIED_DESC
+        NoteSearchSort.RELEVANCE -> browseSortOrder
+        NoteSearchSort.TITLE_ASC,
+        NoteSearchSort.TITLE_DESC -> error("Handled above")
+    }
+    return sortVaultNotes(notes = notes, sortOrder = effectiveSortOrder)
 }
 
 private fun sortVaultNotes(notes: List<Note>, sortOrder: SortOrder): List<Note> {

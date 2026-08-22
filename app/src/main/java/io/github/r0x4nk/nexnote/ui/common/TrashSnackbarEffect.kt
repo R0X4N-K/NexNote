@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
 internal fun TrashSnackbarEffect(
     trashEvents: Flow<TrashedNoteEvent>,
     snackbarHostState: SnackbarHostState,
-    onUndoTrash: (Long) -> Unit,
+    onUndoTrash: (Collection<Long>) -> Unit,
     onConfirmTrash: () -> Unit
 ) {
     val currentOnUndoTrash by rememberUpdatedState(onUndoTrash)
@@ -40,11 +40,11 @@ internal fun TrashSnackbarEffect(
 internal suspend fun handleTrashSnackbarEvent(
     event: TrashedNoteEvent,
     showSnackbar: suspend (TrashedNoteEvent) -> SnackbarResult,
-    onUndoTrash: (Long) -> Unit,
+    onUndoTrash: (Collection<Long>) -> Unit,
     onConfirmTrash: () -> Unit
 ) {
     when (showSnackbar(event)) {
-        SnackbarResult.ActionPerformed -> event.noteIds.forEach(onUndoTrash)
+        SnackbarResult.ActionPerformed -> onUndoTrash(event.noteIds)
         SnackbarResult.Dismissed -> onConfirmTrash()
     }
 }

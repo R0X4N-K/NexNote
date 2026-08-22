@@ -9,11 +9,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 
-private const val TAB_FADE_IN_DURATION_MS = 160
-private const val TAB_FADE_OUT_DURATION_MS = 120
-private const val BACK_STACK_SLIDE_DURATION_MS = 280
-private const val BACK_STACK_FADE_IN_DURATION_MS = 220
-private const val BACK_STACK_FADE_OUT_DURATION_MS = 200
+private const val TAB_FADE_IN_DURATION_MS = 100
+private const val TAB_FADE_OUT_DURATION_MS = 70
+private const val BACK_STACK_SLIDE_DURATION_MS = 200
+private const val BACK_STACK_FADE_IN_DURATION_MS = 140
+private const val BACK_STACK_FADE_OUT_DURATION_MS = 120
+private const val BACK_STACK_SLIDE_DISTANCE_DIVISOR = 5
 
 internal fun tabEnterTransition(): EnterTransition =
     fadeIn(tween(TAB_FADE_IN_DURATION_MS))
@@ -22,13 +23,19 @@ internal fun tabExitTransition(): ExitTransition =
     fadeOut(tween(TAB_FADE_OUT_DURATION_MS))
 
 internal fun forwardEnterTransition(): EnterTransition =
-    slideInHorizontally(tween(BACK_STACK_SLIDE_DURATION_MS, easing = FastOutSlowInEasing)) { it } +
+    slideInHorizontally(tween(BACK_STACK_SLIDE_DURATION_MS, easing = FastOutSlowInEasing)) {
+        it / BACK_STACK_SLIDE_DISTANCE_DIVISOR
+    } +
         fadeIn(tween(BACK_STACK_FADE_IN_DURATION_MS))
 
 internal fun backwardEnterTransition(): EnterTransition =
-    slideInHorizontally(tween(BACK_STACK_SLIDE_DURATION_MS, easing = FastOutSlowInEasing)) { -it } +
+    slideInHorizontally(tween(BACK_STACK_SLIDE_DURATION_MS, easing = FastOutSlowInEasing)) {
+        -it / BACK_STACK_SLIDE_DISTANCE_DIVISOR
+    } +
         fadeIn(tween(BACK_STACK_FADE_IN_DURATION_MS))
 
 internal fun forwardExitTransition(): ExitTransition =
-    slideOutHorizontally(tween(BACK_STACK_SLIDE_DURATION_MS, easing = FastOutSlowInEasing)) { it } +
+    slideOutHorizontally(tween(BACK_STACK_SLIDE_DURATION_MS, easing = FastOutSlowInEasing)) {
+        it / BACK_STACK_SLIDE_DISTANCE_DIVISOR
+    } +
         fadeOut(tween(BACK_STACK_FADE_OUT_DURATION_MS))

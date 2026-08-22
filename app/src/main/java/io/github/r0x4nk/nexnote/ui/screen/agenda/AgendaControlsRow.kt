@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.DropdownMenuItem
@@ -21,10 +22,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
 import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
+import io.github.r0x4nk.nexnote.ui.component.NoteSearchSortMenu
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -35,6 +38,8 @@ internal fun AgendaControlsRow(
     viewMode: NoteListViewMode,
     isSearchActive: Boolean,
     searchQuery: String,
+    searchSort: NoteSearchSort,
+    hasActiveSearchFilters: Boolean,
     searchFocusRequester: FocusRequester,
     selectedYear: Int,
     selectedMonth: Int,
@@ -52,6 +57,8 @@ internal fun AgendaControlsRow(
         if (isSearchActive) {
             AgendaSearchControls(
                 searchQuery = searchQuery,
+                searchSort = searchSort,
+                hasActiveSearchFilters = hasActiveSearchFilters,
                 searchFocusRequester = searchFocusRequester,
                 actions = actions
             )
@@ -72,15 +79,11 @@ internal fun AgendaControlsRow(
 @Composable
 private fun RowScope.AgendaSearchControls(
     searchQuery: String,
+    searchSort: NoteSearchSort,
+    hasActiveSearchFilters: Boolean,
     searchFocusRequester: FocusRequester,
     actions: AgendaActions
 ) {
-    NexIconButton(
-        imageVector = Icons.Default.Close,
-        contentDescription = "Close search",
-        onClick = { actions.onSearchToggle(false) }
-    )
-
     NexSearchField(
         value = searchQuery,
         onValueChange = actions.onSearchQueryChange,
@@ -89,6 +92,21 @@ private fun RowScope.AgendaSearchControls(
             .weight(1f),
         focusRequester = searchFocusRequester,
         textStyle = MaterialTheme.typography.bodyLarge
+    )
+    NoteSearchSortMenu(
+        selected = searchSort,
+        onSelect = actions.onSearchSortChange
+    )
+    NexIconButton(
+        imageVector = Icons.Default.FilterAlt,
+        contentDescription = "Filter search results",
+        selected = hasActiveSearchFilters,
+        onClick = actions.onOpenSearchFilters
+    )
+    NexIconButton(
+        imageVector = Icons.Default.Close,
+        contentDescription = "Close search",
+        onClick = { actions.onSearchToggle(false) }
     )
 }
 

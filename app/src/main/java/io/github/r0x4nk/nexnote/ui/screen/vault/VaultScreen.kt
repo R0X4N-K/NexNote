@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Search
@@ -92,6 +93,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.ui.common.NoteCollectionLayoutDefaults
@@ -109,9 +111,12 @@ import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheetHeader
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheetRow
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
 import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
+import io.github.r0x4nk.nexnote.ui.component.NoteSearchFiltersSheet
+import io.github.r0x4nk.nexnote.ui.component.NoteSearchSortMenu
 import io.github.r0x4nk.nexnote.ui.component.NoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderCollection
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
@@ -160,6 +165,7 @@ fun VaultScreen(
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    var showSearchFilters by rememberSaveable { mutableStateOf(false) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
     }
@@ -210,7 +216,11 @@ fun VaultScreen(
         if (!accessState.isUnlocked) {
             activeActionsNote = null
             selectionState = selectionState.exit()
+            showSearchFilters = false
         }
+    }
+    LaunchedEffect(notesState.isSearchActive) {
+        if (!notesState.isSearchActive) showSearchFilters = false
     }
     VaultSelectionCleanupEffect(
         selectionState = selectionState,
@@ -298,6 +308,8 @@ fun VaultScreen(
                     searchQuery = notesState.searchQuery,
                     isSearchActive = notesState.isSearchActive,
                     sortOrder = notesState.sortOrder,
+                    searchSort = notesState.searchSort,
+                    hasActiveSearchFilters = notesState.hasActiveSearchFilters,
                     viewMode = notesState.viewMode,
                     isTrashVisible = notesState.isTrashVisible,
                     searchFocusRequester = searchFocusRequester,
@@ -305,6 +317,8 @@ fun VaultScreen(
                     onLock = accessViewModel::lock,
                     onSearchQueryChange = notesViewModel::onSearchQueryChange,
                     onSearchToggle = notesViewModel::onSearchToggle,
+                    onOpenSearchFilters = { showSearchFilters = true },
+                    onSearchSortChange = notesViewModel::setSearchSort,
                     onToggleSortOrder = notesViewModel::toggleSortOrder,
                     onToggleViewMode = notesViewModel::toggleViewMode,
                     onToggleTrashVisibility = notesViewModel::toggleTrashVisibility,
@@ -354,9 +368,31 @@ fun VaultScreen(
                 isFabAvailable = isVaultRadialMenuAvailable,
                 floatingBottomPadding = floatingBottomPadding
             ),
+            scrollToTopBottomPadding = if (isVaultRadialMenuAvailable) {
+                RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
+            } else {
+                floatingBottomPadding + 16.dp
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+        )
+    }
+
+    if (
+        showSearchFilters && accessState.isUnlocked &&
+        notesState.isUnlocked && notesState.isSearchActive
+    ) {
+        NoteSearchFiltersSheet(
+            searchScope = notesState.searchScope,
+            pinnedFilter = notesState.pinnedFilter,
+            selectedTagFilters = notesState.selectedTagFilters,
+            availableTagNames = notesState.availableTagNames,
+            onSearchScopeChange = notesViewModel::setSearchScope,
+            onPinnedFilterChange = notesViewModel::setPinnedFilter,
+            onToggleTagFilter = notesViewModel::toggleTagFilter,
+            onClearTagFilters = notesViewModel::clearTagFilters,
+            onDismiss = { showSearchFilters = false }
         )
     }
 
@@ -462,6 +498,8 @@ private fun VaultTopBar(
     searchQuery: String,
     isSearchActive: Boolean,
     sortOrder: SortOrder,
+    searchSort: NoteSearchSort,
+    hasActiveSearchFilters: Boolean,
     viewMode: NoteListViewMode,
     isTrashVisible: Boolean,
     searchFocusRequester: FocusRequester,
@@ -469,6 +507,8 @@ private fun VaultTopBar(
     onLock: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onSearchToggle: (Boolean) -> Unit,
+    onOpenSearchFilters: () -> Unit,
+    onSearchSortChange: (NoteSearchSort) -> Unit,
     onToggleSortOrder: () -> Unit,
     onToggleViewMode: () -> Unit,
     onToggleTrashVisibility: () -> Unit,
@@ -494,6 +534,16 @@ private fun VaultTopBar(
         actions = {
             if (isUnlocked) {
                 if (isSearchActive) {
+                    NoteSearchSortMenu(
+                        selected = searchSort,
+                        onSelect = onSearchSortChange
+                    )
+                    NexIconButton(
+                        imageVector = Icons.Default.FilterAlt,
+                        contentDescription = "Filter search results",
+                        selected = hasActiveSearchFilters,
+                        onClick = onOpenSearchFilters
+                    )
                     NexIconButton(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close search",
@@ -698,6 +748,7 @@ private fun VaultContent(
     onRestoreFromTrash: (Note) -> Unit,
     onRequestDeletePermanentlyFromTrash: (Note) -> Unit,
     bottomContentPadding: Dp,
+    scrollToTopBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
     when {
@@ -755,6 +806,7 @@ private fun VaultContent(
                 onRequestDeletePermanentlyFromTrash =
                     onRequestDeletePermanentlyFromTrash,
                 bottomContentPadding = bottomContentPadding,
+                scrollToTopBottomPadding = scrollToTopBottomPadding,
                 modifier = modifier
             )
         }
@@ -1020,45 +1072,65 @@ internal fun VaultNotesCollection(
     onToggleTagFilter: (String) -> Unit = {},
     onRemoveTagFilter: (String) -> Unit = {},
     onClearTagFilters: () -> Unit = {},
-    bottomContentPadding: Dp = NoteCollectionLayoutDefaults.defaultBottomPadding
+    bottomContentPadding: Dp = NoteCollectionLayoutDefaults.defaultBottomPadding,
+    scrollToTopBottomPadding: Dp = 16.dp
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        VaultProtectionBanner(isTrashVisible = isTrashVisible)
-        // Tag filter bars are hidden while loading: their state derives from
-        // the encrypted Vault tags flow, which has not yet emitted.
-        if (!isLoading) {
-            VaultTagFilterBars(
-                topTags = topTags,
-                selectedTagFilters = selectedTagFilters,
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            VaultProtectionBanner(isTrashVisible = isTrashVisible)
+            // Tag filter bars are hidden while loading: their state derives from
+            // the encrypted Vault tags flow, which has not yet emitted.
+            if (!isLoading) {
+                VaultTagFilterBars(
+                    topTags = topTags,
+                    selectedTagFilters = selectedTagFilters,
+                    isTrashVisible = isTrashVisible,
+                    isSearchActive = isSearchActive,
+                    onToggleTagFilter = onToggleTagFilter,
+                    onRemoveTagFilter = onRemoveTagFilter,
+                    onClearTagFilters = onClearTagFilters
+                )
+            }
+            VaultNotesBody(
+                notes = notes,
+                scoredResults = scoredResults,
+                viewMode = viewMode,
+                noteCardStyle = noteCardStyle,
+                listState = listState,
+                gridState = gridState,
+                isLoading = isLoading,
                 isTrashVisible = isTrashVisible,
                 isSearchActive = isSearchActive,
-                onToggleTagFilter = onToggleTagFilter,
-                onRemoveTagFilter = onRemoveTagFilter,
-                onClearTagFilters = onClearTagFilters
+                hasTagFilter = selectedTagFilters.isNotEmpty(),
+                selectionState = selectionState,
+                onNoteClick = onNoteClick,
+                onRequestNoteActions = onRequestNoteActions,
+                onToggleNoteSelection = onToggleNoteSelection,
+                onMoveToTrash = onMoveToTrash,
+                onTogglePin = onTogglePin,
+                onRestoreFromTrash = onRestoreFromTrash,
+                onRequestDeletePermanentlyFromTrash = onRequestDeletePermanentlyFromTrash,
+                bottomContentPadding = bottomContentPadding,
+                modifier = Modifier.weight(1f)
             )
         }
-        VaultNotesBody(
-            notes = notes,
-            scoredResults = scoredResults,
-            viewMode = viewMode,
-            noteCardStyle = noteCardStyle,
-            listState = listState,
-            gridState = gridState,
-            isLoading = isLoading,
-            isTrashVisible = isTrashVisible,
-            isSearchActive = isSearchActive,
-            hasTagFilter = selectedTagFilters.isNotEmpty(),
-            selectionState = selectionState,
-            onNoteClick = onNoteClick,
-            onRequestNoteActions = onRequestNoteActions,
-            onToggleNoteSelection = onToggleNoteSelection,
-            onMoveToTrash = onMoveToTrash,
-            onTogglePin = onTogglePin,
-            onRestoreFromTrash = onRestoreFromTrash,
-            onRequestDeletePermanentlyFromTrash = onRequestDeletePermanentlyFromTrash,
-            bottomContentPadding = bottomContentPadding,
-            modifier = Modifier.weight(1f)
-        )
+        if (!isLoading && notes.isNotEmpty()) {
+            when (viewMode) {
+                NoteListViewMode.GRID -> ScrollToTopButton(
+                    gridState = gridState,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+                )
+                NoteListViewMode.LIST,
+                NoteListViewMode.TAGS -> ScrollToTopButton(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+                )
+            }
+        }
     }
 }
 

@@ -52,12 +52,14 @@ fun HomeScreen(
     onNewNote: () -> Unit,
     onNewNoteFromTemplate: (templateId: Long) -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenStatistics: () -> Unit,
     onOpenVault: () -> Unit,
     onMoveNoteToVault: (noteId: Long) -> Unit,
     floatingBottomPadding: Dp = 0.dp,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val allSelectionCandidateIds by viewModel.selectionCandidateIds.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val noteCardStyle by viewModel.noteCardStyle.collectAsStateWithLifecycle()
@@ -68,14 +70,16 @@ fun HomeScreen(
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    var showSearchFilters by rememberSaveable { mutableStateOf(false) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
     }
     val selectableNotes = rememberHomeSelectableNotes(uiState)
-    val selectableNoteIds = remember(selectableNotes) { selectableNotes.map { it.id } }
+    val selectableNoteIds = allSelectionCandidateIds.orEmpty()
     val selectedNotes = remember(selectionState, selectableNotes) {
         selectionState.selectedItems(selectableNotes) { it.id }
     }
+    val hasUnloadedSelection = selectionState.selectedCount > selectedNotes.size
 
     TrashSnackbarEffect(
         trashEvents = viewModel.trashEvents,
@@ -87,7 +91,7 @@ fun HomeScreen(
     DoubleBackToExitHandler()
     HomeSelectionCleanupEffect(
         selectionState = selectionState,
-        selectableIds = selectableNoteIds,
+        selectableIds = allSelectionCandidateIds,
         onSelectionChange = { selectionState = it }
     )
     RadialMenuFabHideEffect(selectionState.isActive)
@@ -123,23 +127,29 @@ fun HomeScreen(
                     onDeselectAll = {
                         selectionState = selectionState.deselectAll()
                     },
-                    onShareSelected = {
-                        shareCallbacks.onShareNotes(selectedNotes)
-                        selectionState = selectionState.exit()
-                        activeActionsNote = null
+                    onShareSelected = if (hasUnloadedSelection) null else {
+                        {
+                            shareCallbacks.onShareNotes(selectedNotes)
+                            selectionState = selectionState.exit()
+                            activeActionsNote = null
+                        }
                     },
-                    onCopySelectedAsText = {
-                        clipboardCallbacks.onCopyPlainTextNotes(selectedNotes)
-                        selectionState = selectionState.exit()
-                        activeActionsNote = null
+                    onCopySelectedAsText = if (hasUnloadedSelection) null else {
+                        {
+                            clipboardCallbacks.onCopyPlainTextNotes(selectedNotes)
+                            selectionState = selectionState.exit()
+                            activeActionsNote = null
+                        }
                     },
-                    onCopySelectedAsMarkdown = {
-                        clipboardCallbacks.onCopyMarkdownNotes(selectedNotes)
-                        selectionState = selectionState.exit()
-                        activeActionsNote = null
+                    onCopySelectedAsMarkdown = if (hasUnloadedSelection) null else {
+                        {
+                            clipboardCallbacks.onCopyMarkdownNotes(selectedNotes)
+                            selectionState = selectionState.exit()
+                            activeActionsNote = null
+                        }
                     },
                     onDeleteSelected = {
-                        viewModel.requestTrash(selectedNotes)
+                        viewModel.requestTrashByIds(selectionState.selectedIds)
                         selectionState = selectionState.exit()
                         activeActionsNote = null
                     }
@@ -150,10 +160,16 @@ fun HomeScreen(
                     scrollBehavior = scrollBehavior,
                     searchFocusRequester = searchFocusRequester,
                     onSearchQueryChange = viewModel::onSearchQueryChange,
-                    onSearchToggle = viewModel::onSearchToggle,
+                    onSearchToggle = { active ->
+                        if (!active) showSearchFilters = false
+                        viewModel.onSearchToggle(active)
+                    },
+                    onOpenSearchFilters = { showSearchFilters = true },
+                    onSearchSortChange = viewModel::setSearchSort,
                     onSortToggle = viewModel::toggleSortOrder,
                     onViewModeToggle = viewModel::toggleViewMode,
                     onOpenTrash = onOpenTrash,
+                    onOpenStatistics = onOpenStatistics,
                     onOpenVault = onOpenVault,
                     onStartSelection = {
                         selectionState = selectionState.enter()
@@ -175,6 +191,7 @@ fun HomeScreen(
             onToggleTagFilter = viewModel::toggleTagFilter,
             onRemoveTagFilter = viewModel::removeTagFilter,
             onClearTagFilters = viewModel::clearTagFilters,
+            onLoadMoreNotes = viewModel::loadMoreNotes,
             onTogglePin = viewModel::togglePin,
             onRequestTrash = viewModel::requestTrash,
             onRequestNoteActions = { note ->
@@ -212,6 +229,17 @@ fun HomeScreen(
                 onNewNoteFromTemplate(templateId)
             },
             onDismiss = viewModel::dismissTemplatePicker
+        )
+    }
+
+    if (showSearchFilters && uiState.isSearchActive) {
+        HomeSearchFiltersSheet(
+            uiState = uiState,
+            onSearchScopeChange = viewModel::setSearchScope,
+            onPinnedFilterChange = viewModel::setPinnedFilter,
+            onToggleTagFilter = viewModel::toggleTagFilter,
+            onClearTagFilters = viewModel::clearTagFilters,
+            onDismiss = { showSearchFilters = false }
         )
     }
 }
@@ -282,10 +310,11 @@ private fun rememberHomeSelectableNotes(uiState: HomeUiState): List<Note> =
 @Composable
 private fun HomeSelectionCleanupEffect(
     selectionState: SelectionUiState,
-    selectableIds: List<Long>,
+    selectableIds: Set<Long>?,
     onSelectionChange: (SelectionUiState) -> Unit
 ) {
     LaunchedEffect(selectionState, selectableIds) {
+        if (selectableIds == null) return@LaunchedEffect
         val retained = selectionState.retainSelectableIds(selectableIds)
         if (retained != selectionState) {
             onSelectionChange(retained)

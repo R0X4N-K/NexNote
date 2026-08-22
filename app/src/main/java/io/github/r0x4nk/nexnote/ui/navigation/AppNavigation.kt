@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.view.Window
 import android.view.WindowManager
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -407,6 +408,7 @@ private fun RowScope.AppBottomNavItem(
         } else {
             Color.Transparent
         },
+        animationSpec = tween(BOTTOM_NAV_COLOR_DURATION_MS),
         label = "bottom navigation container"
     )
     val contentColor by animateColorAsState(
@@ -415,6 +417,7 @@ private fun RowScope.AppBottomNavItem(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
+        animationSpec = tween(BOTTOM_NAV_COLOR_DURATION_MS),
         label = "bottom navigation content"
     )
     val shape = RoundedCornerShape(19.dp)
@@ -467,6 +470,8 @@ private val bottomNavRoutes = setOf(
     Screen.Templates.route,
     Screen.Settings.route
 )
+
+private const val BOTTOM_NAV_COLOR_DURATION_MS = 100
 
 private data class BottomNavItem(
     val screen: Screen,

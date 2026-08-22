@@ -3,6 +3,9 @@ package io.github.r0x4nk.nexnote.ui.screen.agenda
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
+import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
@@ -255,6 +258,67 @@ class AgendaViewModelTest {
         val notes = viewModel.uiState.value.notesForSelectedDate
         assertEquals(1, notes.size)
         assertEquals(20L, notes.first().id)
+    }
+
+    @Test
+    fun `advanced search applies scope pinned filter and title ordering`() = runViewModelTest {
+        val noteTs = DateUtils.toMillis(2025, Calendar.JUNE, 10)
+        fakeDao.addNote(
+            NoteEntity(
+                id = 20L,
+                title = "Zulu Kotlin",
+                content = "Alpha",
+                creationDate = noteTs,
+                isPinned = true
+            )
+        )
+        fakeDao.addNote(
+            NoteEntity(
+                id = 21L,
+                title = "Alpha Java",
+                content = "Kotlin body",
+                creationDate = noteTs
+            )
+        )
+        fakeDao.addNote(
+            NoteEntity(
+                id = 22L,
+                title = "Beta Kotlin",
+                content = "Gamma",
+                creationDate = noteTs
+            )
+        )
+        viewModel.selectDate(2025, Calendar.JUNE, 10)
+        viewModel.onSearchToggle(true)
+        viewModel.setSearchScope(NoteSearchScope.TITLE)
+        viewModel.setPinnedFilter(NotePinnedFilter.UNPINNED)
+        viewModel.setSearchSort(NoteSearchSort.TITLE_ASC)
+        viewModel.onSearchQueryChange("Kotlin")
+        advanceTimeBy(350)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(22L),
+            viewModel.uiState.value.notesForSelectedDate.map { note -> note.id }
+        )
+        assertEquals(NoteSearchScope.TITLE, viewModel.uiState.value.searchScope)
+        assertEquals(NotePinnedFilter.UNPINNED, viewModel.uiState.value.pinnedFilter)
+        assertEquals(NoteSearchSort.TITLE_ASC, viewModel.uiState.value.searchSort)
+    }
+
+    @Test
+    fun `closing search resets advanced options`() = runViewModelTest {
+        viewModel.onSearchToggle(true)
+        viewModel.setSearchScope(NoteSearchScope.CONTENT)
+        viewModel.setPinnedFilter(NotePinnedFilter.PINNED)
+        viewModel.setSearchSort(NoteSearchSort.TITLE_DESC)
+
+        viewModel.onSearchToggle(false)
+        advanceUntilIdle()
+
+        assertEquals(NoteSearchScope.TITLE_AND_CONTENT, viewModel.uiState.value.searchScope)
+        assertEquals(NotePinnedFilter.ALL, viewModel.uiState.value.pinnedFilter)
+        assertEquals(NoteSearchSort.RELEVANCE, viewModel.uiState.value.searchSort)
     }
 
     @Test

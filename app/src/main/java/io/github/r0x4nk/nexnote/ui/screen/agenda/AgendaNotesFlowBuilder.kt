@@ -1,11 +1,17 @@
 package io.github.r0x4nk.nexnote.ui.screen.agenda
 
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
+import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.util.DateUtils
+import io.github.r0x4nk.nexnote.util.SearchUtils
+import io.github.r0x4nk.nexnote.util.TagParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -60,26 +66,68 @@ internal fun buildAgendaProcessedNotesFlow(
     filteredNoteIds: Flow<Set<Long>>,
     searchQuery: Flow<String>,
     sortOrder: Flow<SortOrder>,
+    searchSort: Flow<NoteSearchSort>,
+    searchScope: Flow<NoteSearchScope>,
+    pinnedFilter: Flow<NotePinnedFilter>,
     searchDebounceMs: Long
-): Flow<List<Note>> {
+): Flow<AgendaProcessedNotes> {
+    val searchOptions = combine(
+        searchQuery.debounce(searchDebounceMs),
+        searchSort,
+        searchScope,
+        pinnedFilter,
+        ::AgendaSearchOptions
+    )
     return combine(
         rawNotesForDay,
         filteredNoteIds,
-        searchQuery.debounce(searchDebounceMs),
-        sortOrder
-    ) { notes, tagIds, query, order ->
+        sortOrder,
+        searchOptions
+    ) { notes, tagIds, order, options ->
+        val availableTagNames = notes.asSequence()
+            .flatMap { note -> TagParser.extractTags(note.content).asSequence() }
+            .toSet()
         val tagFiltered = if (tagIds.isEmpty()) notes else notes.filter { it.id in tagIds }
-        val searched = if (query.isBlank()) {
-            tagFiltered
-        } else {
-            tagFiltered.filter {
-                it.title.contains(query, ignoreCase = true) ||
-                    it.content.contains(query, ignoreCase = true)
+        val pinnedFiltered = tagFiltered.filter { note ->
+            when (options.pinnedFilter) {
+                NotePinnedFilter.ALL -> true
+                NotePinnedFilter.PINNED -> note.isPinned
+                NotePinnedFilter.UNPINNED -> !note.isPinned
             }
         }
-        searched.sortedByPinnedAndModifiedDate(order)
+        if (options.query.isBlank()) {
+            return@combine AgendaProcessedNotes(
+                notes = pinnedFiltered.sortedByPinnedAndModifiedDate(order),
+                availableTagNames = availableTagNames
+            )
+        }
+
+        val scored = SearchUtils.searchAndSort(
+            notes = pinnedFiltered,
+            query = options.query,
+            scope = options.searchScope,
+            sort = options.searchSort
+        )
+        AgendaProcessedNotes(
+            notes = scored.map(ScoredNote::note),
+            scoredResults = scored,
+            availableTagNames = availableTagNames
+        )
     }
 }
+
+internal data class AgendaProcessedNotes(
+    val notes: List<Note>,
+    val scoredResults: List<ScoredNote> = emptyList(),
+    val availableTagNames: Set<String> = emptySet()
+)
+
+private data class AgendaSearchOptions(
+    val query: String,
+    val searchSort: NoteSearchSort,
+    val searchScope: NoteSearchScope,
+    val pinnedFilter: NotePinnedFilter
+)
 
 private fun List<Note>.sortedByPinnedAndModifiedDate(order: SortOrder): List<Note> {
     val comparator = when (order) {

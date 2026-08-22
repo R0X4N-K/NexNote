@@ -1,21 +1,27 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -23,6 +29,7 @@ import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 
 @Composable
 internal fun TemplatesCollection(
@@ -35,33 +42,58 @@ internal fun TemplatesCollection(
     onDelete: (Template) -> Unit,
     onToggleSelection: (Template) -> Unit
 ) {
-    val contentModifier = Modifier.fillMaxSize().padding(padding)
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyStaggeredGridState()
     val bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
-
-    if (uiState.viewMode == NoteListViewMode.GRID) {
-        TemplatesGrid(
-            predefined = uiState.predefined,
-            custom = uiState.custom,
-            bottomContentPadding = bottomContentPadding,
-            selectionState = selectionState,
-            onApply = onApply,
-            onEdit = onEdit,
-            onDelete = onDelete,
-            onToggleSelection = onToggleSelection,
-            modifier = contentModifier
-        )
+    val scrollToTopBottomPadding = if (selectionState.isActive) {
+        floatingBottomPadding + 16.dp
     } else {
-        TemplatesList(
-            predefined = uiState.predefined,
-            custom = uiState.custom,
-            bottomContentPadding = bottomContentPadding,
-            selectionState = selectionState,
-            onApply = onApply,
-            onEdit = onEdit,
-            onDelete = onDelete,
-            onToggleSelection = onToggleSelection,
-            modifier = contentModifier
-        )
+        bottomContentPadding
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+    ) {
+        if (uiState.viewMode == NoteListViewMode.GRID) {
+            TemplatesGrid(
+                predefined = uiState.predefined,
+                custom = uiState.custom,
+                bottomContentPadding = bottomContentPadding,
+                gridState = gridState,
+                selectionState = selectionState,
+                onApply = onApply,
+                onEdit = onEdit,
+                onDelete = onDelete,
+                onToggleSelection = onToggleSelection,
+                modifier = Modifier.fillMaxSize()
+            )
+            ScrollToTopButton(
+                gridState = gridState,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+            )
+        } else {
+            TemplatesList(
+                predefined = uiState.predefined,
+                custom = uiState.custom,
+                bottomContentPadding = bottomContentPadding,
+                listState = listState,
+                selectionState = selectionState,
+                onApply = onApply,
+                onEdit = onEdit,
+                onDelete = onDelete,
+                onToggleSelection = onToggleSelection,
+                modifier = Modifier.fillMaxSize()
+            )
+            ScrollToTopButton(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = scrollToTopBottomPadding)
+            )
+        }
     }
 }
 
@@ -70,6 +102,7 @@ private fun TemplatesList(
     predefined: List<Template>,
     custom: List<Template>,
     bottomContentPadding: Dp,
+    listState: LazyListState,
     selectionState: SelectionUiState,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
@@ -78,6 +111,7 @@ private fun TemplatesList(
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
+        state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(
             start = 16.dp,
@@ -148,6 +182,7 @@ private fun TemplatesGrid(
     predefined: List<Template>,
     custom: List<Template>,
     bottomContentPadding: Dp,
+    gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
     onApply: (Long) -> Unit,
     onEdit: (Long) -> Unit,
@@ -157,6 +192,7 @@ private fun TemplatesGrid(
 ) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(2),
+        state = gridState,
         modifier = modifier,
         contentPadding = PaddingValues(
             start = 12.dp,

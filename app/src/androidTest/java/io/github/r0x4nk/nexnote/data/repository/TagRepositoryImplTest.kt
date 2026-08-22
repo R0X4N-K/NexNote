@@ -83,6 +83,33 @@ class TagRepositoryImplTest {
     }
 
     @Test
+    fun observeNotesForTag_selectsOnlyMatchingActiveNormalNotes() = runTest {
+        val normalId = db.noteDao().insertNote(
+            NoteEntity(title = "Normal", content = "#work", lastModifiedDate = 3_000L)
+        )
+        val unrelatedId = db.noteDao().insertNote(
+            NoteEntity(title = "Unrelated", content = "#home", lastModifiedDate = 2_000L)
+        )
+        val deletedId = db.noteDao().insertNote(
+            NoteEntity(title = "Deleted", content = "#work", isDeleted = true)
+        )
+        val vaultId = db.noteDao().insertNote(
+            NoteEntity(title = "Vault", content = "#work", isInVault = true)
+        )
+        db.tagDao().insertTag(TagEntity("work", 1_000L, 1_000L))
+        listOf(normalId, deletedId, vaultId).forEach { noteId ->
+            db.tagDao().insertCrossRef(NoteTagCrossRef(noteId, "work"))
+        }
+        db.tagDao().insertTag(TagEntity("home", 1_000L, 1_000L))
+        db.tagDao().insertCrossRef(NoteTagCrossRef(unrelatedId, "home"))
+
+        assertEquals(
+            listOf(normalId),
+            repository.observeNotesForTag("work").first().map { note -> note.id }
+        )
+    }
+
+    @Test
     fun deleteTag_scrubsStaleVaultCrossRefsWithoutPatchingVaultContent() = runTest {
         val normalNoteId = db.noteDao().insertNote(
             NoteEntity(

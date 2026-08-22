@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
+import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +67,7 @@ internal fun TagsScreenLayout(
             uiState = uiState,
             searchFocusRequester = searchFocusRequester,
             isSearchActive = isSearchActive,
+            floatingBottomPadding = floatingBottomPadding,
             actions = actions,
             modifier = Modifier.padding(innerPadding)
         )
@@ -75,9 +79,11 @@ private fun TagsScreenContent(
     uiState: TagsUiState,
     searchFocusRequester: FocusRequester,
     isSearchActive: Boolean,
+    floatingBottomPadding: Dp,
     actions: TagsActions,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
     Column(modifier = modifier.fillMaxSize()) {
         InlineSearchBar(
             isVisible = isSearchActive,
@@ -86,17 +92,31 @@ private fun TagsScreenContent(
             onQueryChange = actions.onSearchQueryChange,
             onClose = actions.onSearchClose
         )
-        TagsBody(
-            uiState = uiState,
-            actions = actions,
-            modifier = Modifier.weight(1f)
-        )
+        Box(modifier = Modifier.weight(1f)) {
+            TagsBody(
+                uiState = uiState,
+                listState = listState,
+                bottomContentPadding = floatingBottomPadding,
+                actions = actions,
+                modifier = Modifier.fillMaxSize()
+            )
+            if (uiState.tags.isNotEmpty()) {
+                ScrollToTopButton(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = floatingBottomPadding + 16.dp)
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun TagsBody(
     uiState: TagsUiState,
+    listState: LazyListState,
+    bottomContentPadding: Dp,
     actions: TagsActions,
     modifier: Modifier = Modifier
 ) {
@@ -111,6 +131,8 @@ private fun TagsBody(
             selectedTagName = uiState.selectedTagName,
             notesForSelectedTag = uiState.notesForSelectedTag,
             viewMode = uiState.viewMode,
+            listState = listState,
+            bottomContentPadding = bottomContentPadding,
             actions = actions,
             modifier = modifier
         )
@@ -133,6 +155,8 @@ private fun TagsList(
     selectedTagName: String?,
     notesForSelectedTag: List<Note>,
     viewMode: TagsViewMode,
+    listState: LazyListState,
+    bottomContentPadding: Dp,
     actions: TagsActions,
     modifier: Modifier = Modifier
 ) {
@@ -147,6 +171,8 @@ private fun TagsList(
             selectedTagName = selectedTagName,
             notesForSelectedTag = notesForSelectedTag,
             actions = actions,
+            listState = listState,
+            bottomContentPadding = bottomContentPadding,
             modifier = modifier
         )
         TagsViewMode.TREEMAP -> TagsTreemapList(
@@ -155,6 +181,8 @@ private fun TagsList(
             selectedTagName = selectedTagName,
             notesForSelectedTag = notesForSelectedTag,
             actions = actions,
+            listState = listState,
+            bottomContentPadding = bottomContentPadding,
             modifier = modifier
         )
     }
@@ -167,11 +195,19 @@ private fun TagsScoreboardList(
     selectedTagName: String?,
     notesForSelectedTag: List<Note>,
     actions: TagsActions,
+    listState: LazyListState,
+    bottomContentPadding: Dp,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
+        state = listState,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 8.dp,
+            end = 16.dp,
+            bottom = bottomContentPadding + 8.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(items = tags, key = { tag -> tag.name }, contentType = { "tag_item" }) { tag ->

@@ -3,6 +3,9 @@ package io.github.r0x4nk.nexnote.ui.screen.agenda
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
+import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import java.util.Calendar
 
 internal data class AgendaActions(
@@ -12,9 +15,14 @@ internal data class AgendaActions(
     val onSelectDate: (Int, Int, Int) -> Unit,
     val onSearchQueryChange: (String) -> Unit,
     val onSearchToggle: (Boolean) -> Unit,
+    val onOpenSearchFilters: () -> Unit,
+    val onSearchSortChange: (NoteSearchSort) -> Unit,
+    val onSearchScopeChange: (NoteSearchScope) -> Unit,
+    val onPinnedFilterChange: (NotePinnedFilter) -> Unit,
     val onToggleSort: () -> Unit,
     val onToggleView: () -> Unit,
     val onRemoveTagFilter: (String) -> Unit,
+    val onToggleTagFilter: (String) -> Unit,
     val onClearTagFilters: () -> Unit,
     val onNewNote: (Long) -> Unit,
     val onNoteClick: (Long) -> Unit,
@@ -31,7 +39,7 @@ internal data class AgendaActions(
     val onCopySelectedNotesAsMarkdown: () -> Unit,
     val onDeleteSelectedNotes: () -> Unit,
     val onToggleNoteSelection: (Note) -> Unit,
-    val onUndoTrash: (Long) -> Unit,
+    val onUndoTrash: (Collection<Long>) -> Unit,
     val onConfirmTrash: () -> Unit
 )
 
@@ -40,6 +48,7 @@ internal fun rememberAgendaActions(
     viewModel: AgendaViewModel,
     onNoteClick: (Long) -> Unit,
     onNewNote: (Long) -> Unit,
+    onOpenSearchFilters: () -> Unit,
     onRequestNoteActions: (Note) -> Unit,
     onStartNoteSelection: () -> Unit,
     onExitNoteSelection: () -> Unit,
@@ -55,6 +64,7 @@ internal fun rememberAgendaActions(
         viewModel,
         onNoteClick,
         onNewNote,
+        onOpenSearchFilters,
         onRequestNoteActions,
         onStartNoteSelection,
         onExitNoteSelection,
@@ -70,6 +80,7 @@ internal fun rememberAgendaActions(
             viewModel = viewModel,
             onNoteClick = onNoteClick,
             onNewNote = onNewNote,
+            onOpenSearchFilters = onOpenSearchFilters,
             onRequestNoteActions = onRequestNoteActions,
             onStartNoteSelection = onStartNoteSelection,
             onExitNoteSelection = onExitNoteSelection,
@@ -88,6 +99,7 @@ private fun buildAgendaActions(
     viewModel: AgendaViewModel,
     onNoteClick: (Long) -> Unit,
     onNewNote: (Long) -> Unit,
+    onOpenSearchFilters: () -> Unit,
     onRequestNoteActions: (Note) -> Unit,
     onStartNoteSelection: () -> Unit,
     onExitNoteSelection: () -> Unit,
@@ -105,9 +117,14 @@ private fun buildAgendaActions(
     onSelectDate = viewModel::selectDate,
     onSearchQueryChange = viewModel::onSearchQueryChange,
     onSearchToggle = viewModel::onSearchToggle,
+    onOpenSearchFilters = onOpenSearchFilters,
+    onSearchSortChange = viewModel::setSearchSort,
+    onSearchScopeChange = viewModel::setSearchScope,
+    onPinnedFilterChange = viewModel::setPinnedFilter,
     onToggleSort = viewModel::toggleSortOrder,
     onToggleView = viewModel::toggleViewMode,
     onRemoveTagFilter = viewModel::removeTagFilter,
+    onToggleTagFilter = viewModel::toggleTagFilter,
     onClearTagFilters = viewModel::clearTagFilters,
     onNewNote = onNewNote,
     onNoteClick = onNoteClick,

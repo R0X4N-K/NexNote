@@ -9,8 +9,7 @@ import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesForTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
@@ -59,8 +58,7 @@ class TagsViewModelTest {
             observeTagsByDateDesc = ObserveTagsByDateDescUseCase(tagRepository),
             observeTagsByDateAsc = ObserveTagsByDateAscUseCase(tagRepository),
             searchTags = SearchTagsUseCase(tagRepository),
-            observeFilteredNoteIds = ObserveFilteredNoteIdsUseCase(tagRepository),
-            observeAllNotes = ObserveAllNotesUseCase(noteRepository),
+            observeNotesForTag = ObserveNotesForTagUseCase(tagRepository),
             deleteTag = DeleteTagUseCase(tagRepository),
             moveNoteToTrash = MoveNoteToTrashUseCase(noteRepository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(noteRepository),
@@ -286,6 +284,11 @@ private class TagsFakeTagRepository(
             current.filterValues { tags -> tags.containsAll(tagNames) }.keys
         }
     }
+
+    override fun observeNotesForTag(tagName: String): Flow<List<Note>> =
+        combine(refs, noteRepository.allNotes) { current, notes ->
+            notes.filter { note -> tagName in current[note.id].orEmpty() }
+        }
 
     override suspend fun indexNoteTags(noteId: Long, content: String) = Unit
 

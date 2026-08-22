@@ -3,17 +3,19 @@ package io.github.r0x4nk.nexnote.ui.screen.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchScope
+import io.github.r0x4nk.nexnote.domain.model.HomeSearchSort
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesSortedAscUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveActiveNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveHomeNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveHomeNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveMostUsedTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.SearchNotesScoredUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListActionsDelegate
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
@@ -29,25 +31,28 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 class HomeViewModel(
-    private val searchNotesScored: SearchNotesScoredUseCase,
-    private val observeAllNotesSortedAsc: ObserveAllNotesSortedAscUseCase,
-    private val observeAllNotes: ObserveAllNotesUseCase,
+    private val observeHomeNotes: ObserveHomeNotesUseCase,
+    observeHomeNoteIds: ObserveHomeNoteIdsUseCase,
+    observeActiveNoteCount: ObserveActiveNoteCountUseCase,
     moveNoteToTrash: MoveNoteToTrashUseCase,
     restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     toggleNotePin: ToggleNotePinUseCase,
     duplicateNoteUseCase: DuplicateNoteUseCase,
     private val observeTemplates: ObserveTemplatesUseCase,
     private val observeMostUsedTags: ObserveMostUsedTagsUseCase,
-    private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
     observeNoteCardStyle: ObserveNoteCardStyleUseCase
 ) : ViewModel() {
 
     private val _searchQuery       = MutableStateFlow("")
     private val _isSearchActive    = MutableStateFlow(false)
     private val _sortOrder         = MutableStateFlow(SortOrder.MODIFIED_DESC)
+    private val _searchSort        = MutableStateFlow(HomeSearchSort.RELEVANCE)
+    private val _searchScope       = MutableStateFlow(HomeSearchScope.TITLE_AND_CONTENT)
+    private val _pinnedFilter      = MutableStateFlow(HomePinnedFilter.ALL)
     private val _viewMode          = MutableStateFlow(NoteListViewMode.LIST)
     private val _showTemplatePicker = MutableStateFlow(false)
     private val _selectedTagFilters = MutableStateFlow<Set<String>>(emptySet())
+    private val _noteLimit = MutableStateFlow(INITIAL_NOTE_LIMIT)
 
     /**
      * One-shot event channel for trash actions. Each emission triggers a
@@ -81,19 +86,7 @@ class HomeViewModel(
      */
     private val templatesFlow = buildHomeTemplatesFlow(observeTemplates, viewModelScope)
 
-    /**
-     * Most-used tags for the AutoScrollingTagRow.
-     *
-     * Bug B fix: shared as a hot [StateFlow] (Lazily started) so the Room query
-     * stays alive in [viewModelScope] once started, regardless of whether the UI
-     * is currently collecting [uiState]. Without this, the query stops after the
-     * [WhileSubscribed] timeout while the Editor is open (>5 s), and the tag row
-     * on the notes list does not reflect changes made in the Editor until the
-     * [uiState] combine fully restarts — which itself incurs the debounce delay.
-     * With [SharingStarted.Lazily] the query never stops once started, so the
-     * [StateFlow] always replays the latest tags to [uiState] combine
-     * immediately on restart.
-     */
+    /** Keeps the compact tag filter source current while Home is off screen. */
     private val topTagsFlow = buildHomeTopTagsFlow(observeMostUsedTags, viewModelScope)
 
     val noteCardStyle: StateFlow<NoteCardStyle> = observeNoteCardStyle().stateIn(
@@ -102,56 +95,50 @@ class HomeViewModel(
         initialValue = NoteCardStyle.TITLE_AND_PREVIEW
     )
 
-    /**
-     * Note IDs matching the active tag filters (intersection semantics).
-     * Emits an empty set when no filters are active — the UI treats an empty
-     * set as "show all".
-     */
-    private val filteredNoteIds: Flow<Set<Long>> =
-        buildFilteredNoteIdsFlow(_selectedTagFilters, observeFilteredNoteIds)
-
-    /**
-     * Combines a debounce-aware search query and sort order as a single
-     * [flatMapLatest] key, so a sort-order change immediately re-subscribes to
-     * the correct DAO query.
-     *
-     * Bug A fix: [transformLatest] replaces the previous [debounce] call so that
-     * an empty query (initial load, search cleared) emits instantly rather than
-     * after [SEARCH_DEBOUNCE_MS]. Without this, the first subscription to [notesData]
-     * waits 300 ms before emitting, keeping [uiState] in its [isLoading] state and
-     * leaving [topTags] blank for that entire window. The debounce is still applied
-     * for non-empty queries (live search typing) to avoid hammering the database.
-     *
-     * During search the sort order is ignored — results are ranked by score.
-     */
+    /** Builds the bounded DAO query from debounced text and immediate controls. */
     private val notesData =
         buildHomeNotesQueryFlow(
             searchQuery = _searchQuery,
+            isSearchActive = _isSearchActive,
             sortOrder = _sortOrder,
-            searchNotesScored = searchNotesScored,
-            observeAllNotesSortedAsc = observeAllNotesSortedAsc,
-            observeAllNotes = observeAllNotes,
+            searchSort = _searchSort,
+            searchScope = _searchScope,
+            pinnedFilter = _pinnedFilter,
+            selectedTagFilters = _selectedTagFilters,
+            noteLimit = _noteLimit,
+            observeHomeNotes = observeHomeNotes,
             searchDebounceMs = SEARCH_DEBOUNCE_MS
         )
 
+    val selectionCandidateIds: StateFlow<Set<Long>?> =
+        buildHomeSelectionCandidateIdsFlow(
+            searchQuery = _searchQuery,
+            isSearchActive = _isSearchActive,
+            searchScope = _searchScope,
+            pinnedFilter = _pinnedFilter,
+            selectedTagFilters = _selectedTagFilters,
+            observeHomeNoteIds = observeHomeNoteIds,
+            searchDebounceMs = SEARCH_DEBOUNCE_MS
+        ).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null
+        )
+
     /**
-     * Room flows are the single source of truth for the note list. No in-memory
-     * pending-trash filter is applied here — [requestTrash] writes to the database
-     * immediately, so Room's [allNotes] flow (which queries WHERE isDeleted = 0)
-     * automatically excludes trashed notes without any extra in-memory layer.
-     *
-     * Tag filtering is applied in-memory after the Room query: [filteredNoteIds]
-     * provides the set of matching IDs reactively, and the notes list is filtered
-     * against it. This approach avoids a complex JOIN query in NoteDao and keeps
-     * the tag filter logic separate from the core note queries.
+     * Home observes a bounded Room query. Search, sorting and tag intersection
+     * are executed by SQLite before note bodies enter application memory.
      */
     val uiState: StateFlow<HomeUiState> = buildHomeUiStateFlow(
         flows = HomeUiStateFlows(
             notesData = notesData,
-            filteredNoteIds = filteredNoteIds,
+            activeNoteCount = observeActiveNoteCount(),
             searchQuery = _searchQuery,
             isSearchActive = _isSearchActive,
             selectedTagFilters = _selectedTagFilters,
+            searchSort = _searchSort,
+            searchScope = _searchScope,
+            pinnedFilter = _pinnedFilter,
             sortOrder = _sortOrder,
             viewMode = _viewMode,
             templates = templatesFlow,
@@ -162,15 +149,38 @@ class HomeViewModel(
     )
 
     fun onSearchQueryChange(query: String) {
+        if (query != _searchQuery.value) resetNoteWindow()
         _searchQuery.update { query }
     }
 
     fun onSearchToggle(active: Boolean) {
+        if (active != _isSearchActive.value) resetNoteWindow()
         _isSearchActive.update { active }
-        if (!active) _searchQuery.update { "" }
+        if (!active) {
+            _searchQuery.value = ""
+            _searchSort.value = HomeSearchSort.RELEVANCE
+            _searchScope.value = HomeSearchScope.TITLE_AND_CONTENT
+            _pinnedFilter.value = HomePinnedFilter.ALL
+        }
+    }
+
+    fun setSearchSort(sort: HomeSearchSort) {
+        resetNoteWindow()
+        _searchSort.value = sort
+    }
+
+    fun setSearchScope(scope: HomeSearchScope) {
+        resetNoteWindow()
+        _searchScope.value = scope
+    }
+
+    fun setPinnedFilter(filter: HomePinnedFilter) {
+        resetNoteWindow()
+        _pinnedFilter.value = filter
     }
 
     fun toggleSortOrder() {
+        resetNoteWindow()
         noteListActions.toggleSortOrder()
     }
 
@@ -193,17 +203,33 @@ class HomeViewModel(
      * otherwise it is added. An empty filter set means "show all notes".
      */
     fun toggleTagFilter(tagName: String) {
+        resetNoteWindow()
         noteListActions.toggleTagFilter(tagName)
     }
 
     /** Removes a single tag from the active filters. */
     fun removeTagFilter(tagName: String) {
+        resetNoteWindow()
         noteListActions.removeTagFilter(tagName)
     }
 
     /** Clears all active tag filters, restoring the full note list. */
     fun clearTagFilters() {
+        resetNoteWindow()
         noteListActions.clearTagFilters()
+    }
+
+    /** Extends the bounded Home query when the user approaches the loaded edge. */
+    fun loadMoreNotes() {
+        _noteLimit.update { current ->
+            (current + NOTE_LOAD_BATCH_SIZE).coerceAtMost(
+                uiState.value.totalNoteCount.coerceAtLeast(INITIAL_NOTE_LIMIT)
+            )
+        }
+    }
+
+    private fun resetNoteWindow() {
+        _noteLimit.value = INITIAL_NOTE_LIMIT
     }
 
     // ── Trash actions ─────────────────────────────────────────────────────────
@@ -232,6 +258,10 @@ class HomeViewModel(
         noteListActions.requestTrash(notes)
     }
 
+    fun requestTrashByIds(noteIds: Collection<Long>) {
+        noteListActions.requestTrashByIds(noteIds)
+    }
+
     /**
      * Called when the undo snackbar is dismissed without pressing Undo.
      * The note is already in the database trash (written in [requestTrash]);
@@ -250,6 +280,10 @@ class HomeViewModel(
         noteListActions.undoPendingTrash(noteId)
     }
 
+    fun undoPendingTrash(noteIds: Collection<Long>) {
+        noteListActions.undoPendingTrash(noteIds)
+    }
+
     fun togglePin(note: Note) {
         noteListActions.togglePin(note)
     }
@@ -260,6 +294,8 @@ class HomeViewModel(
 
     companion object {
         private const val SEARCH_DEBOUNCE_MS = 300L
+        private const val INITIAL_NOTE_LIMIT = 64
+        private const val NOTE_LOAD_BATCH_SIZE = 64
 
         val Factory = homeViewModelFactory()
     }

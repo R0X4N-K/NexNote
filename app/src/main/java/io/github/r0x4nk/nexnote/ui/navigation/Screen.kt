@@ -34,6 +34,8 @@ sealed class Screen(val route: String) {
 
     data object Trash : Screen("trash")
 
+    data object Statistics : Screen("statistics")
+
     data object Vault : Screen("vault?moveNoteId={moveNoteId}") {
         const val ARG_MOVE_NOTE_ID = "moveNoteId"
 

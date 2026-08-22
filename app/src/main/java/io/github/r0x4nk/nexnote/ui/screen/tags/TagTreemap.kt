@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
@@ -40,6 +42,8 @@ internal fun TagsTreemapList(
     selectedTagName: String?,
     notesForSelectedTag: List<Note>,
     actions: TagsActions,
+    listState: LazyListState,
+    bottomContentPadding: Dp,
     modifier: Modifier = Modifier
 ) {
     val selectedTag = remember(tags, selectedTagName) {
@@ -47,8 +51,14 @@ internal fun TagsTreemapList(
     }
 
     LazyColumn(
+        state = listState,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 8.dp,
+            end = 16.dp,
+            bottom = bottomContentPadding + 8.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item(key = "tag_treemap", contentType = "tag_treemap") {

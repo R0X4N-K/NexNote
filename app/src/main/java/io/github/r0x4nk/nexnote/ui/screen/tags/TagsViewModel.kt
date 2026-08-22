@@ -12,8 +12,7 @@ import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesForTagUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByDateDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
@@ -103,8 +102,7 @@ class TagsViewModel(
     private val observeTagsByDateDesc: ObserveTagsByDateDescUseCase,
     private val observeTagsByDateAsc: ObserveTagsByDateAscUseCase,
     private val searchTags: SearchTagsUseCase,
-    private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
-    private val observeAllNotes: ObserveAllNotesUseCase,
+    private val observeNotesForTag: ObserveNotesForTagUseCase,
     private val deleteTag: DeleteTagUseCase,
     private val moveNoteToTrash: MoveNoteToTrashUseCase,
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
@@ -143,8 +141,7 @@ class TagsViewModel(
 
     private val notesForSelected = buildNotesForSelectedTagFlow(
         selectedTagName = _selectedTagName,
-        observeFilteredNoteIds = observeFilteredNoteIds,
-        observeAllNotes = observeAllNotes
+        observeNotesForTag = observeNotesForTag
     )
 
     val uiState: StateFlow<TagsUiState> = buildTagsUiStateFlow(
@@ -241,6 +238,10 @@ class TagsViewModel(
         noteMutations.undoPendingTrash(noteId)
     }
 
+    fun undoPendingTrash(noteIds: Collection<Long>) {
+        noteMutations.undoPendingTrash(noteIds)
+    }
+
     fun duplicateNote(note: Note) {
         noteMutations.duplicateNote(note)
     }
@@ -258,8 +259,7 @@ class TagsViewModel(
                     observeTagsByDateDesc = useCases.tags.observeTagsByDateDesc,
                     observeTagsByDateAsc = useCases.tags.observeTagsByDateAsc,
                     searchTags = useCases.tags.searchTags,
-                    observeFilteredNoteIds = useCases.tags.observeFilteredNoteIds,
-                    observeAllNotes = useCases.notes.observeAllNotes,
+                    observeNotesForTag = useCases.tags.observeNotesForTag,
                     deleteTag = useCases.tags.deleteTag,
                     moveNoteToTrash = useCases.notes.moveNoteToTrash,
                     restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,

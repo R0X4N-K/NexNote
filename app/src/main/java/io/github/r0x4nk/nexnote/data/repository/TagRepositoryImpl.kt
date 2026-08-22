@@ -8,6 +8,7 @@ import io.github.r0x4nk.nexnote.data.db.TagWithCount
 import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
 import io.github.r0x4nk.nexnote.data.db.entity.TagEntity
 import io.github.r0x4nk.nexnote.domain.model.Tag
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.TagParser
@@ -84,6 +85,12 @@ class TagRepositoryImpl(
         return tagDao.getNoteIdsWithAllTags(tagNames.toList(), tagNames.size)
             .map { it.toSet() }
     }
+
+    /** Notes for the expanded tag row, selected by Room through the tag join. */
+    override fun observeNotesForTag(tagName: String): Flow<List<Note>> =
+        tagDao.observeNotesForTag(tagName).map { entries ->
+            entries.map { entry -> entry.toDomain() }
+        }
 
     // ── Tag indexing ──────────────────────────────────────────────────────────
 
