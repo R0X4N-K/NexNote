@@ -6,4 +6,4 @@ Be kind, clear, and constructive. Avoid harassment, personal attacks, discrimina
 
 Maintainers may remove comments, close issues, or restrict participation when behavior makes collaboration unsafe or unproductive.
 
-For now, contact the repository owner for conduct concerns. If the project grows, this file can be replaced with a full Contributor Covenant policy and dedicated contact path.
+Report conduct concerns privately to the repository owner. Maintainers will handle reports discreetly and avoid publicly disclosing personal information.

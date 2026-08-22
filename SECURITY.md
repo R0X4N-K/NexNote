@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-NexNote is in early development. Security fixes will target the latest code on `main` until public releases begin.
+Security fixes target the latest published release and the current code on `main`.
 
 ## Reporting A Vulnerability
 
-For now, report vulnerabilities privately to the repository owner. Once the repository becomes public, prefer GitHub private vulnerability reporting if it is enabled.
+Use GitHub private vulnerability reporting when it is available. Otherwise, contact the repository owner through a private channel before sharing details.
 
 Please include:
 

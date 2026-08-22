@@ -1,12 +1,15 @@
 # Privacy Policy
 
-Last updated: 2026-08-16
+Last updated: 2026-08-22
 
 NexNote is a local-first note-taking app.
 
 ## Data Stored By The App
 
-NexNote stores notes, tags, templates, preferences, and imported note images on the device. The app uses local Android storage, Room, and DataStore.
+NexNote stores notes, tags, templates, preferences, imported note images, and
+derived search and writing-statistics indexes on the device. The app uses local
+Android storage, Room, and DataStore. The derived indexes are rebuilt from
+ordinary notes and do not include notes kept in the Vault or trash.
 
 Ordinary notes rely on Android's private app sandbox and are not encrypted by a
 separate NexNote key. Notes and images placed in the Vault are additionally
@@ -31,7 +34,10 @@ NexNote opts its private app data out of Android cloud backup and device-to-devi
 
 ## User Control
 
-Deleting notes or clearing app data removes local app data according to Android's normal storage behavior. Exported files that you save or share outside the app must be managed separately.
+Notes can be deleted individually or through the delete-all action in Settings.
+Clearing app data removes local app data according to Android's normal storage
+behavior. Exported files that you save or share outside the app must be managed
+separately.
 
 ## Changes
 

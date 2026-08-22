@@ -10,10 +10,13 @@ Jetpack Compose, Material 3, Room, DataStore, Coroutines, and Flow.
 
 - Local notes stored on device with Room.
 - Markdown-oriented editing and preview.
-- Tags, note search, agenda view, templates, and trash.
+- Full-text search with scope, pin, and ordering controls.
+- Tags, agenda view, reusable templates, and trash.
+- On-device writing statistics with yearly activity and streak insights.
 - An encrypted Vault for selected notes and their images.
 - PDF/export flow with Android FileProvider sharing.
 - Theme, accent color, font scale, timezone, and left-handed preferences.
+- Select-all and bulk data-management actions, including deleting all notes.
 - No account, analytics, Firebase, Google Play Services, or remote backend.
 
 Ordinary notes are protected by Android's private app sandbox. Vault note fields
@@ -106,7 +109,7 @@ Keep the production signing key stable forever once the app is distributed. Neve
 ## F-Droid Status
 
 NexNote is not currently published on F-Droid. The repository includes the
-source-side material intended to support a future submission:
+source-side material required for review:
 
 - GPL-3.0-only license;
 - localized Fastlane metadata in `fastlane/metadata/android/en-US/`;
@@ -116,11 +119,10 @@ source-side material intended to support a future submission:
 - GitHub CI for build, tests, and lint;
 - a tag-triggered release workflow.
 
-The metadata template is not a completed F-Droid submission. Before submitting
-a release, the maintainer must select an immutable public commit or tag, replace
-the release-reference placeholder, and validate a clean source build from that
-exact ref. See [`docs/fdroid-readiness.md`](docs/fdroid-readiness.md) for the
-repository preparation status and remaining submission steps.
+The metadata template is not a completed F-Droid submission. A public immutable
+release ref and an `fdroiddata` merge request are still required. See
+[`docs/fdroid-readiness.md`](docs/fdroid-readiness.md) for the audited status,
+known blockers, validation evidence, and exact submission procedure.
 
 ## Privacy
 

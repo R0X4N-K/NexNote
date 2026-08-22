@@ -29,7 +29,9 @@ Circle, squircle, rounded-square, themed-light, and themed-dark renderings are
 shown in `artwork/nexnote-icon-mask-preview.png`.
 
 The Fastlane icon is rendered from the same adaptive layout. It is a full-square
-512×512 RGBA sRGB PNG without a rounded outer mask or external shadow.
+512×512 RGBA sRGB PNG without a rounded outer mask or external shadow. PNG text,
+timestamp, and EXIF chunks are removed from every distributed image; color and
+physical-dimension profiles are retained.
 
 ## Screenshots
 
@@ -48,9 +50,9 @@ PNGs and are distributed with NexNote under `GPL-3.0-only`.
 | `app/src/main/res/drawable/ic_launcher_foreground.xml` | `379498D1E51AE10272B94715E6E88E8A00EC819487AD4B464356CF0B03A31C5E` | Safe-zone transform of the original foreground; GPL-3.0-only |
 | `app/src/main/res/drawable/ic_launcher_monochrome.xml` | `EDE7653804F3B0801DB99581F34DF570635AC445682544D0D09E9A351B00CD71` | Single-color derivation of the original silhouette; GPL-3.0-only |
 | both `app/src/main/res/mipmap-anydpi/ic_launcher*.xml` | `ADA31DA9E23F4520F3753E71CA23799A107431473DAA3774B6CECAC26847260C` | Adaptive-icon references to the three layers above |
-| `fastlane/metadata/android/en-US/images/icon.png` | `675296FA07538046EF356039AFEFECE4AE59004892778CEDA96FA845D9FE68BA` | Production rendering of the same identity; GPL-3.0-only |
-| `fastlane/metadata/android/en-US/images/phoneScreenshots/01-home.png` | `8676CA3BC31C00186D10F29BDD657177CD6DEF6B9BA25F7D9E21C40F3518B56D` | Project screenshot with synthetic content; GPL-3.0-only |
-| `fastlane/metadata/android/en-US/images/phoneScreenshots/02-settings.png` | `7DB47D2E40BF18DDDABFAAE29640EECCD3FE98C53F86B87F35230FE7971AC60B` | Project screenshot without user content; GPL-3.0-only |
+| `fastlane/metadata/android/en-US/images/icon.png` | `F49A3A87252F825CBEB4CA165903B6C349E4A2674EC11A53FAB9174015841E36` | Production rendering of the same identity; GPL-3.0-only |
+| `fastlane/metadata/android/en-US/images/phoneScreenshots/1.png` | `55A9433943FF4EA7075F6D51D171F1C1D20AB24067287140AD1D04685719DA7D` | Project screenshot with synthetic content; GPL-3.0-only |
+| `fastlane/metadata/android/en-US/images/phoneScreenshots/2.png` | `23C27498F193A1EAA9C842CA12B708200585872F055AA606586823D99BE421D7` | Project screenshot without user content; GPL-3.0-only |
 
 Source vectors, production exports, and the visual validation sheet are retained
 under `artwork/`; `artwork/README.md` describes their relationships.

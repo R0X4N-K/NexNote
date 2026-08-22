@@ -77,7 +77,7 @@ families remain pinned pending a separately tested upgrade:
 | Gradle/AGP | Gradle 9.3.1 and AGP 9.1.1 are an officially supported pair; do not move either independently. |
 | Kotlin/Compose compiler | Kotlin 2.2.10 is retained with the current Compose and KSP graph. |
 | Compose BOM | The resolved 2026.02.01 platform and its Compose 1.10.4 modules are retained as one tested set. |
-| Room | 2.7.0 supports the validated 5→6, 6→7, and 5→7 migration baseline. Database schemas earlier than 5 are outside the supported upgrade path. |
+| Room | 2.7.0 supports the migration chain from schema 5 through 9. Versions 8 and 9 add a derived statistics index and active-note FTS index. Database schemas earlier than 5 are outside the supported upgrade path. |
 | Navigation, DataStore, ExifInterface | Retained to keep dependency changes scoped to the current release. |
 | AndroidX test/Espresso/JUnit | Test-only pins; upgrade separately with device-backed instrumentation. |
 | Coroutines | 1.10.1 retained with the current cancellation regression coverage. |

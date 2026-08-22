@@ -5,10 +5,13 @@ It is built for fast personal notes without accounts, analytics, advertising, or
 Features:
 
 * Write and edit notes with Markdown-oriented tools.
-* Organize notes with tags and search.
+* Organize notes with tags and full-text search.
+* Filter search by text scope and pinned state, then choose the result order.
 * Browse notes by date in the agenda view.
 * Create and reuse templates.
+* Review local writing statistics, activity history, streaks, and tag insights.
 * Move deleted notes to trash before permanent deletion.
+* Select notes in bulk or delete all stored notes from Settings.
 * Put selected notes and their images in a PIN-protected encrypted Vault.
 * Export notes and share generated files through Android's system share flow.
 * Customize theme, accent color, font scale, timezone, and left-handed layout preference.
@@ -19,5 +22,6 @@ Privacy:
 * Android cloud backup and device-to-device transfer are disabled; export data before uninstalling or changing devices.
 * No account is required.
 * No Firebase, Google Play Services, analytics, ads, or remote backend are included.
+* Search and statistics indexes stay in the app's private on-device database.
 
 NexNote is free software licensed under GPL-3.0-only.

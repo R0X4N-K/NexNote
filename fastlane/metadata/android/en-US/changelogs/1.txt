@@ -1,1 +1,1 @@
-Initial release with local Room storage, Markdown editing, tags, templates, agenda, trash, export, and an encrypted Vault. Includes GPL-3.0-only licensing and reproducible source-build controls; automatic Android backup and device transfer are disabled.
+Initial release with local Markdown notes, full-text search and filters, tags, templates, agenda, writing statistics, trash, export, bulk data controls, and an encrypted Vault. No account, analytics, ads, remote backend, or automatic Android backup is included.

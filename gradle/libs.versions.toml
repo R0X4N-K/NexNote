@@ -6,14 +6,14 @@ coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
-# Allineati alle versioni già selezionate dal grafo risolto.
+# Pinned to the versions selected by the validated dependency graph.
 lifecycleRuntimeKtx = "2.9.4"
 activityCompose = "1.8.2"
 kotlin = "2.2.10"
 composeBom = "2026.02.01"
 # Test
 coroutinesTest = "1.10.1"
-# Nuove dipendenze aggiunte per il piano NexNote
+# Symbol processing and persistence
 ksp = "2.3.9"
 room = "2.7.0"
 navigationCompose = "2.9.0"
@@ -38,7 +38,7 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-# Icons (versione gestita dal BOM)
+# Icons (versions managed by the Compose BOM)
 androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 # Room
