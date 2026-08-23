@@ -2,21 +2,24 @@
 
 Audit date: 2026-08-22
 
+Submission status updated: 2026-08-23
+
 This document records the source-side audit of NexNote 1.0.0 (`versionCode` 1).
 It is not an F-Droid approval or a claim that the app is already published.
 Only F-Droid maintainers can accept the final `fdroiddata` merge request.
 
 ## Verdict
 
-NexNote's application source, public repository, metadata, and local source
-build are ready for an F-Droid review. The release is **not yet ready to submit**
-because no immutable public `v1.0.0` tag exists. The local metadata template
-therefore still contains `REQUIRED_FULL_PUBLIC_RELEASE_COMMIT_SHA`.
+NexNote has been submitted for official F-Droid review. The immutable public
+[`v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0) tag resolves to
+commit `b26bbca1792c3d86241e80ecbb6db1d1de08baf9`. The metadata is under review in
+[`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
 
-An `fdroiddata` merge request has not been created, and the project has not been
-built inside F-Droid's own build environment. Do not describe NexNote as
-available on F-Droid until that merge request has been accepted and the package
-appears in the official repository.
+Both the pre-submission branch pipeline and the merge-request pipeline passed
+all nine jobs, including `fdroid build` and `check apk`. This is not an F-Droid
+approval or a claim that the app is already published. Do not describe NexNote
+as available on F-Droid until maintainers merge the request and the package
+appears in the official repository index.
 
 ## Audited repository state
 
@@ -59,8 +62,8 @@ working directory.
 | Source-buildable release | Pass locally | Flavorless `assembleRelease` succeeds offline and produces an unsigned APK without signing secrets. |
 | Reproducible build controls | Pass locally | Two clean, offline, cache-free release builds were byte-identical. This does not replace F-Droid's own builder verification. |
 | Store metadata | Pass | English title, descriptions, changelog, 512×512 icon, and two 1392×3120 screenshots are present upstream. |
-| Immutable release ref | **Blocked** | No `v1.0.0` tag exists; the submission template deliberately rejects an unresolved ref. |
-| F-Droid metadata validation | Pending | `fdroidserver` is not installed in the audited Windows environment; run the official checks in an `fdroiddata` checkout before opening the merge request. |
+| Immutable release ref | Pass | Public annotated tag `v1.0.0` resolves to `b26bbca1792c3d86241e80ecbb6db1d1de08baf9`. |
+| F-Droid metadata validation | Pass | `readmeta`, `rewritemeta`, `checkupdates`, `lint`, `fdroid build`, and `check apk` passed; the merge-request pipeline completed successfully. |
 
 The relevant rules are defined by F-Droid's
 [Inclusion Policy](https://f-droid.org/en/docs/Inclusion_Policy/),
@@ -81,6 +84,7 @@ and [Anti-Features documentation](https://f-droid.org/en/docs/Anti-Features/).
 | Lint | 0 errors; 13 advisory warnings per build variant |
 | Release APK | 50,870,839 bytes, unsigned, 154 ZIP entries |
 | Repeatability | Two clean offline APKs had identical SHA-256 hashes |
+| Signed upstream APK | 50,897,550 bytes; SHA-256 `24EDDE261B160640C1E6881FBB13C11281BE75E817CD7549D1E2F6C28C515F91` |
 
 The complete local gate was executed with every task forced and all network
 resolution disabled:
@@ -147,99 +151,33 @@ are recorded in `docs/fdroid-asset-inventory.md`. F-Droid's current image and
 description requirements are documented in
 [All About Descriptions, Graphics, and Screenshots](https://f-droid.org/en/docs/All_About_Descriptions_Graphics_and_Screenshots/).
 
-## Required maintainer actions
+## Submission record and remaining actions
 
-### 1. Recheck public source access
+The completed submission is recorded by these public artifacts:
 
-The GitHub repository is public. Before submission, verify again that the
-repository, license, issues, release source, and tag are accessible in a private
-browser window without signing in. Do not rely on access from an authenticated
-GitHub session.
+- source tag and signed upstream APK:
+  [GitHub release `v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0);
+- fork metadata branch: `R0X4N-K/fdroiddata:io.github.r0x4nk.nexnote`;
+- canonical metadata commit:
+  `12ba5badc6aed35662d1f51009a874c99d8031b8`;
+- successful pre-submission pipeline:
+  [`#2783220213`](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2783220213);
+- official review request:
+  [`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620);
+- successful merge-request pipeline:
+  [`#2783228159`](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2783228159).
 
-PowerShell verification:
-
-```powershell
-Invoke-WebRequest -Method Head -Uri 'https://github.com/R0X4N-K/NexNote'
-$env:GIT_TERMINAL_PROMPT = '0'
-git -c credential.helper= ls-remote 'https://github.com/R0X4N-K/NexNote.git' 'refs/heads/main'
-Remove-Item Env:GIT_TERMINAL_PROMPT
-```
-
-Both commands must succeed anonymously.
-
-### 2. Select and tag the immutable release
-
-Wait for the pushed `main` workflow to pass. Confirm that the working tree is
-empty and that `main` is synchronized, then create the release tag:
-
-```powershell
-git switch main
-git pull --ff-only origin main
-git status --short
-git tag -a v1.0.0 -m 'NexNote 1.0.0'
-git push origin v1.0.0
-git rev-parse 'v1.0.0^{commit}'
-```
-
-`git status --short` must print nothing. Record the full 40-character commit
-hash printed by the final command. The tag must identify the same source used by
-the 1.0.0 GitHub release.
-
-### 3. Complete the F-Droid metadata
-
-Copy `docs/fdroid-submission-template.yml` to
-`metadata/io.github.r0x4nk.nexnote.yml` in a current fork of the official
-`fdroiddata` repository. Replace
-`REQUIRED_FULL_PUBLIC_RELEASE_COMMIT_SHA` with the full public commit hash from
-the tag. Recheck every URL and version field. Never submit the placeholder.
-
-The initial recipe is intentionally minimal:
-
-```yaml
-Builds:
-  - versionName: 1.0.0
-    versionCode: 1
-    commit: FULL_40_CHARACTER_PUBLIC_COMMIT_SHA
-    subdir: app
-    gradle:
-      - yes
-```
-
-F-Droid's `gradle: yes` build maps to the standard flavorless release build.
-The invocation was tested locally from the `app` subdirectory and requires no
-signing material.
-
-### 4. Validate in an official `fdroiddata` checkout
-
-Install the current `fdroidserver` toolchain using the official
-[installation instructions](https://f-droid.org/en/docs/Installing_the_Server_and_Repo_Tools/).
-From the root of the `fdroiddata` checkout, run:
-
-```bash
-fdroid readmeta
-fdroid rewritemeta io.github.r0x4nk.nexnote
-fdroid checkupdates io.github.r0x4nk.nexnote
-fdroid lint io.github.r0x4nk.nexnote
-fdroid build -v -l io.github.r0x4nk.nexnote
-```
-
-Review any rewrite before committing. All five commands must complete without
-an unexplained error. The local source audit does not substitute for this step.
-
-### 5. Open and monitor the `fdroiddata` merge request
-
-Commit only the new metadata file in the `fdroiddata` fork, push the branch, and
-open a GitLab merge request against `fdroid/fdroiddata`. Follow the repository's
-current contribution template and apply the `New App` label. Respond to bot and
-maintainer findings, keep the upstream source public, and do not rewrite the
-tag while review is in progress.
+While review is in progress, keep the repository and release tag public, never
+rewrite `v1.0.0`, and respond to concrete bot or maintainer findings. Any
+metadata correction must be committed to the existing submission branch so the
+merge request and its pipeline update in place.
 
 The authoritative workflow is the current
 [F-Droid submission guide](https://f-droid.org/en/docs/Submitting_to_F-Droid_Quick_Start_Guide/)
 and the
 [`fdroiddata` contribution guide](https://gitlab.com/fdroid/fdroiddata/-/blob/master/CONTRIBUTING.md).
 
-### 6. After acceptance
+### After acceptance
 
 - verify the package id, version, descriptions, icon, screenshots, license,
   source link, and issue tracker on the live F-Droid page;

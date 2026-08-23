@@ -1,6 +1,8 @@
 # NexNote
 
 [![Build](https://github.com/R0X4N-K/NexNote/actions/workflows/build.yml/badge.svg)](https://github.com/R0X4N-K/NexNote/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/R0X4N-K/NexNote)](https://github.com/R0X4N-K/NexNote/releases/latest)
+[![F-Droid submission](https://img.shields.io/badge/F--Droid-submission%20under%20review-orange)](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 NexNote is an offline, local-first Android note-taking app built with Kotlin,
@@ -88,13 +90,14 @@ into each APK under `assets/legal/` from `LICENSE` and
 
 ## Release
 
-The release workflow is designed to run from a semantic tag such as `v1.0.0`.
-Creating or pushing that tag is a maintainer action and is not part of a local
-build:
+The current signed upstream release is
+[`v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0). Its APK is
+built and signed by the tag-triggered GitHub Actions release workflow. Future
+releases use the same semantic-tag process:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag -a v1.1.0 -m "NexNote 1.1.0"
+git push origin v1.1.0
 ```
 
 The release workflow expects these GitHub Secrets:
@@ -108,21 +111,32 @@ Keep the production signing key stable forever once the app is distributed. Neve
 
 ## F-Droid Status
 
-NexNote is not currently published on F-Droid. The repository includes the
-source-side material required for review:
+NexNote has been submitted to the official F-Droid repository and is currently
+awaiting maintainer review in
+[`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
+The merge-request pipeline passed all nine jobs, including `fdroid build` and
+`check apk`.
+
+The submission includes:
 
 - GPL-3.0-only license;
 - localized Fastlane metadata in `fastlane/metadata/android/en-US/`;
-- a source-build metadata template in `docs/fdroid-submission-template.yml`;
+- the reviewed metadata snapshot in `docs/fdroid-submission-template.yml`;
 - Gradle dependency locking and strict artifact checksum verification;
 - no proprietary runtime services;
 - GitHub CI for build, tests, and lint;
-- a tag-triggered release workflow.
+- the immutable public `v1.0.0` tag and its signed upstream release.
 
-The metadata template is not a completed F-Droid submission. A public immutable
-release ref and an `fdroiddata` merge request are still required. See
-[`docs/fdroid-readiness.md`](docs/fdroid-readiness.md) for the audited status,
-known blockers, validation evidence, and exact submission procedure.
+NexNote is **not yet available in the F-Droid catalog**. Publication occurs only
+after F-Droid maintainers accept and merge the submission and the package is
+included in an official repository index. See
+[`docs/fdroid-readiness.md`](docs/fdroid-readiness.md) for the complete audit,
+submission evidence, and post-acceptance checks.
+
+The GitHub release and the future F-Droid package are separate distribution
+channels. The GitHub APK is signed with the upstream production key; the
+standard F-Droid build will be signed with F-Droid's key, so one channel cannot
+be installed as an update over the other.
 
 ## Privacy
 
