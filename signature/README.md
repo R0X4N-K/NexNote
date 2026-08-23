@@ -3,6 +3,9 @@
 The upstream GitHub release APKs are signed with the NexNote production
 certificate. The first signed release is
 [`v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0).
+Starting with `v1.0.1`, the release workflow uses Android Build Tools 34 and
+omits legacy v1/JAR signature metadata so F-Droid can verify and publish the
+upstream-signed APK as a reproducible build.
 
 - Key alias: `nexnote-release`
 - Certificate SHA-256 fingerprint:
@@ -16,6 +19,6 @@ Generate it with:
 keytool -list -v -keystore release.keystore -alias YOUR_ALIAS
 ```
 
-Do not commit the keystore or signing passwords. The standard F-Droid package
-will be signed independently by F-Droid; this fingerprint identifies only the
-upstream GitHub distribution channel.
+Do not commit the keystore or signing passwords. F-Droid metadata pins this
+certificate with `AllowedAPKSigningKeys`, so GitHub and F-Droid releases share
+the same Android signing identity after reproducible-build verification.

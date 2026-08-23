@@ -1,0 +1,1 @@
+Release signing is now compatible with F-Droid reproducible-build verification. There are no user-facing behavior changes in this maintenance release.

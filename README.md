@@ -32,7 +32,7 @@ and limitations.
 
 - Release application id: `io.github.r0x4nk.nexnote`
 - Debug application id: `io.github.r0x4nk.nexnote.debug`
-- Current version: `1.0.0` / versionCode `1`
+- Current version: `1.0.1` / versionCode `2`
 
 The Kotlin namespace and release application id are both `io.github.r0x4nk.nexnote`, with the debug variant using `io.github.r0x4nk.nexnote.debug`.
 

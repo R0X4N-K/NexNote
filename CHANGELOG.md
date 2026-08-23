@@ -4,6 +4,13 @@ All notable changes to NexNote will be documented in this file.
 
 The format follows Keep a Changelog, and this project uses semantic versioning.
 
+## [1.0.1] - 2026-08-23
+
+### Changed
+
+- Pinned release signing to Android Build Tools 34 for F-Droid reproducible-build verification.
+- Preserved 16 KiB native-library alignment checks before signing.
+
 ## [1.0.0] - 2026-08-22
 
 ### Added

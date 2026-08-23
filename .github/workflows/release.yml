@@ -37,6 +37,16 @@ jobs:
       - name: Build unsigned release APK
         run: ./gradlew --no-daemon clean assembleRelease
 
+      - name: Install reproducible signing tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          signing_build_tools="${ANDROID_HOME}/build-tools/34.0.0"
+          if [[ ! -x "${signing_build_tools}/apksigner" ]]; then
+            yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "build-tools;34.0.0"
+          fi
+          test -x "${signing_build_tools}/apksigner"
+
       - name: Decode signing keystore
         shell: bash
         env:
@@ -61,20 +71,23 @@ jobs:
           : "${KEY_ALIAS:?Missing KEY_ALIAS secret}"
           : "${KEY_PASSWORD:?Missing KEY_PASSWORD secret}"
           unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
-          aligned_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}-aligned.apk"
           signed_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}.apk"
-          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          alignment_build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          signing_build_tools="${ANDROID_HOME}/build-tools/34.0.0"
 
           test -f "$unsigned_apk"
-          "$build_tools/zipalign" -p -f 4 "$unsigned_apk" "$aligned_apk"
-          "$build_tools/apksigner" sign \
+          "$alignment_build_tools/zipalign" -c -P 16 -v 4 "$unsigned_apk"
+          "$signing_build_tools/apksigner" sign \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
             --ks "$KEYSTORE_PATH" \
             --ks-pass "pass:${KEYSTORE_PASSWORD}" \
             --ks-key-alias "${KEY_ALIAS}" \
             --key-pass "pass:${KEY_PASSWORD}" \
             --out "$signed_apk" \
-            "$aligned_apk"
-          "$build_tools/apksigner" verify --verbose "$signed_apk"
+            "$unsigned_apk"
+          "$signing_build_tools/apksigner" verify --verbose --print-certs "$signed_apk"
 
       - name: Remove signing keystore
         if: always()
