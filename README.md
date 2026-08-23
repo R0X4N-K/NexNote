@@ -91,7 +91,7 @@ into each APK under `assets/legal/` from `LICENSE` and
 ## Release
 
 The current signed upstream release is
-[`v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0). Its APK is
+[`v1.0.1`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.1). Its APK is
 built and signed by the tag-triggered GitHub Actions release workflow. Future
 releases use the same semantic-tag process:
 
@@ -125,7 +125,9 @@ The submission includes:
 - Gradle dependency locking and strict artifact checksum verification;
 - no proprietary runtime services;
 - GitHub CI for build, tests, and lint;
-- the immutable public `v1.0.0` tag and its signed upstream release.
+- the immutable public `v1.0.1` tag and its signed upstream release;
+- F-Droid reproducible-build verification pinned to the upstream signing
+  certificate.
 
 NexNote is **not yet available in the F-Droid catalog**. Publication occurs only
 after F-Droid maintainers accept and merge the submission and the package is
@@ -134,9 +136,10 @@ included in an official repository index. See
 submission evidence, and post-acceptance checks.
 
 The GitHub release and the future F-Droid package are separate distribution
-channels. The GitHub APK is signed with the upstream production key; the
-standard F-Droid build will be signed with F-Droid's key, so one channel cannot
-be installed as an update over the other.
+channels, but both use the same upstream production signing identity. F-Droid
+rebuilds the app from source, verifies that the upstream signature can be
+transferred to its byte-equivalent build, and publishes the verified
+upstream-signed APK.
 
 ## Privacy
 

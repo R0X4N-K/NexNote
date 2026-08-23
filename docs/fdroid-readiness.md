@@ -4,19 +4,21 @@ Audit date: 2026-08-22
 
 Submission status updated: 2026-08-23
 
-This document records the source-side audit of NexNote 1.0.0 (`versionCode` 1).
+This document records the source-side audit of NexNote 1.0.1 (`versionCode` 2).
 It is not an F-Droid approval or a claim that the app is already published.
 Only F-Droid maintainers can accept the final `fdroiddata` merge request.
 
 ## Verdict
 
 NexNote has been submitted for official F-Droid review. The immutable public
-[`v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0) tag resolves to
-commit `b26bbca1792c3d86241e80ecbb6db1d1de08baf9`. The metadata is under review in
+[`v1.0.1`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.1) tag resolves to
+commit `430175d07bf445c124f895622bc7a59ba619918c`. The metadata is under review in
 [`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
 
-Both the pre-submission branch pipeline and the merge-request pipeline passed
-all nine jobs, including `fdroid build` and `check apk`. This is not an F-Droid
+The current merge-request pipeline passed all nine jobs, including `fdroid
+build` and `check apk`. F-Droid successfully rebuilt version 1.0.1, transferred
+the upstream v3 signature to its build, compared it with the supplied GitHub
+APK, and accepted the configured signing certificate. This is not an F-Droid
 approval or a claim that the app is already published. Do not describe NexNote
 as available on F-Droid until maintainers merge the request and the package
 appears in the official repository index.
@@ -60,9 +62,9 @@ working directory.
 | No proprietary runtime service | Pass | No Firebase, Google Play Services, proprietary analytics, ads, crash reporting, account, or remote backend. |
 | No network tracking | Pass | The release manifest does not request `android.permission.INTERNET`; the only permission in the built APK is AndroidX's package-scoped dynamic-receiver permission. |
 | Source-buildable release | Pass locally | Flavorless `assembleRelease` succeeds offline and produces an unsigned APK without signing secrets. |
-| Reproducible build controls | Pass locally | Two clean, offline, cache-free release builds were byte-identical. This does not replace F-Droid's own builder verification. |
+| Reproducible build controls | Pass | F-Droid pipeline `#2783418223` reported `successfully verified`, successfully compared the rebuilt APK with the supplied reference binary, and accepted the pinned signer. |
 | Store metadata | Pass | English title, descriptions, changelog, 512×512 icon, and two 1392×3120 screenshots are present upstream. |
-| Immutable release ref | Pass | Public annotated tag `v1.0.0` resolves to `b26bbca1792c3d86241e80ecbb6db1d1de08baf9`. |
+| Immutable release ref | Pass | Public annotated tag `v1.0.1` resolves to `430175d07bf445c124f895622bc7a59ba619918c`. |
 | F-Droid metadata validation | Pass | `readmeta`, `rewritemeta`, `checkupdates`, `lint`, `fdroid build`, and `check apk` passed; the merge-request pipeline completed successfully. |
 
 The relevant rules are defined by F-Droid's
@@ -75,25 +77,30 @@ and [Anti-Features documentation](https://f-droid.org/en/docs/Anti-Features/).
 | Property | Audited value |
 |---|---|
 | Application id | `io.github.r0x4nk.nexnote` |
-| Version | `1.0.0` (`versionCode` 1) |
+| Version | `1.0.1` (`versionCode` 2) |
 | SDK | minSdk 29, targetSdk 36, compileSdk 36 |
 | Toolchain | Gradle 9.3.1, Android Gradle Plugin 9.1.1, Kotlin 2.2.10, JDK 21 |
 | Database | Room schema 9; explicit non-destructive migrations from schema 5 through 9 |
-| JVM tests | 815 passed, 0 failed, 0 skipped |
-| Android tests | 177 passed on a Pixel 9 Pro XL AVD running Android 16, 0 failed, 0 skipped |
+| JVM tests | 815 passed on 1.0.1, 0 failed, 0 skipped |
+| Android tests | 177 passed on 1.0.0 on a Pixel 9 Pro XL AVD running Android 16; 1.0.1 changes only version, release workflow, changelog, and documentation files |
 | Lint | 0 errors; 13 advisory warnings per build variant |
-| Release APK | 50,870,839 bytes, unsigned, 154 ZIP entries |
+| Release APK | 50,870,843 bytes, unsigned |
 | Repeatability | Two clean offline APKs had identical SHA-256 hashes |
-| Signed upstream APK | 50,897,550 bytes; SHA-256 `24EDDE261B160640C1E6881FBB13C11281BE75E817CD7549D1E2F6C28C515F91` |
+| Signed upstream APK | 50,880,967 bytes; SHA-256 `C01681FB8A87F37615E15BB9FB5A62BDDCB7D771ECF6BC13002E0C368B40E79A` |
 
-The complete local gate was executed with every task forced and all network
-resolution disabled:
+The complete app gate was executed for 1.0.0 with every task forced and all
+network resolution disabled:
 
 ```powershell
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 .\gradlew.bat clean ci --offline --no-daemon --no-build-cache --rerun-tasks
 .\gradlew.bat connectedDebugAndroidTest --offline --no-daemon --no-build-cache --rerun-tasks
 ```
+
+Version 1.0.1 was then validated with a clean release build, all 815 JVM tests,
+and release lint. Its two clean unsigned release builds were byte-identical.
+The only source changes between the tested app revisions are version and
+distribution-maintenance files; application and test source are unchanged.
 
 The `ci` task executes unit tests, compiles instrumentation tests, runs debug
 and release lint, and assembles both APK variants. `connectedDebugAndroidTest`
@@ -142,7 +149,7 @@ documented F-Droid limits:
 - title: 7 characters, below the 50-character limit;
 - short description: below 80 characters and without a trailing period;
 - full description: below 4,000 characters;
-- versionCode 1 changelog: below 500 characters;
+- versionCode 1 and 2 changelogs: below 500 characters each;
 - screenshots use the conventional `1.png` and `2.png` names;
 - images are PNG, and the icon is 512×512.
 
@@ -156,19 +163,17 @@ description requirements are documented in
 The completed submission is recorded by these public artifacts:
 
 - source tag and signed upstream APK:
-  [GitHub release `v1.0.0`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.0);
+  [GitHub release `v1.0.1`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.1);
 - fork metadata branch: `R0X4N-K/fdroiddata:io.github.r0x4nk.nexnote`;
 - canonical metadata commit:
-  `12ba5badc6aed35662d1f51009a874c99d8031b8`;
-- successful pre-submission pipeline:
-  [`#2783220213`](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2783220213);
+  `d0073b5221248ad6dc54310a3429e86e1642067d`;
 - official review request:
   [`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620);
 - successful merge-request pipeline:
-  [`#2783228159`](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2783228159).
+  [`#2783418223`](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2783418223).
 
 While review is in progress, keep the repository and release tag public, never
-rewrite `v1.0.0`, and respond to concrete bot or maintainer findings. Any
+rewrite `v1.0.1`, and respond to concrete bot or maintainer findings. Any
 metadata correction must be committed to the existing submission branch so the
 merge request and its pipeline update in place.
 
@@ -181,15 +186,14 @@ and the
 
 - verify the package id, version, descriptions, icon, screenshots, license,
   source link, and issue tracker on the live F-Droid page;
-- install the F-Droid-signed APK on a clean supported device and repeat the
+- install the APK published by F-Droid on a clean supported device and repeat the
   primary note, Vault, export, migration, and deletion smoke tests;
-- publish F-Droid's signing certificate fingerprint in `signature/README.md`;
 - preserve application id, versionCode monotonicity, database migrations, and
-  the F-Droid signing lineage for every update;
+  the upstream signing lineage for every update;
 - tag each later release and update upstream Fastlane changelogs before F-Droid
   detects the new version.
 
-F-Droid signs its own APK. The optional GitHub-signed release and the F-Droid
-release therefore normally have different signing certificates. Users cannot
-install one distribution channel directly over the other unless a separately
-approved reproducible-build/signing arrangement is implemented.
+This submission uses F-Droid's reproducible-build path. F-Droid rebuilds each
+version from source and publishes the upstream-signed APK only when the rebuilt
+binary matches and the signer equals `AllowedAPKSigningKeys`. The GitHub and
+F-Droid channels therefore retain the same Android signing identity.
