@@ -10,6 +10,10 @@ The format follows Keep a Changelog, and this project uses semantic versioning.
 
 - Added an About section in Settings with a direct link to the NexNote source code.
 
+### Changed
+
+- Added architecture-specific release APKs and ordered version codes for F-Droid.
+
 ### Fixed
 
 - Corrected the editor's bottom fade so content extends naturally into it without overlapping editing controls.

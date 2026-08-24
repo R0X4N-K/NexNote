@@ -43,3 +43,56 @@ jobs:
 
       - name: Run build validation
         run: ./gradlew --no-daemon --no-build-cache ci
+
+  abi-splits:
+    name: Assemble ABI split (${{ matrix.abi }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: armeabi-v7a
+            version_code: 31
+          - abi: arm64-v8a
+            version_code: 32
+          - abi: x86
+            version_code: 33
+          - abi: x86_64
+            version_code: 34
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          cache-provider: basic
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Assemble and inspect ABI APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-build-cache assembleRelease \
+            "-Pnexnote.abi=${{ matrix.abi }}"
+
+          apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          badging="$("${build_tools}/aapt" dump badging "$apk")"
+          actual_abis="$(unzip -Z1 "$apk" 'lib/*/*.so' | cut -d/ -f2 | sort -u | paste -sd, -)"
+
+          grep -F "versionCode='${{ matrix.version_code }}'" <<< "$badging"
+          grep -F "versionName='1.0.2'" <<< "$badging"
+          test "$actual_abis" = "${{ matrix.abi }}"

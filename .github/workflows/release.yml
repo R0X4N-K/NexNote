@@ -34,8 +34,67 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build unsigned release APK
-        run: ./gradlew --no-daemon clean assembleRelease
+      - name: Build unsigned release APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          unsigned_dir="${RUNNER_TEMP}/nexnote-unsigned"
+          mkdir -p "$unsigned_dir"
+
+          build_apk() {
+            local abi="$1"
+            local output_name="$2"
+            local gradle_args=(--no-daemon --no-build-cache clean assembleRelease)
+
+            if [[ -n "$abi" ]]; then
+              gradle_args+=("-Pnexnote.abi=${abi}")
+            fi
+
+            ./gradlew "${gradle_args[@]}"
+            cp app/build/outputs/apk/release/app-release-unsigned.apk \
+              "${unsigned_dir}/${output_name}"
+          }
+
+          build_apk "" "NexNote-${GITHUB_REF_NAME}.apk"
+          build_apk "armeabi-v7a" "NexNote-${GITHUB_REF_NAME}-armeabi-v7a.apk"
+          build_apk "arm64-v8a" "NexNote-${GITHUB_REF_NAME}-arm64-v8a.apk"
+          build_apk "x86" "NexNote-${GITHUB_REF_NAME}-x86.apk"
+          build_apk "x86_64" "NexNote-${GITHUB_REF_NAME}-x86_64.apk"
+
+          printf 'UNSIGNED_APK_DIR=%s\n' "$unsigned_dir" >> "$GITHUB_ENV"
+
+      - name: Validate unsigned release APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          release_version="${GITHUB_REF_NAME#v}"
+
+          validate_apk() {
+            local apk="$1"
+            local expected_code="$2"
+            local expected_abis="$3"
+            local badging
+            local actual_abis
+
+            badging="$("${build_tools}/aapt" dump badging "$apk")"
+            actual_abis="$(unzip -Z1 "$apk" 'lib/*/*.so' | cut -d/ -f2 | sort -u | paste -sd, -)"
+
+            grep -F "versionCode='${expected_code}'" <<< "$badging"
+            grep -F "versionName='${release_version}'" <<< "$badging"
+            test "$actual_abis" = "$expected_abis"
+          }
+
+          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}.apk" \
+            3 "arm64-v8a,armeabi-v7a,x86,x86_64"
+          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-armeabi-v7a.apk" \
+            31 "armeabi-v7a"
+          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-arm64-v8a.apk" \
+            32 "arm64-v8a"
+          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-x86.apk" \
+            33 "x86"
+          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-x86_64.apk" \
+            34 "x86_64"
 
       - name: Install reproducible signing tools
         shell: bash
@@ -59,7 +118,7 @@ jobs:
           chmod 600 "$keystore_path"
           printf 'KEYSTORE_PATH=%s\n' "$keystore_path" >> "$GITHUB_ENV"
 
-      - name: Sign APK
+      - name: Sign APKs
         shell: bash
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -70,24 +129,28 @@ jobs:
           : "${KEYSTORE_PASSWORD:?Missing KEYSTORE_PASSWORD secret}"
           : "${KEY_ALIAS:?Missing KEY_ALIAS secret}"
           : "${KEY_PASSWORD:?Missing KEY_PASSWORD secret}"
-          unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
-          signed_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}.apk"
+          signed_dir="${RUNNER_TEMP}/nexnote-signed"
+          mkdir -p "$signed_dir"
           alignment_build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
           signing_build_tools="${ANDROID_HOME}/build-tools/34.0.0"
 
-          test -f "$unsigned_apk"
-          "$alignment_build_tools/zipalign" -c -P 16 -v 4 "$unsigned_apk"
-          "$signing_build_tools/apksigner" sign \
-            --v1-signing-enabled false \
-            --v2-signing-enabled true \
-            --v3-signing-enabled true \
-            --ks "$KEYSTORE_PATH" \
-            --ks-pass "pass:${KEYSTORE_PASSWORD}" \
-            --ks-key-alias "${KEY_ALIAS}" \
-            --key-pass "pass:${KEY_PASSWORD}" \
-            --out "$signed_apk" \
-            "$unsigned_apk"
-          "$signing_build_tools/apksigner" verify --verbose --print-certs "$signed_apk"
+          for unsigned_apk in "${UNSIGNED_APK_DIR}"/*.apk; do
+            signed_apk="${signed_dir}/$(basename "$unsigned_apk")"
+            "$alignment_build_tools/zipalign" -c -P 16 -v 4 "$unsigned_apk"
+            "$signing_build_tools/apksigner" sign \
+              --v1-signing-enabled false \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              --ks "$KEYSTORE_PATH" \
+              --ks-pass "pass:${KEYSTORE_PASSWORD}" \
+              --ks-key-alias "${KEY_ALIAS}" \
+              --key-pass "pass:${KEY_PASSWORD}" \
+              --out "$signed_apk" \
+              "$unsigned_apk"
+            "$signing_build_tools/apksigner" verify --verbose --print-certs "$signed_apk"
+          done
+
+          printf 'SIGNED_APK_DIR=%s\n' "$signed_dir" >> "$GITHUB_ENV"
 
       - name: Remove signing keystore
         if: always()
@@ -100,8 +163,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          signed_apk="app/build/outputs/apk/release/NexNote-${GITHUB_REF_NAME}.apk"
-          gh release create "$GITHUB_REF_NAME" "$signed_apk" \
+          mapfile -t signed_apks < <(find "$SIGNED_APK_DIR" -maxdepth 1 -type f -name '*.apk' | sort)
+          test "${#signed_apks[@]}" -eq 5
+          gh release create "$GITHUB_REF_NAME" "${signed_apks[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "NexNote ${GITHUB_REF_NAME}" \
             --notes-file CHANGELOG.md \

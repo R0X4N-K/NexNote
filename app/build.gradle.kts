@@ -4,6 +4,24 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val baseVersionCode = 3
+val releaseAbiVersionCodeSuffixes = linkedMapOf(
+    "armeabi-v7a" to 1,
+    "arm64-v8a" to 2,
+    "x86" to 3,
+    "x86_64" to 4
+)
+val selectedReleaseAbi = providers.gradleProperty("nexnote.abi").orNull
+
+require(selectedReleaseAbi == null || selectedReleaseAbi in releaseAbiVersionCodeSuffixes) {
+    "Unsupported nexnote.abi '$selectedReleaseAbi'. " +
+        "Expected one of: ${releaseAbiVersionCodeSuffixes.keys.joinToString()}"
+}
+
+val packageVersionCode = selectedReleaseAbi?.let { abi ->
+    baseVersionCode * 10 + releaseAbiVersionCodeSuffixes.getValue(abi)
+} ?: baseVersionCode
+
 val prepareLegalAssets by tasks.registering(Sync::class) {
     from(rootProject.file("LICENSE")) {
         rename { "GPL-3.0-only.txt" }
@@ -38,8 +56,12 @@ android {
         applicationId = "io.github.r0x4nk.nexnote"
         minSdk = 29
         targetSdk = 36
-        versionCode = 3
+        versionCode = packageVersionCode
         versionName = "1.0.2"
+
+        ndk {
+            selectedReleaseAbi?.let(abiFilters::add)
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

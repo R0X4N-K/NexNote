@@ -1,7 +1,7 @@
 # F-Droid build supply chain
 
-This document describes the source-build configuration for NexNote 1.0.0
-(`versionCode` 1).
+This document describes the source-build configuration for NexNote 1.0.2
+(base `versionCode` 3).
 
 ## Toolchain and repositories
 
@@ -85,7 +85,7 @@ families remain pinned pending a separately tested upgrade:
 ## Android API and native libraries
 
 The app compiles and targets API 36. API 37 targeting and its Android 17
-behavior changes are outside the scope of version 1.0.0. `OldTargetApi`
+behavior changes are outside the scope of version 1.0.2. `OldTargetApi`
 therefore remains visible rather than being suppressed. The deprecated
 device-credential confirmation API is retained until a modern Biometric
 migration can be validated on supported devices.
@@ -94,10 +94,30 @@ The APK's two AndroidX native libraries are supplied for four ABIs. The
 dependencies ship stripped binaries without `.debug*` sections or `.symtab`;
 `.dynsym` remains as required for dynamic linking.
 
+The default release build remains a universal APK with base `versionCode` 3.
+Passing the `nexnote.abi` Gradle property filters the package to one ABI and
+derives the F-Droid versionCode by appending an ordered suffix:
+
+| Gradle property | versionCode |
+|---|---:|
+| `nexnote.abi=armeabi-v7a` | 31 |
+| `nexnote.abi=arm64-v8a` | 32 |
+| `nexnote.abi=x86` | 33 |
+| `nexnote.abi=x86_64` | 34 |
+
+This ordering follows F-Droid's ABI-split guidance. Future base versionCodes
+must retain the same lowest-digit suffixes so every new package remains newer
+than every package from the preceding release.
+
 ## F-Droid invocation
 
-With Android SDK platform/API 36 and JDK 21 provisioned, the recipe needs only
-the standard Gradle build (`gradle: yes`), which maps to `assembleRelease` for
-this flavorless single-module project. The unsigned APK does not depend on
-signing secrets. `docs/fdroid-submission-template.yml` intentionally leaves the
-public release ref unresolved until a real, immutable commit or tag exists.
+With Android SDK platform/API 36 and JDK 21 provisioned, each build uses the
+standard Gradle release task plus one `gradleprops` entry selecting its ABI. The
+unsigned APKs do not depend on signing secrets. Each build block has its own
+upstream `binary` URL so F-Droid can compare it with the matching signed GitHub
+asset and transfer the verified signature.
+
+`VercodeOperation` derives all four versionCodes from the base versionCode
+reported upstream. The metadata template uses the intended immutable
+`v1.0.2` release ref; the live merge request should pin the exact tag commit
+after the tag and signed release are public.

@@ -1,0 +1,2 @@
+- Fixed the editor's bottom fade so content extends naturally into it without overlapping editing controls.
+- Added an About section in Settings with a direct link to the NexNote source code.

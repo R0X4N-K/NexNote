@@ -32,7 +32,9 @@ and limitations.
 
 - Release application id: `io.github.r0x4nk.nexnote`
 - Debug application id: `io.github.r0x4nk.nexnote.debug`
-- Current version: `1.0.2` / versionCode `3`
+- Current source version: `1.0.2` / universal versionCode `3`
+- F-Droid ABI versionCodes: `31` (`armeabi-v7a`), `32` (`arm64-v8a`),
+  `33` (`x86`), and `34` (`x86_64`)
 
 The Kotlin namespace and release application id are both `io.github.r0x4nk.nexnote`, with the debug variant using `io.github.r0x4nk.nexnote.debug`.
 
@@ -63,6 +65,7 @@ Useful commands:
 ./gradlew ci
 ./gradlew clean assembleDebug
 ./gradlew assembleRelease
+./gradlew assembleRelease -Pnexnote.abi=arm64-v8a
 ./gradlew compileDebugAndroidTestKotlin
 ./gradlew lintRelease --offline
 ```
@@ -73,6 +76,7 @@ On Windows PowerShell:
 .\gradlew.bat ci
 .\gradlew.bat clean assembleDebug
 .\gradlew.bat assembleRelease
+.\gradlew.bat assembleRelease "-Pnexnote.abi=arm64-v8a"
 .\gradlew.bat compileDebugAndroidTestKotlin
 .\gradlew.bat lintRelease --offline
 ```
@@ -90,10 +94,10 @@ into each APK under `assets/legal/` from `LICENSE` and
 
 ## Release
 
-The current signed upstream release is
-[`v1.0.2`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.2). Its APK is
-built and signed by the tag-triggered GitHub Actions release workflow. Future
-releases use the same semantic-tag process:
+Signed upstream releases are built from immutable tags by the tag-triggered
+GitHub Actions release workflow. For each release, it publishes a universal APK
+plus `armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64` APKs. Releases use this
+semantic-tag process:
 
 ```bash
 git tag -a v1.1.0 -m "NexNote 1.1.0"
@@ -114,8 +118,8 @@ Keep the production signing key stable forever once the app is distributed. Neve
 NexNote has been submitted to the official F-Droid repository and is currently
 awaiting maintainer review in
 [`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
-The merge-request pipeline passed all nine jobs, including `fdroid build` and
-`check apk`.
+Each metadata revision is validated by the F-Droid merge-request pipeline,
+including its source build and APK checks.
 
 The submission includes:
 
@@ -125,7 +129,8 @@ The submission includes:
 - Gradle dependency locking and strict artifact checksum verification;
 - no proprietary runtime services;
 - GitHub CI for build, tests, and lint;
-- the immutable public `v1.0.2` tag and its signed upstream release;
+- ABI-scoped Gradle builds with ordered F-Droid versionCodes;
+- a release workflow that publishes matching upstream reference APKs;
 - F-Droid reproducible-build verification pinned to the upstream signing
   certificate.
 
