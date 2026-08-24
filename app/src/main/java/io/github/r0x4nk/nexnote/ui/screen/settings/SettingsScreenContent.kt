@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -81,11 +82,13 @@ internal const val SETTINGS_DELETE_ALL_NOTES_PIN_FIELD_TAG =
 internal const val SETTINGS_DELETE_ALL_NOTES_CONFIRM_BUTTON_TAG =
     "settings_delete_all_notes_confirm_button"
 internal const val SETTINGS_LIST_TAG = "settings_list"
+internal const val SETTINGS_SOURCE_CODE_ROW_TAG = "settings_source_code_row"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsScreenContent(
     uiState: SettingsUiState,
+    versionName: String,
     vaultPinChangeState: SettingsVaultPinChangeUiState = SettingsVaultPinChangeUiState(),
     vaultResetState: SettingsVaultResetUiState = SettingsVaultResetUiState(),
     deleteAllNotesState: SettingsDeleteAllNotesUiState = SettingsDeleteAllNotesUiState(),
@@ -113,7 +116,8 @@ internal fun SettingsScreenContent(
     onRequestDeleteAllNotes: () -> Unit = {},
     onCancelDeleteAllNotes: () -> Unit = {},
     onConfirmDeleteAllNotes: (CharArray) -> Unit = {},
-    onClearDeleteAllNotesFeedback: () -> Unit = {}
+    onClearDeleteAllNotesFeedback: () -> Unit = {},
+    onOpenSourceCode: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     Scaffold(
@@ -164,7 +168,9 @@ internal fun SettingsScreenContent(
                 onConfirmVaultReset = onConfirmVaultReset,
                 onClearVaultResetFeedback = onClearVaultResetFeedback,
                 onRequestDeleteAllNotes = onRequestDeleteAllNotes,
-                onClearDeleteAllNotesFeedback = onClearDeleteAllNotesFeedback
+                onClearDeleteAllNotesFeedback = onClearDeleteAllNotesFeedback,
+                versionName = versionName,
+                onOpenSourceCode = onOpenSourceCode
             )
             ScrollToTopButton(
                 listState = listState,
@@ -217,7 +223,9 @@ private fun SettingsList(
     onConfirmVaultReset: () -> Unit,
     onClearVaultResetFeedback: () -> Unit,
     onRequestDeleteAllNotes: () -> Unit,
-    onClearDeleteAllNotesFeedback: () -> Unit
+    onClearDeleteAllNotesFeedback: () -> Unit,
+    versionName: String,
+    onOpenSourceCode: () -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -267,6 +275,7 @@ private fun SettingsList(
         )
         developerToolsSection()
         timezoneSection(uiState, onTimezoneChange)
+        aboutSection(versionName, onOpenSourceCode)
     }
 }
 
@@ -1305,7 +1314,82 @@ private fun LazyListScope.timezoneSection(
                 onSelect = onSelect
             )
         }
+    }
+}
+
+private fun LazyListScope.aboutSection(
+    versionName: String,
+    onOpenSourceCode: () -> Unit
+) {
+    item {
+        SettingsSectionSurface {
+            SettingsSectionHeader("About")
+            Spacer(Modifier.height(6.dp))
+            SourceCodeRow(onClick = onOpenSourceCode)
+            Spacer(Modifier.height(4.dp))
+            AboutInfoRow(
+                label = "Version",
+                value = versionName
+            )
+        }
         Spacer(Modifier.height(96.dp))
+    }
+}
+
+@Composable
+private fun SourceCodeRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SETTINGS_SOURCE_CODE_ROW_TAG)
+            .clickable(
+                role = Role.Button,
+                onClick = onClick
+            )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Source code",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "github.com/R0X4N-K/NexNote",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AboutInfoRow(
+    label: String,
+    value: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

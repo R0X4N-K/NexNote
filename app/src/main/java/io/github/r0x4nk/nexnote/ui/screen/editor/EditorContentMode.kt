@@ -41,10 +41,9 @@ import java.io.File
 
 private val EditorContentHorizontalPadding = 8.dp
 private val EditorContentTopPadding = 8.dp
-private val EditorContentDefaultBottomPadding = 8.dp
 private val EditorBottomFadeHeight = 52.dp
 private val EditorContentFadeBottomPadding = 44.dp
-private const val EditorContentFadeSpacerLines = 2
+private const val EditorContentScrollSpacerLines = 5
 private const val EditorBottomFadeZIndex = 10f
 
 internal const val EDITOR_BOTTOM_FADE_TAG = "editor_bottom_fade"
@@ -249,6 +248,10 @@ private fun EditorContentField(
     val toolbarBottomPadding = with(density) {
         state.keyboardToolbarHeightPx.toDp()
     }
+    val toolbarClearance = editorKeyboardToolbarBottomPadding(
+        keyboardToolbarVisible = keyboardToolbarVisible,
+        keyboardToolbarHeight = toolbarBottomPadding
+    )
 
     ContentField(
         textFieldState = state.contentTextFieldState,
@@ -260,42 +263,24 @@ private fun EditorContentField(
         highlightRange = state.fallbackContentHighlightRange(),
         searchRanges = state.searchContentHighlightRanges(),
         activeSearchRange = state.activeSearchHighlightRange(),
-        trailingSpacerLines = if (bottomFadeVisible) EditorContentFadeSpacerLines else 0,
+        trailingSpacerLines = editorContentTrailingSpacerLines(bottomFadeVisible),
         modifier = Modifier
             .fillMaxSize()
             .padding(
                 start = EditorContentHorizontalPadding,
                 top = EditorContentTopPadding,
                 end = EditorContentHorizontalPadding,
-                bottom = editorContentBottomPadding(
-                    keyboardToolbarVisible = keyboardToolbarVisible,
-                    keyboardToolbarHeight = toolbarBottomPadding,
-                    bottomFadeVisible = bottomFadeVisible
-                )
+                bottom = toolbarClearance
             )
             .testTag(EDITOR_CONTENT_FIELD_TAG)
             .focusRequester(state.contentFocusRequester)
     )
 }
 
-private fun editorContentBottomPadding(
-    keyboardToolbarVisible: Boolean,
-    keyboardToolbarHeight: Dp,
-    bottomFadeVisible: Boolean
-): Dp {
-    val toolbarPadding = editorKeyboardToolbarBottomPadding(
-        keyboardToolbarVisible = keyboardToolbarVisible,
-        keyboardToolbarHeight = keyboardToolbarHeight
-    )
-    val basePadding = if (toolbarPadding > 0.dp) {
-        toolbarPadding
-    } else {
-        EditorContentDefaultBottomPadding
-    }
-    val fadeClearance = if (bottomFadeVisible) EditorBottomFadeHeight else 0.dp
-
-    return basePadding + fadeClearance
-}
+// Deliberately independent of IME/toolbar visibility: changing this value would
+// replace the focused field's output transformation while the keyboard is hiding.
+internal fun editorContentTrailingSpacerLines(bottomFadeVisible: Boolean): Int =
+    if (bottomFadeVisible) EditorContentScrollSpacerLines else 0
 
 private fun editorKeyboardToolbarBottomPadding(
     keyboardToolbarVisible: Boolean,

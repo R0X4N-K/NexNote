@@ -2,11 +2,15 @@ package io.github.r0x4nk.nexnote.ui.screen.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.BuildConfig
 import io.github.r0x4nk.nexnote.ui.screen.vault.VaultAndroidCredentialPromptCoordinator
+
+internal const val NEXNOTE_SOURCE_CODE_URL = "https://github.com/R0X4N-K/NexNote"
 
 @Composable
 fun SettingsScreen(
@@ -19,6 +23,7 @@ fun SettingsScreen(
     val vaultResetState by viewModel.vaultResetState.collectAsStateWithLifecycle()
     val deleteAllNotesState by viewModel.deleteAllNotesState.collectAsStateWithLifecycle()
     val statisticsIndexState by viewModel.statisticsIndexState.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
 
     VaultAndroidCredentialPromptCoordinator(
         requestId = vaultPinChangeState.androidCredentialRefreshPromptRequestId,
@@ -28,6 +33,7 @@ fun SettingsScreen(
 
     SettingsScreenContent(
         uiState = uiState,
+        versionName = BuildConfig.VERSION_NAME,
         vaultPinChangeState = vaultPinChangeState,
         vaultResetState = vaultResetState,
         deleteAllNotesState = deleteAllNotesState,
@@ -56,6 +62,9 @@ fun SettingsScreen(
         onRequestDeleteAllNotes = viewModel::requestDeleteAllNotes,
         onCancelDeleteAllNotes = viewModel::cancelDeleteAllNotes,
         onConfirmDeleteAllNotes = viewModel::confirmDeleteAllNotes,
-        onClearDeleteAllNotesFeedback = viewModel::clearDeleteAllNotesFeedback
+        onClearDeleteAllNotesFeedback = viewModel::clearDeleteAllNotesFeedback,
+        onOpenSourceCode = {
+            runCatching { uriHandler.openUri(NEXNOTE_SOURCE_CODE_URL) }
+        }
     )
 }

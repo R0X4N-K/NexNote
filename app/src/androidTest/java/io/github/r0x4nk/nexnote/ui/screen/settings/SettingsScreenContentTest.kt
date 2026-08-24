@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -286,6 +287,51 @@ class SettingsScreenContentTest {
     }
 
     @Test
+    fun aboutSection_displaysSourceRepositoryAndVersion() {
+        composeRule.setSettingsContent(
+            vaultState = VaultState.NOT_CONFIGURED,
+            versionName = "1.2.3-test"
+        )
+
+        composeRule.scrollToSourceCodeRow()
+        composeRule.onNodeWithTag(SETTINGS_SOURCE_CODE_ROW_TAG)
+            .assertIsDisplayed()
+            .assertHasClickAction()
+        composeRule.onNodeWithText("About").assertIsDisplayed()
+        composeRule.onNodeWithText("Source code").assertIsDisplayed()
+        composeRule.onNodeWithText("github.com/R0X4N-K/NexNote").assertIsDisplayed()
+        composeRule.onNodeWithText("Version").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("1.2.3-test").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun sourceCodeRow_invokesCallback() {
+        var opened = false
+        composeRule.setSettingsContent(
+            vaultState = VaultState.NOT_CONFIGURED,
+            onOpenSourceCode = { opened = true }
+        )
+
+        composeRule.scrollToSourceCodeRow()
+        composeRule.onNodeWithTag(SETTINGS_SOURCE_CODE_ROW_TAG).performClick()
+
+        assertTrue(opened)
+    }
+
+    @Test
+    fun aboutSection_isReadableInDarkTheme() {
+        composeRule.setSettingsContent(
+            vaultState = VaultState.NOT_CONFIGURED,
+            darkTheme = true
+        )
+
+        composeRule.scrollToSourceCodeRow()
+        composeRule.onNodeWithTag(SETTINGS_SOURCE_CODE_ROW_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("github.com/R0X4N-K/NexNote").assertIsDisplayed()
+        composeRule.onNodeWithText("1.0.1").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun deleteAllNotesRow_invokesRequestWhenNotesExist() {
         var requested = false
         composeRule.setSettingsContent(
@@ -327,6 +373,8 @@ class SettingsScreenContentTest {
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setSettingsContent(
         vaultState: VaultState,
+        versionName: String = "1.0.1",
+        darkTheme: Boolean = false,
         unlockVaultWithAndroidCredential: Boolean = false,
         vaultAutoLockTimeout: VaultAutoLockTimeout = VaultAutoLockTimeout.IMMEDIATELY,
         vaultResetState: SettingsVaultResetUiState = SettingsVaultResetUiState(),
@@ -340,10 +388,11 @@ class SettingsScreenContentTest {
         onConfirmVaultReset: () -> Unit = {},
         onClearVaultResetFeedback: () -> Unit = {},
         onRequestDeleteAllNotes: () -> Unit = {},
-        onConfirmDeleteAllNotes: (CharArray) -> Unit = {}
+        onConfirmDeleteAllNotes: (CharArray) -> Unit = {},
+        onOpenSourceCode: () -> Unit = {}
     ) {
         setContent {
-            NexNoteTheme {
+            NexNoteTheme(darkTheme = darkTheme) {
                 SettingsScreenContent(
                     uiState = SettingsUiState(
                         themeMode = ThemeMode.SYSTEM,
@@ -358,6 +407,7 @@ class SettingsScreenContentTest {
                         vaultAutoLockTimeout = vaultAutoLockTimeout,
                         unlockVaultWithAndroidCredential = unlockVaultWithAndroidCredential
                     ),
+                    versionName = versionName,
                     vaultPinChangeState = SettingsVaultPinChangeUiState(),
                     vaultResetState = vaultResetState,
                     deleteAllNotesState = deleteAllNotesState,
@@ -376,9 +426,15 @@ class SettingsScreenContentTest {
                     onConfirmVaultReset = onConfirmVaultReset,
                     onClearVaultResetFeedback = onClearVaultResetFeedback,
                     onRequestDeleteAllNotes = onRequestDeleteAllNotes,
-                    onConfirmDeleteAllNotes = onConfirmDeleteAllNotes
+                    onConfirmDeleteAllNotes = onConfirmDeleteAllNotes,
+                    onOpenSourceCode = onOpenSourceCode
                 )
             }
         }
+    }
+
+    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.scrollToSourceCodeRow() {
+        onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(SETTINGS_SOURCE_CODE_ROW_TAG))
     }
 }

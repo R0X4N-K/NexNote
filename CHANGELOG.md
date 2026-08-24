@@ -4,6 +4,16 @@ All notable changes to NexNote will be documented in this file.
 
 The format follows Keep a Changelog, and this project uses semantic versioning.
 
+## [1.0.2] - 2026-08-24
+
+### Added
+
+- Added an About section in Settings with a direct link to the NexNote source code.
+
+### Fixed
+
+- Corrected the editor's bottom fade so content extends naturally into it without overlapping editing controls.
+
 ## [1.0.1] - 2026-08-23
 
 ### Changed

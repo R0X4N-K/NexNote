@@ -32,7 +32,7 @@ and limitations.
 
 - Release application id: `io.github.r0x4nk.nexnote`
 - Debug application id: `io.github.r0x4nk.nexnote.debug`
-- Current version: `1.0.1` / versionCode `2`
+- Current version: `1.0.2` / versionCode `3`
 
 The Kotlin namespace and release application id are both `io.github.r0x4nk.nexnote`, with the debug variant using `io.github.r0x4nk.nexnote.debug`.
 
@@ -91,7 +91,7 @@ into each APK under `assets/legal/` from `LICENSE` and
 ## Release
 
 The current signed upstream release is
-[`v1.0.1`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.1). Its APK is
+[`v1.0.2`](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.2). Its APK is
 built and signed by the tag-triggered GitHub Actions release workflow. Future
 releases use the same semantic-tag process:
 
@@ -125,7 +125,7 @@ The submission includes:
 - Gradle dependency locking and strict artifact checksum verification;
 - no proprietary runtime services;
 - GitHub CI for build, tests, and lint;
-- the immutable public `v1.0.1` tag and its signed upstream release;
+- the immutable public `v1.0.2` tag and its signed upstream release;
 - F-Droid reproducible-build verification pinned to the upstream signing
   certificate.
 
