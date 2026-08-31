@@ -1,4 +1,4 @@
-# ABI-split metadata template for fdroid/fdroiddata merge request !46620.
+# Universal optimized metadata template for fdroid/fdroiddata merge request !46620.
 Categories:
   - Note
 License: GPL-3.0-only
@@ -12,55 +12,18 @@ AutoName: NexNote
 RepoType: git
 Repo: https://github.com/R0X4N-K/NexNote.git
 Builds:
-  - versionName: 1.0.2
-    versionCode: 31
-    commit: v1.0.2
+  - versionName: 1.0.3
+    versionCode: 35
+    commit: v1.0.3
     subdir: app
     gradle:
       - yes
-    binary: https://github.com/R0X4N-K/NexNote/releases/download/v%v/NexNote-v%v-armeabi-v7a.apk
-    gradleprops:
-      - nexnote.abi=armeabi-v7a
-
-  - versionName: 1.0.2
-    versionCode: 32
-    commit: v1.0.2
-    subdir: app
-    gradle:
-      - yes
-    binary: https://github.com/R0X4N-K/NexNote/releases/download/v%v/NexNote-v%v-arm64-v8a.apk
-    gradleprops:
-      - nexnote.abi=arm64-v8a
-
-  - versionName: 1.0.2
-    versionCode: 33
-    commit: v1.0.2
-    subdir: app
-    gradle:
-      - yes
-    binary: https://github.com/R0X4N-K/NexNote/releases/download/v%v/NexNote-v%v-x86.apk
-    gradleprops:
-      - nexnote.abi=x86
-
-  - versionName: 1.0.2
-    versionCode: 34
-    commit: v1.0.2
-    subdir: app
-    gradle:
-      - yes
-    binary: https://github.com/R0X4N-K/NexNote/releases/download/v%v/NexNote-v%v-x86_64.apk
-    gradleprops:
-      - nexnote.abi=x86_64
+    binary: https://github.com/R0X4N-K/NexNote/releases/download/v%v/NexNote-v%v.apk
 
 AllowedAPKSigningKeys: 74c22d14ebe94c04469a6eb546ea93496ec9eb723d71755b7a035118a64878a4
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9]+(?:\.[0-9]+){2}$
-VercodeOperation:
-  - 10 * %c + 1
-  - 10 * %c + 2
-  - 10 * %c + 3
-  - 10 * %c + 4
 UpdateCheckData: app/build.gradle.kts|baseVersionCode\s*=\s*(\d+)|.|versionName\s*=\s*"([^"]+)"
-CurrentVersion: 1.0.2
-CurrentVersionCode: 34
+CurrentVersion: 1.0.3
+CurrentVersionCode: 35

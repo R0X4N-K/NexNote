@@ -32,9 +32,7 @@ and limitations.
 
 - Release application id: `io.github.r0x4nk.nexnote`
 - Debug application id: `io.github.r0x4nk.nexnote.debug`
-- Current source version: `1.0.2` / universal versionCode `3`
-- F-Droid ABI versionCodes: `31` (`armeabi-v7a`), `32` (`arm64-v8a`),
-  `33` (`x86`), and `34` (`x86_64`)
+- Current source version: `1.0.3` / versionCode `35`
 
 The Kotlin namespace and release application id are both `io.github.r0x4nk.nexnote`, with the debug variant using `io.github.r0x4nk.nexnote.debug`.
 
@@ -65,7 +63,6 @@ Useful commands:
 ./gradlew ci
 ./gradlew clean assembleDebug
 ./gradlew assembleRelease
-./gradlew assembleRelease -Pnexnote.abi=arm64-v8a
 ./gradlew compileDebugAndroidTestKotlin
 ./gradlew lintRelease --offline
 ```
@@ -76,7 +73,6 @@ On Windows PowerShell:
 .\gradlew.bat ci
 .\gradlew.bat clean assembleDebug
 .\gradlew.bat assembleRelease
-.\gradlew.bat assembleRelease "-Pnexnote.abi=arm64-v8a"
 .\gradlew.bat compileDebugAndroidTestKotlin
 .\gradlew.bat lintRelease --offline
 ```
@@ -95,9 +91,9 @@ into each APK under `assets/legal/` from `LICENSE` and
 ## Release
 
 Signed upstream releases are built from immutable tags by the tag-triggered
-GitHub Actions release workflow. For each release, it publishes a universal APK
-plus `armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64` APKs. Releases use this
-semantic-tag process:
+GitHub Actions release workflow. Each release publishes one optimized universal
+APK containing native libraries for `armeabi-v7a`, `arm64-v8a`, `x86`, and
+`x86_64`. Releases use this semantic-tag process:
 
 ```bash
 git tag -a v1.1.0 -m "NexNote 1.1.0"
@@ -129,8 +125,8 @@ The submission includes:
 - Gradle dependency locking and strict artifact checksum verification;
 - no proprietary runtime services;
 - GitHub CI for build, tests, and lint;
-- ABI-scoped Gradle builds with ordered F-Droid versionCodes;
-- a release workflow that publishes matching upstream reference APKs;
+- R8-minified, resource-shrunk universal release builds;
+- a release workflow that publishes the matching upstream reference APK;
 - F-Droid reproducible-build verification pinned to the upstream signing
   certificate.
 

@@ -53,11 +53,10 @@ Use short branch names:
 ## Release Checklist
 
 - Update `CHANGELOG.md`.
-- Update `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` for the
-  universal APK and for each ABI-specific versionCode.
+- Update `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 - Ensure `versionName` and the git tag match, for example `1.0.0` and `v1.0.0`.
 - Ensure `versionCode` only increases.
-- Keep ABI versionCodes in the form `10 * baseVersionCode + suffix`, with
-  suffixes `1` through `4` in the documented ABI order.
-- Verify the universal APK and all four `nexnote.abi` release builds.
+- Keep R8 minification and resource shrinking enabled for release builds.
+- Verify that the universal APK contains all four packaged ABIs and stays below
+  the release-size guard.
 - Build from a clean clone before tagging.

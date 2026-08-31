@@ -1,0 +1,2 @@
+- Reduced the release APK size by enabling code minification and resource shrinking.
+- Returned to a single universal APK that supports all four packaged ABIs.

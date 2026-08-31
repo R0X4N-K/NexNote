@@ -34,67 +34,36 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build unsigned release APKs
+      - name: Build unsigned release APK
         shell: bash
         run: |
           set -euo pipefail
           unsigned_dir="${RUNNER_TEMP}/nexnote-unsigned"
           mkdir -p "$unsigned_dir"
 
-          build_apk() {
-            local abi="$1"
-            local output_name="$2"
-            local gradle_args=(--no-daemon --no-build-cache clean assembleRelease)
-
-            if [[ -n "$abi" ]]; then
-              gradle_args+=("-Pnexnote.abi=${abi}")
-            fi
-
-            ./gradlew "${gradle_args[@]}"
-            cp app/build/outputs/apk/release/app-release-unsigned.apk \
-              "${unsigned_dir}/${output_name}"
-          }
-
-          build_apk "" "NexNote-${GITHUB_REF_NAME}.apk"
-          build_apk "armeabi-v7a" "NexNote-${GITHUB_REF_NAME}-armeabi-v7a.apk"
-          build_apk "arm64-v8a" "NexNote-${GITHUB_REF_NAME}-arm64-v8a.apk"
-          build_apk "x86" "NexNote-${GITHUB_REF_NAME}-x86.apk"
-          build_apk "x86_64" "NexNote-${GITHUB_REF_NAME}-x86_64.apk"
+          ./gradlew --no-daemon --no-build-cache clean assembleRelease
+          cp app/build/outputs/apk/release/app-release-unsigned.apk \
+            "${unsigned_dir}/NexNote-${GITHUB_REF_NAME}.apk"
 
           printf 'UNSIGNED_APK_DIR=%s\n' "$unsigned_dir" >> "$GITHUB_ENV"
 
-      - name: Validate unsigned release APKs
+      - name: Validate unsigned release APK
         shell: bash
         run: |
           set -euo pipefail
           build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
           release_version="${GITHUB_REF_NAME#v}"
+          expected_code="$(sed -nE 's/^[[:space:]]*val baseVersionCode = ([0-9]+)[[:space:]]*$/\1/p' app/build.gradle.kts)"
+          apk="${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}.apk"
+          badging="$("${build_tools}/aapt" dump badging "$apk")"
+          actual_abis="$(unzip -Z1 "$apk" 'lib/*/*.so' | cut -d/ -f2 | sort -u | paste -sd, -)"
 
-          validate_apk() {
-            local apk="$1"
-            local expected_code="$2"
-            local expected_abis="$3"
-            local badging
-            local actual_abis
-
-            badging="$("${build_tools}/aapt" dump badging "$apk")"
-            actual_abis="$(unzip -Z1 "$apk" 'lib/*/*.so' | cut -d/ -f2 | sort -u | paste -sd, -)"
-
-            grep -F "versionCode='${expected_code}'" <<< "$badging"
-            grep -F "versionName='${release_version}'" <<< "$badging"
-            test "$actual_abis" = "$expected_abis"
-          }
-
-          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}.apk" \
-            3 "arm64-v8a,armeabi-v7a,x86,x86_64"
-          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-armeabi-v7a.apk" \
-            31 "armeabi-v7a"
-          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-arm64-v8a.apk" \
-            32 "arm64-v8a"
-          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-x86.apk" \
-            33 "x86"
-          validate_apk "${UNSIGNED_APK_DIR}/NexNote-${GITHUB_REF_NAME}-x86_64.apk" \
-            34 "x86_64"
+          test -n "$expected_code"
+          test -s "app/build/outputs/mapping/release/mapping.txt"
+          grep -F "versionCode='${expected_code}'" <<< "$badging"
+          grep -F "versionName='${release_version}'" <<< "$badging"
+          test "$actual_abis" = "arm64-v8a,armeabi-v7a,x86,x86_64"
+          test "$(stat -c%s "$apk")" -lt 15728640
 
       - name: Install reproducible signing tools
         shell: bash
@@ -118,7 +87,7 @@ jobs:
           chmod 600 "$keystore_path"
           printf 'KEYSTORE_PATH=%s\n' "$keystore_path" >> "$GITHUB_ENV"
 
-      - name: Sign APKs
+      - name: Sign APK
         shell: bash
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -164,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t signed_apks < <(find "$SIGNED_APK_DIR" -maxdepth 1 -type f -name '*.apk' | sort)
-          test "${#signed_apks[@]}" -eq 5
+          test "${#signed_apks[@]}" -eq 1
           gh release create "$GITHUB_REF_NAME" "${signed_apks[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "NexNote ${GITHUB_REF_NAME}" \

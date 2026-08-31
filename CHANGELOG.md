@@ -4,6 +4,13 @@ All notable changes to NexNote will be documented in this file.
 
 The format follows Keep a Changelog, and this project uses semantic versioning.
 
+## [1.0.3] - 2026-08-31
+
+### Changed
+
+- Enabled R8 code minification and resource shrinking for release builds.
+- Returned to a single universal release APK after reducing its size by more than 90%.
+
 ## [1.0.2] - 2026-08-24
 
 ### Added
