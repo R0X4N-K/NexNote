@@ -107,7 +107,7 @@ for users who installed any of those packages.
 
 With Android SDK platform/API 36 and JDK 21 provisioned, the build uses the
 standard Gradle release task. The unsigned APK does not depend on signing
-secrets. Its upstream `binary` URL lets F-Droid compare it with the signed
+secrets. The top-level `Binaries` URL lets F-Droid compare it with the signed
 GitHub asset and transfer the verified signature.
 
 `UpdateCheckData` reads the numeric `baseVersionCode` and `versionName` directly
