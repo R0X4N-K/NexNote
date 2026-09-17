@@ -69,6 +69,14 @@ android {
         compose = true
         buildConfig = true
     }
+    lint {
+        // targetSdk is pinned to the documented SDK 36.1; newer platforms are
+        // not adopted until they are built and validated end to end.
+        disable += "OldTargetApi"
+        // Dependency versions are pinned and checksum-verified for F-Droid
+        // reproducible builds; update notices are handled deliberately.
+        disable += "GradleDependency"
+    }
     sourceSets {
         getByName("main").assets.directories.add("$projectDir/build/generated/legalAssets")
         getByName("androidTest").assets.directories.add("$projectDir/schemas")
@@ -88,6 +96,9 @@ dependencyLocking {
 }
 
 dependencies {
+    implementation(libs.tink)
+    implementation(libs.material.color.utilities)
+
     // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
