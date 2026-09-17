@@ -1,0 +1,6 @@
+- Attach files and share notes with media in ZIP bundles.
+- Import text and images shared from other apps.
+- Enjoy refreshed screens, device colors, five typefaces, and new translations.
+- Browse Calendar and Agenda tabs and change note creation dates.
+- Use improved checklist and indentation tools.
+- Improve Vault PIN protection, file handling, accessibility, and export reliability.

@@ -16,7 +16,14 @@ Binaries: https://github.com/R0X4N-K/NexNote/releases/download/v%v/NexNote-v%v.a
 Builds:
   - versionName: 1.0.3
     versionCode: 35
-    commit: v1.0.3
+    commit: 78324d9ed653cc512d1d00a1467f8b23563ee73a
+    subdir: app
+    gradle:
+      - yes
+
+  - versionName: 1.0.4
+    versionCode: 36
+    commit: v1.0.4
     subdir: app
     gradle:
       - yes
@@ -26,5 +33,5 @@ AllowedAPKSigningKeys: 74c22d14ebe94c04469a6eb546ea93496ec9eb723d71755b7a035118a
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[\d.]+$
 UpdateCheckData: app/build.gradle.kts|baseVersionCode\s*=\s*(\d+)|.|versionName\s*=\s*"([^"]+)"
-CurrentVersion: 1.0.3
-CurrentVersionCode: 35
+CurrentVersion: 1.0.4
+CurrentVersionCode: 36

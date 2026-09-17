@@ -31,7 +31,7 @@ body:
     id: version
     attributes:
       label: App version
-      placeholder: 1.0.0
+      placeholder: 1.0.4
   - type: input
     id: device
     attributes:
