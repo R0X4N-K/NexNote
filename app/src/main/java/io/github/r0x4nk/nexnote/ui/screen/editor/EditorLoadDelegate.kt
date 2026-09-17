@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
@@ -7,6 +9,7 @@ import io.github.r0x4nk.nexnote.util.DateUtils
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.ensureActive
 
 internal class EditorLoadDelegate(
     private val uiState: MutableStateFlow<EditorUiState>,
@@ -14,7 +17,8 @@ internal class EditorLoadDelegate(
     private val getVaultNoteById: GetVaultNoteByIdUseCase,
     private val getTemplateById: GetTemplateByIdUseCase,
     private val scheduleAutosave: () -> Unit,
-    private val resetContentHistory: (content: String, selectionOffset: Int?) -> Unit
+    private val resetContentHistory: (content: String, selectionOffset: Int?) -> Unit,
+    private val strings: StringProvider
 ) {
     suspend fun loadInitial(mode: EditorMode) {
         NexNoteDebugLog.viewModel(
@@ -39,7 +43,12 @@ internal class EditorLoadDelegate(
         val note = getNoteById(id)
         if (note == null) {
             NexNoteDebugLog.viewModel(event = "loadNoteMissing", details = "noteId=$id")
-            uiState.update { it.copy(isLoading = false, errorMessage = "Note not found") }
+            uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = strings.get(R.string.editor_error_note_not_found)
+                )
+            }
             return
         }
         NexNoteDebugLog.viewModel(
@@ -110,12 +119,19 @@ internal class EditorLoadDelegate(
         resetContentHistory("", null)
     }
 
-    private suspend fun loadVaultNote(id: Long) {
+    internal suspend fun loadVaultNote(id: Long, mayApply: suspend () -> Boolean = { true }) {
         NexNoteDebugLog.viewModel(event = "loadVaultNoteStart", details = "vaultNoteId=$id")
         val note = getVaultNoteById(id)
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        if (!mayApply()) return
         if (note == null || !note.isInVault) {
             NexNoteDebugLog.viewModel(event = "loadVaultNoteMissing", details = "vaultNoteId=$id")
-            uiState.update { it.copy(isLoading = false, errorMessage = "Vault note not available") }
+            uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = strings.get(R.string.editor_error_vault_note_unavailable)
+                )
+            }
             return
         }
         NexNoteDebugLog.viewModel(
@@ -160,7 +176,12 @@ internal class EditorLoadDelegate(
                 event = "loadTemplateForEditMissing",
                 details = "editTemplateId=$editTemplateId"
             )
-            uiState.update { it.copy(isLoading = false, errorMessage = "Template not found") }
+            uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = strings.get(R.string.editor_error_template_not_found)
+                )
+            }
             return
         }
         NexNoteDebugLog.viewModel(

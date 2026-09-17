@@ -36,7 +36,55 @@ class NoteRepositoryTest {
         db.close()
     }
 
+    @Test
+    fun globalWipePersistsFailedImageCleanupAndRetryClearsQueue() = runTest {
+        var canDelete = false
+        val storage = object : io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage by imageStorage {
+            override suspend fun deleteImage(relativePath: String): Boolean = canDelete
+        }
+        val persistentRepository = NoteRepositoryImpl(db.noteDao(), storage, database = db, pendingImageDeletionDao = db.pendingImageDeletionDao())
+        val id = persistentRepository.saveNote(Note(imagePaths = listOf("images/a.jpg")))
+        assertEquals(1, persistentRepository.deleteAllNormalNotesPermanently())
+        assertNull(persistentRepository.getNoteById(id))
+        assertEquals(listOf("images/a.jpg"), db.pendingImageDeletionDao().nextBatch("", 100))
+        canDelete = true
+        PendingImageCleanup(db.pendingImageDeletionDao(), storage).runOnce()
+        assertTrue(db.pendingImageDeletionDao().nextBatch("", 100).isEmpty())
+    }
+
+    @Test
+    fun failedDatabaseWipeRollsBackCleanupQueue() = runTest {
+        val persistentRepository = NoteRepositoryImpl(db.noteDao(), imageStorage, database = db, pendingImageDeletionDao = db.pendingImageDeletionDao())
+        val id = persistentRepository.saveNote(Note(imagePaths = listOf("images/keep.jpg")))
+        db.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER reject_wipe BEFORE DELETE ON notes BEGIN SELECT RAISE(ABORT, 'test'); END"
+        )
+        try {
+            persistentRepository.deleteAllNormalNotesPermanently()
+            fail("Expected failed transaction")
+        } catch (_: android.database.sqlite.SQLiteException) { }
+        assertNotNull(persistentRepository.getNoteById(id))
+        assertTrue(db.pendingImageDeletionDao().nextBatch("", 100).isEmpty())
+        assertTrue(imageStorage.deletedPaths.isEmpty())
+    }
     // ── Insert / Retrieve ─────────────────────────────────────────────────────
+
+    @Test
+    fun duplicateLargeNote_preservesContentAndIndexesWithProductionRepositories() = runTest {
+        val indexedRepository = NoteRepositoryImpl(
+            dao = db.noteDao(), imageStorage = imageStorage,
+            database = db, statisticsDao = db.noteStatisticsDao()
+        )
+        val tags = TagRepositoryImpl(db, db.tagDao(), db.noteContentPatchDao())
+        val duplicate = io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase(indexedRepository, tags, imageStorage)
+        val source = Note(content = "Long note #work\n".repeat(40_000))
+        val start = android.os.SystemClock.elapsedRealtime()
+        val id = duplicate(source)
+        val elapsed = android.os.SystemClock.elapsedRealtime() - start
+        println("LARGE_NOTE_DUPLICATION chars=${source.content.length} elapsedMs=$elapsed")
+        assertEquals(source.content, indexedRepository.getNoteById(id)?.content)
+        assertEquals(listOf("work"), db.tagDao().getCrossRefsForNote(id).map { it.tagName })
+    }
 
     @Test
     fun saveNote_insertNewNote_returnsPositiveId() = runTest {

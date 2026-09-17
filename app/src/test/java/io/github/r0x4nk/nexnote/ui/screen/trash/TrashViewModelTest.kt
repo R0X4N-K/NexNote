@@ -7,6 +7,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.DeleteNotePermanentlyUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.EmptyTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDeletedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
+import io.github.r0x4nk.nexnote.testing.TestStringProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -45,7 +46,8 @@ class TrashViewModelTest {
             observeDeletedNotes = ObserveDeletedNotesUseCase(repository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),
             deleteNotePermanently = DeleteNotePermanentlyUseCase(repository),
-            emptyTrash = EmptyTrashUseCase(repository)
+            emptyTrash = EmptyTrashUseCase(repository),
+            strings = TestStringProvider
         )
     }
 
@@ -60,6 +62,17 @@ class TrashViewModelTest {
             viewModel.uiState.collect {}
         }
         block()
+    }
+
+    @Test
+    fun `restore all restores current trash once despite repeated taps`() = runViewModelTest {
+        fakeDao.emitDeletedNotes(listOf(deletedNoteEntity(1L, "One", 1000L, ""), deletedNoteEntity(2L, "Two", 1000L, "")))
+        advanceUntilIdle()
+        viewModel.restoreAll()
+        viewModel.restoreAll()
+        advanceUntilIdle()
+        assertEquals(2, fakeDao.restoredCount)
+        assertNull(viewModel.operationProgress.value)
     }
 
     // ── Initial state ─────────────────────────────────────────────────────────

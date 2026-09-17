@@ -23,13 +23,19 @@ import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -49,9 +55,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 
 private val EditorTopBarMinHeight = 44.dp
@@ -83,6 +92,11 @@ internal data class EditorTopBarToolingState(
  */
 internal data class EditorTopBarToolingActions(
     val onToggleColorPicker: () -> Unit,
+    val onClearContent: (() -> Unit)? = null,
+    val onTrash: (() -> Unit)? = null,
+    val onMoveToVault: (() -> Unit)? = null,
+    val onCheckAllTasks: (() -> Unit)? = null,
+    val onUncheckAllTasks: (() -> Unit)? = null,
 )
 
 @Composable
@@ -103,15 +117,18 @@ internal fun EditorTopBar(
     onSearchPrevious: () -> Unit,
     onSearchNext: () -> Unit,
     metadata: EditorNoteMetadata? = null,
+    onShare: (() -> Unit)? = null,
     onExport: (() -> Unit)? = null,
     onCopyNoteAsText: (() -> Unit)? = null,
     onCopyNoteAsMarkdown: (() -> Unit)? = null,
     onCreationDateEdit: (() -> Unit)? = null
 ) {
+    val newNoteFallback = stringResource(
+        if (isTemplateMode) R.string.editor_new_template else R.string.editor_new_note
+    )
     val displayTitle = when {
         title.isNotBlank() -> title
-        isTemplateMode -> "New template"
-        else -> "New note"
+        else -> newNoteFallback
     }
 
     Surface(
@@ -130,7 +147,7 @@ internal fun EditorTopBar(
         ) {
             NexIconButton(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.common_back),
                 onClick = onBack
             )
             Box(
@@ -159,6 +176,7 @@ internal fun EditorTopBar(
                 onSearchClose = onSearchClose,
                 onSearchPrevious = onSearchPrevious,
                 onSearchNext = onSearchNext,
+                onShare = onShare,
                 onExport = onExport,
                 onCopyNoteAsText = onCopyNoteAsText,
                 onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
@@ -189,6 +207,7 @@ private fun EditorTopBarTitle(
             Text(
                 text = displayTitle,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -206,7 +225,7 @@ private fun EditorSearchField(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp
@@ -241,9 +260,9 @@ private fun EditorSearchField(
                     Box {
                         if (value.isEmpty()) {
                             Text(
-                                text = "Search in note",
+                                text = stringResource(R.string.search_in_note),
                                 style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         inner()
@@ -266,6 +285,7 @@ private fun EditorTopBarActions(
     onSearchClose: () -> Unit,
     onSearchPrevious: () -> Unit,
     onSearchNext: () -> Unit,
+    onShare: (() -> Unit)?,
     onExport: (() -> Unit)?,
     onCopyNoteAsText: (() -> Unit)?,
     onCopyNoteAsMarkdown: (() -> Unit)?,
@@ -287,7 +307,8 @@ private fun EditorTopBarActions(
             toolingState = toolingState,
             toolingActions = toolingActions,
             onSearchOpen = onSearchOpen,
-            onExport = onExport,
+            onShare = onShare,
+                onExport = onExport,
             onCopyNoteAsText = onCopyNoteAsText,
             onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
             onCreationDateEdit = onCreationDateEdit
@@ -316,26 +337,26 @@ private fun EditorSearchActions(
         Text(
             text = searchState.resultLabel,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.End,
             modifier = Modifier.widthIn(min = 40.dp)
         )
     }
     NexIconButton(
         imageVector = Icons.Default.KeyboardArrowUp,
-        contentDescription = "Previous match",
+        contentDescription = stringResource(R.string.common_previous_match),
         onClick = onSearchPrevious,
         enabled = searchState.hasMatches
     )
     NexIconButton(
         imageVector = Icons.Default.KeyboardArrowDown,
-        contentDescription = "Next match",
+        contentDescription = stringResource(R.string.common_next_match),
         onClick = onSearchNext,
         enabled = searchState.hasMatches
     )
     NexIconButton(
         imageVector = Icons.Default.Close,
-        contentDescription = "Close search",
+        contentDescription = stringResource(R.string.common_close_search),
         onClick = onSearchClose
     )
 }
@@ -357,6 +378,7 @@ private fun EditorBrowsingActions(
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
     onSearchOpen: () -> Unit,
+    onShare: (() -> Unit)?,
     onExport: (() -> Unit)?,
     onCopyNoteAsText: (() -> Unit)?,
     onCopyNoteAsMarkdown: (() -> Unit)?,
@@ -364,11 +386,11 @@ private fun EditorBrowsingActions(
 ) {
     NexIconButton(
         imageVector = Icons.Default.Search,
-        contentDescription = "Search in note",
+        contentDescription = stringResource(R.string.search_in_note),
         onClick = onSearchOpen
     )
     if (
-        onExport != null ||
+        onShare != null || onExport != null ||
         onCopyNoteAsText != null ||
         onCopyNoteAsMarkdown != null ||
         onCreationDateEdit != null ||
@@ -378,7 +400,8 @@ private fun EditorBrowsingActions(
             showColorAction = !isTemplateMode && !isReadOnly,
             toolingState = toolingState,
             toolingActions = toolingActions,
-            onExport = onExport,
+            onShare = onShare,
+                onExport = onExport,
             onCopyNoteAsText = onCopyNoteAsText,
             onCopyNoteAsMarkdown = onCopyNoteAsMarkdown,
             onCreationDateEdit = onCreationDateEdit
@@ -391,6 +414,7 @@ private fun EditorOverflowMenu(
     showColorAction: Boolean,
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
+    onShare: (() -> Unit)?,
     onExport: (() -> Unit)?,
     onCopyNoteAsText: (() -> Unit)?,
     onCopyNoteAsMarkdown: (() -> Unit)?,
@@ -407,7 +431,7 @@ private fun EditorOverflowMenu(
     Box {
         NexIconButton(
             imageVector = Icons.Default.MoreVert,
-            contentDescription = "Note options",
+            contentDescription = stringResource(R.string.common_note_options),
             onClick = {
                 page = EditorOverflowMenuPage.Actions
                 expanded = true
@@ -424,7 +448,8 @@ private fun EditorOverflowMenu(
                     hasCopyActions = hasCopyActions,
                     toolingState = toolingState,
                     toolingActions = toolingActions,
-                    onExport = onExport,
+                    onShare = onShare,
+                onExport = onExport,
                     onCreationDateEdit = onCreationDateEdit,
                     onCopyOpen = { page = EditorOverflowMenuPage.Copy },
                     onDismiss = dismiss
@@ -447,17 +472,25 @@ private fun EditorOverflowActionsPage(
     hasCopyActions: Boolean,
     toolingState: EditorTopBarToolingState,
     toolingActions: EditorTopBarToolingActions,
+    onShare: (() -> Unit)?,
     onExport: (() -> Unit)?,
     onCreationDateEdit: (() -> Unit)?,
     onCopyOpen: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    if (onShare != null) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.common_share_note)) },
+            leadingIcon = { Icon(Icons.Default.IosShare, contentDescription = null) },
+            onClick = { onDismiss(); onShare() }
+        )
+    }
     if (onExport != null) {
         DropdownMenuItem(
-            text = { Text("Export note") },
+            text = { Text(stringResource(R.string.common_export_note)) },
             leadingIcon = {
                 Icon(
-                    imageVector = Icons.Default.IosShare,
+                    imageVector = Icons.Default.FileDownload,
                     contentDescription = null
                 )
             },
@@ -469,7 +502,7 @@ private fun EditorOverflowActionsPage(
     }
     if (hasCopyActions) {
         DropdownMenuItem(
-            text = { Text("Copy note") },
+            text = { Text(stringResource(R.string.common_copy_note)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
@@ -481,7 +514,7 @@ private fun EditorOverflowActionsPage(
     }
     if (onCreationDateEdit != null) {
         DropdownMenuItem(
-            text = { Text("Edit creation date") },
+            text = { Text(stringResource(R.string.edit_creation_date)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.CalendarToday,
@@ -494,6 +527,72 @@ private fun EditorOverflowActionsPage(
             }
         )
     }
+    toolingActions.onMoveToVault?.let { move ->
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.common_move_to_vault)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null
+                )
+            },
+            onClick = { onDismiss(); move() }
+        )
+    }
+    toolingActions.onClearContent?.let { clear ->
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.editor_clear_content)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.DeleteSweep,
+                    contentDescription = null
+                )
+            },
+            onClick = { onDismiss(); clear() }
+        )
+    }
+    toolingActions.onCheckAllTasks?.let { checkAll ->
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.editor_check_all_tasks)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.DoneAll,
+                    contentDescription = null
+                )
+            },
+            onClick = { onDismiss(); checkAll() }
+        )
+    }
+    toolingActions.onUncheckAllTasks?.let { uncheckAll ->
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.editor_uncheck_all_tasks)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.RemoveDone,
+                    contentDescription = null
+                )
+            },
+            onClick = { onDismiss(); uncheckAll() }
+        )
+    }
+    toolingActions.onTrash?.let { trash ->
+        DropdownMenuItem(
+            text = {
+                Text(
+                    stringResource(R.string.common_move_to_trash),
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            onClick = { onDismiss(); trash() }
+        )
+    }
     if (showColorAction) {
         val color = if (toolingState.hasCustomColor) {
             MaterialTheme.colorScheme.primary
@@ -501,7 +600,7 @@ private fun EditorOverflowActionsPage(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
         DropdownMenuItem(
-            text = { Text("Note background color") },
+            text = { Text(stringResource(R.string.note_background_color)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Palette,
@@ -525,7 +624,7 @@ private fun EditorOverflowCopyPage(
     onDismiss: () -> Unit
 ) {
     DropdownMenuItem(
-        text = { Text("Back") },
+        text = { Text(stringResource(R.string.common_back)) },
         leadingIcon = {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -536,7 +635,7 @@ private fun EditorOverflowCopyPage(
     )
     if (onCopyNoteAsText != null) {
         DropdownMenuItem(
-            text = { Text("Copy as text") },
+            text = { Text(stringResource(R.string.common_copy_as_text)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.TextSnippet,
@@ -551,7 +650,7 @@ private fun EditorOverflowCopyPage(
     }
     if (onCopyNoteAsMarkdown != null) {
         DropdownMenuItem(
-            text = { Text("Copy as Markdown") },
+            text = { Text(stringResource(R.string.common_copy_as_markdown)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Outlined.Code,

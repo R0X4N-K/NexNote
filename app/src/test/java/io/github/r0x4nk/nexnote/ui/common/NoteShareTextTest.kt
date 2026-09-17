@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.common
 
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.testing.TestStringProvider
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -23,7 +24,7 @@ class NoteShareTextTest {
     fun `shareSubject uses single note title when available`() {
         val notes = listOf(Note(title = "Roadmap", content = "Next"))
 
-        assertEquals("Roadmap", notes.shareSubject())
+        assertEquals("Roadmap", notes.shareSubject(TestStringProvider))
     }
 
     @Test
@@ -33,6 +34,6 @@ class NoteShareTextTest {
             Note(title = "Two", content = "B")
         )
 
-        assertEquals("2 NexNote notes", notes.shareSubject())
+        assertEquals("2 NexNote notes", notes.shareSubject(TestStringProvider))
     }
 }

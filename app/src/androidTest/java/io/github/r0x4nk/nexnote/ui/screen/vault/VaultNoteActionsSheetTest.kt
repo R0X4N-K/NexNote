@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.domain.model.Note
@@ -26,18 +27,33 @@ class VaultNoteActionsSheetTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun largeTextActionsCanScrollToLastAction() {
+        var deleted = false
+        composeRule.setContent {
+            NexNoteTheme(fontScale = 2f) {
+                VaultNoteActionsSheet(
+                    note = Note(id = 42L, isInVault = true),
+                    clipboardCallbacks = NoteClipboardCallbacks({}, {}),
+                    onMoveToTrash = { deleted = true },
+                    onDuplicate = {}, onRemoveFromVault = {}, onDismiss = {}
+                )
+            }
+        }
+        composeRule.onNodeWithTag(VAULT_NOTE_ACTION_MOVE_TO_TRASH_TAG)
+            .performScrollTo().assertIsDisplayed().performClick()
+        assertTrue(deleted)
+    }
+
+    @Test
     fun vaultNoteActionsSheet_matchesNormalActionOrderWithVaultSpecificActions() {
         composeRule.setVaultNoteActionsSheet()
 
         composeRule.onNodeWithText("Vault note actions").assertIsDisplayed()
-        composeRule.onNodeWithText("Select").assertIsDisplayed()
         composeRule.onNodeWithText("Copy").assertIsDisplayed()
         composeRule.onNodeWithText("Duplicate").assertIsDisplayed()
         composeRule.onNodeWithText("Remove from Vault").assertIsDisplayed()
         composeRule.onNodeWithText("Move to trash").assertIsDisplayed()
 
-        val selectTop = composeRule.onNodeWithTag(VAULT_NOTE_ACTION_SELECT_TAG)
-            .getUnclippedBoundsInRoot().top.value
         val copyTop = composeRule.onNodeWithTag(VAULT_NOTE_ACTION_COPY_TAG)
             .getUnclippedBoundsInRoot().top.value
         val duplicateTop = composeRule.onNodeWithTag(VAULT_NOTE_ACTION_DUPLICATE_TAG)
@@ -47,7 +63,6 @@ class VaultNoteActionsSheetTest {
         val trashTop = composeRule.onNodeWithTag(VAULT_NOTE_ACTION_MOVE_TO_TRASH_TAG)
             .getUnclippedBoundsInRoot().top.value
 
-        assertTrue(selectTop < copyTop)
         assertTrue(copyTop < duplicateTop)
         assertTrue(duplicateTop < removeTop)
         assertTrue(removeTop < trashTop)
@@ -105,32 +120,6 @@ class VaultNoteActionsSheetTest {
         assertNull(removedNoteId)
         assertEquals(1, dismissCount)
     }
-
-    @Test
-    fun vaultNoteActionsSheet_selectInvokesOnlySelectCallback() {
-        var selectedNoteId: Long? = null
-        var trashedNoteId: Long? = null
-        var duplicatedNoteId: Long? = null
-        var removedNoteId: Long? = null
-        var dismissCount = 0
-
-        composeRule.setVaultNoteActionsSheet(
-            onMoveToTrash = { trashedNoteId = it.id },
-            onDuplicate = { duplicatedNoteId = it.id },
-            onRemoveFromVault = { removedNoteId = it.id },
-            onSelect = { selectedNoteId = it.id },
-            onDismiss = { dismissCount++ }
-        )
-
-        composeRule.onNodeWithTag(VAULT_NOTE_ACTION_SELECT_TAG).performClick()
-
-        assertEquals(42L, selectedNoteId)
-        assertNull(trashedNoteId)
-        assertNull(duplicatedNoteId)
-        assertNull(removedNoteId)
-        assertEquals(1, dismissCount)
-    }
-
 
     @Test
     fun vaultNoteActionsSheet_copyAsMarkdownInvokesOnlyMarkdownCallback() {
@@ -239,7 +228,6 @@ class VaultNoteActionsSheetTest {
             onMoveToTrash: (Note) -> Unit = {},
             onDuplicate: (Note) -> Unit = {},
             onRemoveFromVault: (Note) -> Unit = {},
-            onSelect: (Note) -> Unit = {},
             onDismiss: () -> Unit = {}
         ) {
             setContent {
@@ -250,7 +238,6 @@ class VaultNoteActionsSheetTest {
                         onMoveToTrash = onMoveToTrash,
                         onDuplicate = onDuplicate,
                         onRemoveFromVault = onRemoveFromVault,
-                        onSelect = onSelect,
                         onDismiss = onDismiss
                     )
                 }

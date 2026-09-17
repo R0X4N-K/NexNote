@@ -2,7 +2,7 @@ package io.github.r0x4nk.nexnote.data.repository
 
 import io.github.r0x4nk.nexnote.data.db.TemplateDao
 import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
-import io.github.r0x4nk.nexnote.domain.model.PredefinedTemplates
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.repository.TemplateRepository
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.map
  * domain interface, matching the note and tag repositories.
  */
 class TemplateRepositoryImpl(
-    private val dao: TemplateDao
+    private val dao: TemplateDao,
+    private val strings: StringProvider
 ) : TemplateRepository {
 
     /** Flow of all templates: predefined first, then custom templates alphabetically. */
@@ -51,7 +52,7 @@ class TemplateRepositoryImpl(
      */
     suspend fun initializePredefinedTemplates() {
         if (dao.countPredefinedTemplates() == 0) {
-            PredefinedTemplates.all.forEach { template ->
+            PredefinedTemplates.all(strings).forEach { template ->
                 dao.insertTemplate(template.toEntity())
             }
         }

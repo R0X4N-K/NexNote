@@ -2,11 +2,14 @@ package io.github.r0x4nk.nexnote.ui.screen.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.HomePinnedFilter
 import io.github.r0x4nk.nexnote.domain.model.HomeSearchScope
 import io.github.r0x4nk.nexnote.domain.model.HomeSearchSort
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveActiveNoteCountUseCase
@@ -17,10 +20,13 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListActionsDelegate
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,15 +38,18 @@ import kotlinx.coroutines.flow.update
 
 class HomeViewModel(
     private val observeHomeNotes: ObserveHomeNotesUseCase,
+    private val getNoteById: GetNoteByIdUseCase,
     observeHomeNoteIds: ObserveHomeNoteIdsUseCase,
     observeActiveNoteCount: ObserveActiveNoteCountUseCase,
     moveNoteToTrash: MoveNoteToTrashUseCase,
     restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     toggleNotePin: ToggleNotePinUseCase,
     duplicateNoteUseCase: DuplicateNoteUseCase,
+    updateNoteCreationDate: UpdateNoteCreationDateUseCase,
     private val observeTemplates: ObserveTemplatesUseCase,
     private val observeMostUsedTags: ObserveMostUsedTagsUseCase,
-    observeNoteCardStyle: ObserveNoteCardStyleUseCase
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _searchQuery       = MutableStateFlow("")
@@ -72,12 +81,17 @@ class HomeViewModel(
         restoreNoteFromTrash = restoreNoteFromTrash,
         toggleNotePin = toggleNotePin,
         duplicateNoteUseCase = duplicateNoteUseCase,
+        updateNoteCreationDate = updateNoteCreationDate,
         sortOrder = _sortOrder,
         viewMode = _viewMode,
         selectedTagFilters = _selectedTagFilters,
         trashEvents = _trashEvents,
-        noteActionMessages = _noteActionMessages
+        noteActionMessages = _noteActionMessages,
+        strings = strings
     )
+
+    val operationProgress get() = noteListActions.operationProgress
+
 
     /**
      * Templates are loaded once and kept hot for the duration of the ViewModel.
@@ -288,8 +302,35 @@ class HomeViewModel(
         noteListActions.togglePin(note)
     }
 
+    private var isResolvingSelection = false
+
+    /** Resolve by id so actions also include notes outside the paginated Home window. */
+    fun withSelectedNotes(noteIds: Set<Long>, onReady: (List<Note>) -> Unit) {
+        if (isResolvingSelection || noteIds.isEmpty()) return
+        isResolvingSelection = true
+        viewModelScope.launch {
+            try {
+                val notes = noteIds.map { id ->
+                    getNoteById(id)?.takeUnless { it.isDeleted || it.isInVault }
+                        ?: error("Selected note is no longer available")
+                }
+                onReady(notes)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _noteActionMessages.trySend(strings.get(R.string.home_error_load_selected))
+            } finally {
+                isResolvingSelection = false
+            }
+        }
+    }
+
     fun duplicateNote(note: Note) {
         noteListActions.duplicateNote(note)
+    }
+
+    fun updateCreationDate(note: Note, creationDate: Long) {
+        noteListActions.updateCreationDate(note, creationDate)
     }
 
     companion object {

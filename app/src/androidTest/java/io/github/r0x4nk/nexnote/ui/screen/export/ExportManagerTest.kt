@@ -19,6 +19,24 @@ import org.junit.runner.RunWith
 class ExportManagerTest {
 
     @Test
+    fun vaultNotesAreRejectedBeforeCreatingAnyExportFile() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val cacheRoot = File(context.cacheDir, "vault-export-rejection-test").apply { mkdirs() }
+        val cache = ExportCache(cacheRoot)
+        val manager = ExportManager(context, { error("Vault images must not be read") }, cache)
+        try {
+            ExportFormat.entries.forEach { format ->
+                try {
+                    manager.buildShareIntent(listOf(Note(isInVault = true, content = "secret")), format)
+                    org.junit.Assert.fail("Vault export must fail")
+                } catch (_: IllegalArgumentException) { }
+            }
+            assertTrue(cache.directory.listFiles().isNullOrEmpty())
+        } finally {
+            cacheRoot.delete()
+        }
+    }
+    @Test
     fun shareIntentsUseUniqueUrisClipDataAndReadGrant() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val manager = ExportManager(

@@ -49,6 +49,30 @@ private object FailingVaultNoteWiper : VaultNoteWiper {
 @OptIn(ExperimentalCoroutinesApi::class)
 class VaultRepositoryImplTest {
 
+    @Test
+    fun `PIN lockout survives repository recreation and expires`() = testScope.runTest {
+        val store = createTestDataStore()
+        var now = 100_000L
+        fun repository() = VaultRepositoryImpl(
+            dataStore = store,
+            pinHasher = VaultPinHasher(iterations = TEST_ITERATIONS),
+            keyDeriver = VaultKeyDeriver(iterations = TEST_ITERATIONS),
+            nowMillis = { now }
+        )
+        val first = repository()
+        first.configurePin("1234".toCharArray())
+        repeat(5) { assertFalse(first.unlockWithPin("0000".toCharArray())) }
+        val recreated = repository()
+        try {
+            recreated.unlockWithPin("1234".toCharArray())
+            org.junit.Assert.fail("Correct PIN must also wait for lockout")
+        } catch (error: io.github.r0x4nk.nexnote.domain.repository.VaultPinRateLimitException) {
+            assertEquals(30_000L, error.retryAfterMillis)
+        }
+        assertEquals(VaultState.LOCKED, recreated.state.first())
+        now += 30_000L
+        assertTrue(recreated.unlockWithPin("1234".toCharArray()))
+    }
     @get:Rule
     val tmpFolder: TemporaryFolder = TemporaryFolder.builder().assureDeletion().build()
 
@@ -565,7 +589,7 @@ class VaultRepositoryImplTest {
         repository.configurePin("1111".toCharArray())
         assertTrue(repository.unlockWithPin("1111".toCharArray()))
         val originalHash = dataStore.data.first()[VaultRepositoryImpl.PIN_HASH_KEY]
-        dataStore.failNextUpdate = true
+        rewrapper.onRewrap = { dataStore.failNextUpdate = true }
 
         val result = repository.changePin("1111".toCharArray(), "2222".toCharArray())
 
@@ -588,7 +612,7 @@ class VaultRepositoryImplTest {
             val repository = createRepository(dataStore, rewrapper)
             repository.configurePin("1111".toCharArray())
             assertTrue(repository.unlockWithPin("1111".toCharArray()))
-            dataStore.nextFailure = CancellationException("cancel PIN config commit")
+            rewrapper.onRewrap = { dataStore.nextFailure = CancellationException("cancel PIN config commit") }
 
             val thrown = runCatching {
                 repository.changePin("1111".toCharArray(), "2222".toCharArray())
@@ -844,6 +868,7 @@ class VaultRepositoryImplTest {
     ) : VaultNoteRewrapper {
         var callCount: Int = 0
             private set
+        var onRewrap: () -> Unit = { }
         var lastKey: SecretKey? = null
             private set
         var commitCount: Int = 0
@@ -857,6 +882,7 @@ class VaultRepositoryImplTest {
         ): VaultNoteRewrapTransaction {
             callCount += 1
             lastKey = newKey
+            onRewrap()
             if (throwOnRewrap) {
                 throw IllegalStateException("rewrap failed")
             }

@@ -13,12 +13,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
+import io.github.r0x4nk.nexnote.ui.theme.rememberContentMarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
 import io.github.r0x4nk.nexnote.util.MarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownParser
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Renders [markdown] as formatted content using the custom parser.
@@ -52,7 +53,7 @@ fun MarkdownPreview(
     contentBottomPadding: Dp = 0.dp,
     tableLayoutMode: TableLayoutMode = LocalMarkdownTableLayoutMode.current,
     onNoteLinkClick: (Long) -> Unit = {},
-    onTaskListItemClick: (markerOffset: Int) -> Unit = {}
+    onTaskListItemClick: ((markerOffset: Int) -> Unit)? = null
 ) {
     val contentState = rememberMarkdownPreviewContentState(markdown)
     val config = MarkdownPreviewContentConfig(
@@ -86,7 +87,7 @@ internal class MarkdownPreviewContentConfig(
     val contentBottomPadding: Dp,
     val tableLayoutMode: TableLayoutMode,
     val onNoteLinkClick: (Long) -> Unit,
-    val onTaskListItemClick: (markerOffset: Int) -> Unit
+    val onTaskListItemClick: ((markerOffset: Int) -> Unit)?
 )
 
 internal class MarkdownPreviewContentState(
@@ -97,7 +98,7 @@ internal class MarkdownPreviewContentState(
 
 @Composable
 private fun rememberMarkdownPreviewContentState(markdown: String): MarkdownPreviewContentState {
-    val colors = rememberMarkdownColors()
+    val colors = rememberContentMarkdownColors()
     val highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
     val sourceRanges = remember(markdown) { buildMarkdownBlockSourceRanges(markdown) }
     val blocks by rememberMarkdownBlocks(markdown = markdown, colors = colors)
@@ -106,29 +107,6 @@ private fun rememberMarkdownPreviewContentState(markdown: String): MarkdownPrevi
         sourceRanges   = sourceRanges,
         highlightColor = highlightColor
     )
-}
-
-/**
- * Derives the [MarkdownColors] bundle from the active Material theme.
- *
- * `surfaceContainerHigh` for the inline-code background and
- * `onSurfaceVariant` for its foreground guarantee a legible contrast on both
- * light and dark themes — the previous hard-coded translucent black washed out
- * to invisibility on dark backgrounds, which is why inline-code spans looked
- * indistinguishable from plain text when the user was in dark mode.
- */
-@Composable
-private fun rememberMarkdownColors(): MarkdownColors {
-    val linkColor = MaterialTheme.colorScheme.primary
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
-    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
-    return remember(linkColor, codeBackground, codeForeground) {
-        MarkdownColors(
-            linkColor            = linkColor,
-            inlineCodeBackground = codeBackground,
-            inlineCodeForeground = codeForeground
-        )
-    }
 }
 
 @Composable

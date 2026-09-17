@@ -12,9 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,12 +32,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import io.github.r0x4nk.nexnote.ui.component.NexDestructiveButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,24 +46,33 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.NoteStatisticsIndexState
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
-import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
+import io.github.r0x4nk.nexnote.ui.component.GroupedItemPosition
+import io.github.r0x4nk.nexnote.ui.component.GroupedListItem
+import io.github.r0x4nk.nexnote.ui.component.NoteCardContent
+import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 internal const val SETTINGS_VAULT_CURRENT_PIN_FIELD_TAG = "settings_vault_current_pin_field"
 internal const val SETTINGS_VAULT_NEW_PIN_FIELD_TAG = "settings_vault_new_pin_field"
@@ -83,6 +94,9 @@ internal const val SETTINGS_DELETE_ALL_NOTES_CONFIRM_BUTTON_TAG =
     "settings_delete_all_notes_confirm_button"
 internal const val SETTINGS_LIST_TAG = "settings_list"
 internal const val SETTINGS_SOURCE_CODE_ROW_TAG = "settings_source_code_row"
+internal const val SETTINGS_NOTE_PREVIEW_TAG = "settings_note_preview"
+
+private const val NOTE_CARD_PREVIEW_ID = -1L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +109,9 @@ internal fun SettingsScreenContent(
     statisticsIndexState: NoteStatisticsIndexState = NoteStatisticsIndexState(),
     floatingBottomPadding: Dp = 0.dp,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit = {},
     onAccentColorChange: (AccentColor) -> Unit,
+    onAppFontChange: (AppFont) -> Unit = {},
     onFontScaleChange: (FontScale) -> Unit,
     onNoteCardStyleChange: (NoteCardStyle) -> Unit,
     onTableLayoutModeChange: (TableLayoutMode) -> Unit,
@@ -121,12 +137,16 @@ internal fun SettingsScreenContent(
 ) {
     val listState = rememberLazyListState()
     Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground(),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.headlineSmall
+                        text = stringResource(R.string.settings_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 },
                 colors = nexTopAppBarColors()
@@ -148,7 +168,9 @@ internal fun SettingsScreenContent(
                 bottomContentPadding = floatingBottomPadding,
                 modifier = Modifier.fillMaxSize(),
                 onThemeModeChange = onThemeModeChange,
+                onDynamicColorChange = onDynamicColorChange,
                 onAccentColorChange = onAccentColorChange,
+                onAppFontChange = onAppFontChange,
                 onFontScaleChange = onFontScaleChange,
                 onNoteCardStyleChange = onNoteCardStyleChange,
                 onTableLayoutModeChange = onTableLayoutModeChange,
@@ -164,8 +186,6 @@ internal fun SettingsScreenContent(
                 onChangeVaultPin = onChangeVaultPin,
                 onClearVaultPinChangeFeedback = onClearVaultPinChangeFeedback,
                 onRequestVaultReset = onRequestVaultReset,
-                onCancelVaultReset = onCancelVaultReset,
-                onConfirmVaultReset = onConfirmVaultReset,
                 onClearVaultResetFeedback = onClearVaultResetFeedback,
                 onRequestDeleteAllNotes = onRequestDeleteAllNotes,
                 onClearDeleteAllNotesFeedback = onClearDeleteAllNotesFeedback,
@@ -181,6 +201,13 @@ internal fun SettingsScreenContent(
                         bottom = floatingBottomPadding + 16.dp
                     )
             )
+            if (vaultResetState.isConfirmationVisible) {
+                VaultResetConfirmationDialog(
+                    isBusy = vaultResetState.isBusy,
+                    onConfirm = onConfirmVaultReset,
+                    onDismiss = onCancelVaultReset
+                )
+            }
             if (deleteAllNotesState.isConfirmationVisible) {
                 DeleteAllNotesConfirmationDialog(
                     state = deleteAllNotesState,
@@ -204,7 +231,9 @@ private fun SettingsList(
     bottomContentPadding: Dp,
     modifier: Modifier,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit = {},
     onAccentColorChange: (AccentColor) -> Unit,
+    onAppFontChange: (AppFont) -> Unit,
     onFontScaleChange: (FontScale) -> Unit,
     onNoteCardStyleChange: (NoteCardStyle) -> Unit,
     onTableLayoutModeChange: (TableLayoutMode) -> Unit,
@@ -219,8 +248,6 @@ private fun SettingsList(
     onChangeVaultPin: (CharArray, CharArray, CharArray) -> Unit,
     onClearVaultPinChangeFeedback: () -> Unit,
     onRequestVaultReset: () -> Unit,
-    onCancelVaultReset: () -> Unit,
-    onConfirmVaultReset: () -> Unit,
     onClearVaultResetFeedback: () -> Unit,
     onRequestDeleteAllNotes: () -> Unit,
     onClearDeleteAllNotesFeedback: () -> Unit,
@@ -238,7 +265,15 @@ private fun SettingsList(
         )
     ) {
         appearanceSection(uiState.themeMode, onThemeModeChange)
-        accentColorSection(uiState.accentColor, onAccentColorChange)
+        item {
+            SettingsSectionSurface(GroupedItemPosition.MIDDLE) {
+                DeviceColorsPreference(uiState.dynamicColor, onDynamicColorChange)
+            }
+        }
+        if (!uiState.dynamicColor || android.os.Build.VERSION.SDK_INT < 31) {
+            accentColorSection(uiState.accentColor, onAccentColorChange)
+        }
+        fontFamilySection(uiState.appFont, onAppFontChange)
         textSection(uiState.fontScale, onFontScaleChange)
         noteAppearanceSection(uiState.noteCardStyle, onNoteCardStyleChange)
         tableLayoutSection(uiState.tableLayoutMode, onTableLayoutModeChange)
@@ -263,8 +298,6 @@ private fun SettingsList(
             onChangePin = onChangeVaultPin,
             onClearPinChangeFeedback = onClearVaultPinChangeFeedback,
             onRequestReset = onRequestVaultReset,
-            onCancelReset = onCancelVaultReset,
-            onConfirmReset = onConfirmVaultReset,
             onClearResetFeedback = onClearVaultResetFeedback
         )
         statisticsIndexSection(statisticsIndexState, onRebuildStatisticsIndex)
@@ -286,7 +319,7 @@ private fun LazyListScope.storedNotesSection(
 ) {
     item {
         SettingsSectionSurface {
-            SettingsSectionHeader("Storage")
+            SettingsSectionHeader(stringResource(R.string.settings_storage))
             Spacer(Modifier.height(6.dp))
             DeleteAllNotesRow(
                 state = state,
@@ -306,16 +339,20 @@ private fun LazyListScope.statisticsIndexSection(
 ) {
     item {
         SettingsSectionSurface {
-            SettingsSectionHeader("Indexing")
+            SettingsSectionHeader(stringResource(R.string.settings_indexing))
             Spacer(Modifier.height(6.dp))
             Text(
                 text = when {
                     state.isRetryingAfterError ->
-                        "Indexing was interrupted. Retrying in background…"
+                        stringResource(R.string.settings_index_interrupted)
                     state.isIndexing ->
-                        "Indexing ${state.indexedNotes} of ${state.totalNotes} notes in background."
+                        stringResource(
+                            R.string.settings_index_progress,
+                            state.indexedNotes,
+                            state.totalNotes
+                        )
                     else ->
-                        "Up to date · ${state.totalNotes} notes processed"
+                        stringResource(R.string.settings_index_up_to_date, state.totalNotes)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -332,9 +369,10 @@ private fun LazyListScope.statisticsIndexSection(
                         strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f)
                     )
-                    Text("  Restart indexing")
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_restart_indexing))
                 } else {
-                    Text("Reindex notes")
+                    Text(stringResource(R.string.settings_reindex_notes))
                 }
             }
         }
@@ -346,8 +384,8 @@ private fun LazyListScope.appearanceSection(
     onSelect: (ThemeMode) -> Unit
 ) {
     item {
-        SettingsSectionSurface {
-            SettingsSectionHeader("Appearance")
+        SettingsSectionSurface(GroupedItemPosition.FIRST) {
+            SettingsSectionHeader(stringResource(R.string.settings_appearance))
             Spacer(Modifier.height(10.dp))
             ThemeModePicker(
                 selected = selected,
@@ -362,10 +400,26 @@ private fun LazyListScope.accentColorSection(
     onSelect: (AccentColor) -> Unit
 ) {
     item {
-        SettingsSectionSurface {
-            SettingsSectionHeader("Accent color")
+        SettingsSectionSurface(GroupedItemPosition.MIDDLE) {
+            SettingsSectionHeader(stringResource(R.string.settings_accent_color))
             Spacer(Modifier.height(14.dp))
             AccentColorPicker(
+                selected = selected,
+                onSelect = onSelect
+            )
+        }
+    }
+}
+
+private fun LazyListScope.fontFamilySection(
+    selected: AppFont,
+    onSelect: (AppFont) -> Unit
+) {
+    item {
+        SettingsSectionSurface(GroupedItemPosition.MIDDLE) {
+            SettingsSectionHeader(stringResource(R.string.settings_font_family))
+            Spacer(Modifier.height(10.dp))
+            AppFontPicker(
                 selected = selected,
                 onSelect = onSelect
             )
@@ -378,8 +432,8 @@ private fun LazyListScope.textSection(
     onSelect: (FontScale) -> Unit
 ) {
     item {
-        SettingsSectionSurface {
-            SettingsSectionHeader("Text")
+        SettingsSectionSurface(GroupedItemPosition.MIDDLE) {
+            SettingsSectionHeader(stringResource(R.string.settings_text))
             Spacer(Modifier.height(10.dp))
             FontScalePicker(
                 selected = selected,
@@ -394,14 +448,57 @@ private fun LazyListScope.noteAppearanceSection(
     onSelect: (NoteCardStyle) -> Unit
 ) {
     item {
-        SettingsSectionSurface {
-            SettingsSectionHeader("Note appearance")
+        SettingsSectionSurface(GroupedItemPosition.MIDDLE) {
+            SettingsSectionHeader(stringResource(R.string.settings_note_appearance))
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_note_appearance_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(10.dp))
             NoteCardStylePicker(
                 selected = selected,
                 onSelect = onSelect
             )
+            Spacer(Modifier.height(14.dp))
+            NoteCardStylePreview(style = selected)
         }
+    }
+}
+
+/**
+ * Live sample of the selected card style so the setting has a visible effect.
+ * It reuses the real card body, including the footer metadata (tags and files),
+ * instead of duplicating the layout.
+ */
+@Composable
+private fun NoteCardStylePreview(style: NoteCardStyle) {
+    val previewTitle = stringResource(R.string.settings_note_card_preview_title)
+    val previewContent = stringResource(R.string.settings_note_card_preview_content)
+    val sample = remember(previewTitle, previewContent) {
+        Note(
+            id = NOTE_CARD_PREVIEW_ID,
+            title = previewTitle,
+            content = previewContent,
+            imagePaths = listOf("images/attachments/release-notes.pdf")
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SETTINGS_NOTE_PREVIEW_TAG)
+    ) {
+        NoteCardContent(
+            note = sample,
+            onClick = {},
+            onLongPress = {},
+            selectionMode = false,
+            selected = false,
+            noteCardStyle = style,
+            titleHighlightRanges = emptyList(),
+            contentHighlightRanges = emptyList()
+        )
     }
 }
 
@@ -410,11 +507,11 @@ private fun LazyListScope.tableLayoutSection(
     onSelect: (TableLayoutMode) -> Unit
 ) {
     item {
-        SettingsSectionSurface {
-            SettingsSectionHeader("Tables")
+        SettingsSectionSurface(GroupedItemPosition.LAST) {
+            SettingsSectionHeader(stringResource(R.string.settings_tables))
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Wrap table text to fit the screen or keep wider columns and scroll horizontally.",
+                text = stringResource(R.string.settings_tables_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -446,13 +543,11 @@ private fun LazyListScope.vaultSection(
     onChangePin: (CharArray, CharArray, CharArray) -> Unit,
     onClearPinChangeFeedback: () -> Unit,
     onRequestReset: () -> Unit,
-    onCancelReset: () -> Unit,
-    onConfirmReset: () -> Unit,
     onClearResetFeedback: () -> Unit
 ) {
     item {
         SettingsSectionSurface {
-            SettingsSectionHeader("Vault")
+            SettingsSectionHeader(stringResource(R.string.settings_vault))
             Spacer(Modifier.height(10.dp))
             VaultSettingsRow(
                 vaultState = vaultState,
@@ -503,13 +598,6 @@ private fun LazyListScope.vaultSection(
                 state = resetState,
                 onClearFeedback = onClearResetFeedback
             )
-            if (resetState.isConfirmationVisible) {
-                VaultResetConfirmationDialog(
-                    isBusy = resetState.isBusy,
-                    onConfirm = onConfirmReset,
-                    onDismiss = onCancelReset
-                )
-            }
         }
     }
 }
@@ -559,19 +647,21 @@ private fun VaultSettingsRow(
     }
 }
 
+@Composable
 private fun vaultPrimaryLabel(state: VaultState): String =
     when (state) {
-        VaultState.NOT_CONFIGURED -> "Set up Vault"
-        VaultState.LOCKED         -> "Open Vault"
-        VaultState.UNLOCKED       -> "Open Vault"
+        VaultState.NOT_CONFIGURED -> stringResource(R.string.settings_vault_setup)
+        VaultState.LOCKED         -> stringResource(R.string.settings_vault_open)
+        VaultState.UNLOCKED       -> stringResource(R.string.settings_vault_open)
     }
 
+@Composable
 private fun vaultSecondaryLabel(state: VaultState): String =
     when (state) {
-        VaultState.NOT_CONFIGURED -> "Not configured"
-        VaultState.LOCKED         -> "Locked"
-        VaultState.UNLOCKED       -> "Unlocked"
-}
+        VaultState.NOT_CONFIGURED -> stringResource(R.string.settings_vault_not_configured)
+        VaultState.LOCKED         -> stringResource(R.string.settings_vault_locked)
+        VaultState.UNLOCKED       -> stringResource(R.string.settings_vault_unlocked)
+    }
 
 @Composable
 private fun VaultAndroidCredentialUnlockRow(
@@ -613,16 +703,17 @@ private fun VaultAndroidCredentialUnlockRow(
                 .padding(end = 16.dp)
         ) {
             Text(
-                text = "Use Android screen lock",
+                text = stringResource(R.string.settings_vault_use_android_lock),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = when {
-                    vaultState == VaultState.NOT_CONFIGURED -> "Set up Vault first"
-                    !enabled -> "Unlock Vault first"
-                    unlockWithAndroidCredential -> "On"
-                    else -> "Off"
+                    vaultState == VaultState.NOT_CONFIGURED ->
+                        stringResource(R.string.settings_vault_setup_first)
+                    !enabled -> stringResource(R.string.settings_vault_unlock_first)
+                    unlockWithAndroidCredential -> stringResource(R.string.settings_on)
+                    else -> stringResource(R.string.settings_off)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -650,21 +741,20 @@ private fun VaultDisableAndroidCredentialDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
-        title = { Text("Disable Android screen lock?") },
+        title = { Text(stringResource(R.string.settings_vault_disable_lock_title)) },
         text = {
-            Text(
-                "You can still unlock the Vault with your PIN. Android screen lock can be enabled again after a PIN unlock."
-            )
+            Text(stringResource(R.string.settings_vault_disable_lock_message))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Disable")
+                Text(stringResource(R.string.settings_disable))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -688,12 +778,16 @@ private fun VaultRecentPreviewsRow(
                 .padding(end = 16.dp)
         ) {
             Text(
-                text = "Protect recent previews",
+                text = stringResource(R.string.settings_vault_protect_previews),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (protectRecentPreviews) "On" else "Off",
+                text = if (protectRecentPreviews) {
+                    stringResource(R.string.settings_on)
+                } else {
+                    stringResource(R.string.settings_off)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -723,12 +817,16 @@ private fun VaultLockOnBackgroundRow(
                 .padding(end = 16.dp)
         ) {
             Text(
-                text = "Lock on background",
+                text = stringResource(R.string.settings_vault_lock_background),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (lockOnBackground) "On" else "Off",
+                text = if (lockOnBackground) {
+                    stringResource(R.string.settings_on)
+                } else {
+                    stringResource(R.string.settings_off)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -763,7 +861,7 @@ private fun VaultAutoLockTimeoutRow(
                     .padding(end = 16.dp)
             ) {
                 Text(
-                    text = "Auto-lock timeout",
+                    text = stringResource(R.string.settings_vault_auto_lock_timeout),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -797,13 +895,14 @@ private fun VaultAutoLockTimeoutRow(
     }
 }
 
+@Composable
 private fun VaultAutoLockTimeout.label(): String = when (this) {
-    VaultAutoLockTimeout.IMMEDIATELY -> "Immediately"
-    VaultAutoLockTimeout.AFTER_1_MINUTE -> "After 1 minute"
-    VaultAutoLockTimeout.AFTER_5_MINUTES -> "After 5 minutes"
-    VaultAutoLockTimeout.AFTER_15_MINUTES -> "After 15 minutes"
-    VaultAutoLockTimeout.AFTER_30_MINUTES -> "After 30 minutes"
-    VaultAutoLockTimeout.NEVER -> "Never during this session"
+    VaultAutoLockTimeout.IMMEDIATELY -> stringResource(R.string.settings_vault_auto_lock_immediately)
+    VaultAutoLockTimeout.AFTER_1_MINUTE -> stringResource(R.string.settings_vault_auto_lock_1m)
+    VaultAutoLockTimeout.AFTER_5_MINUTES -> stringResource(R.string.settings_vault_auto_lock_5m)
+    VaultAutoLockTimeout.AFTER_15_MINUTES -> stringResource(R.string.settings_vault_auto_lock_15m)
+    VaultAutoLockTimeout.AFTER_30_MINUTES -> stringResource(R.string.settings_vault_auto_lock_30m)
+    VaultAutoLockTimeout.NEVER -> stringResource(R.string.settings_vault_auto_lock_never)
 }
 
 @Composable
@@ -829,7 +928,7 @@ private fun VaultLockRow(
             )
             Text(
                 modifier = Modifier.padding(start = 12.dp),
-                text = "Lock Vault",
+                text = stringResource(R.string.settings_vault_lock),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -857,12 +956,12 @@ private fun VaultResetRow(
                 .padding(end = 16.dp)
         ) {
             Text(
-                text = "Reset Vault",
+                text = stringResource(R.string.settings_vault_reset),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error
             )
             Text(
-                text = "Erases all Vault notes and the Vault PIN.",
+                text = stringResource(R.string.settings_vault_reset_summary),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -915,7 +1014,7 @@ private fun VaultResetFeedback(
         ) {
             Text(
                 modifier = Modifier.weight(1f),
-                text = "Vault reset.",
+                text = stringResource(R.string.settings_vault_reset_done),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -930,23 +1029,21 @@ private fun VaultResetConfirmationDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = {
             if (!isBusy) onDismiss()
         },
-        title = { Text("Reset Vault?") },
+        title = { Text(stringResource(R.string.settings_vault_reset_title)) },
         text = {
-            Text(
-                "This permanently erases all notes in the Vault, the Vault PIN " +
-                    "and any Android screen lock material. This cannot be undone."
-            )
+            Text(stringResource(R.string.settings_vault_reset_message))
         },
         confirmButton = {
-            TextButton(
+            NexDestructiveButton(
                 modifier = Modifier.testTag(SETTINGS_VAULT_RESET_CONFIRM_BUTTON_TAG),
                 enabled = !isBusy,
                 onClick = onConfirm
             ) {
-                Text("Reset")
+                Text(stringResource(R.string.settings_reset))
             }
         },
         dismissButton = {
@@ -955,16 +1052,20 @@ private fun VaultResetConfirmationDialog(
                 enabled = !isBusy,
                 onClick = onDismiss
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
 }
 
+@Composable
 private fun SettingsVaultResetError.message(): String = when (this) {
-    SettingsVaultResetError.VAULT_NOT_CONFIGURED -> "Vault is not configured."
-    SettingsVaultResetError.VAULT_LOCKED -> "Unlock the Vault before resetting it."
-    SettingsVaultResetError.OPERATION_FAILED -> "Vault reset failed."
+    SettingsVaultResetError.VAULT_NOT_CONFIGURED ->
+        stringResource(R.string.vault_error_not_configured)
+    SettingsVaultResetError.VAULT_LOCKED ->
+        stringResource(R.string.settings_vault_reset_error_locked)
+    SettingsVaultResetError.OPERATION_FAILED ->
+        stringResource(R.string.settings_vault_reset_error_failed)
 }
 
 @Composable
@@ -988,7 +1089,7 @@ private fun DeleteAllNotesRow(
                 .padding(end = 16.dp)
         ) {
             Text(
-                text = "Delete all notes",
+                text = stringResource(R.string.settings_delete_all_notes),
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (hasNotes) {
                     MaterialTheme.colorScheme.error
@@ -998,10 +1099,16 @@ private fun DeleteAllNotesRow(
             )
             Text(
                 text = when {
-                    !hasNotes -> "There are no notes to delete."
+                    !hasNotes -> stringResource(R.string.settings_delete_all_notes_empty)
                     state.vaultNoteCount > 0 ->
-                        "${state.totalNoteCount} notes, including trash and Vault."
-                    else -> "${state.totalNoteCount} notes, including trash."
+                        stringResource(
+                            R.string.settings_delete_all_notes_count_vault,
+                            state.totalNoteCount
+                        )
+                    else -> stringResource(
+                        R.string.settings_delete_all_notes_count,
+                        state.totalNoteCount
+                    )
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1030,7 +1137,7 @@ private fun DeleteAllNotesFeedback(
 ) {
     val message = when {
         state.error != null -> state.error.message()
-        state.isSuccessful -> "All notes were permanently deleted."
+        state.isSuccessful -> stringResource(R.string.settings_delete_all_notes_done)
         else -> null
     } ?: return
     Text(
@@ -1060,22 +1167,22 @@ private fun DeleteAllNotesConfirmationDialog(
         if (!state.isConfirmationVisible) vaultPin = ""
     }
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = { if (!state.isBusy) onDismiss() },
-        title = { Text("Delete all notes?") },
+        title = { Text(stringResource(R.string.settings_delete_all_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "This permanently deletes all normal notes and all notes in " +
-                        "the trash. Templates and settings are preserved."
-                )
+                Text(stringResource(R.string.settings_delete_all_message))
                 if (state.requiresVaultAuthentication) {
                     Text(
-                        "${state.vaultNoteCount} Vault notes will also be deleted. " +
-                            "Enter the Vault PIN to authorize this action."
+                        stringResource(
+                            R.string.settings_delete_all_vault_message,
+                            state.vaultNoteCount
+                        )
                     )
                     SettingsVaultPinField(
                         value = vaultPin,
-                        label = "Vault PIN",
+                        label = stringResource(R.string.settings_vault_pin_label),
                         enabled = !state.isBusy,
                         isError = state.error == SettingsDeleteAllNotesError.EMPTY_VAULT_PIN ||
                             state.error == SettingsDeleteAllNotesError.WRONG_VAULT_PIN,
@@ -1100,12 +1207,12 @@ private fun DeleteAllNotesConfirmationDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            NexDestructiveButton(
                 modifier = Modifier.testTag(SETTINGS_DELETE_ALL_NOTES_CONFIRM_BUTTON_TAG),
                 enabled = !state.isBusy,
                 onClick = { onConfirm(vaultPin.toCharArray()) }
             ) {
-                Text("Delete permanently")
+                Text(stringResource(R.string.settings_delete_permanently))
             }
         },
         dismissButton = {
@@ -1113,16 +1220,20 @@ private fun DeleteAllNotesConfirmationDialog(
                 enabled = !state.isBusy,
                 onClick = onDismiss
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
 }
 
+@Composable
 private fun SettingsDeleteAllNotesError.message(): String = when (this) {
-    SettingsDeleteAllNotesError.EMPTY_VAULT_PIN -> "Enter the Vault PIN."
-    SettingsDeleteAllNotesError.WRONG_VAULT_PIN -> "Incorrect Vault PIN."
-    SettingsDeleteAllNotesError.OPERATION_FAILED -> "Could not delete all notes."
+    SettingsDeleteAllNotesError.EMPTY_VAULT_PIN ->
+        stringResource(R.string.settings_delete_all_error_empty_pin)
+    SettingsDeleteAllNotesError.WRONG_VAULT_PIN ->
+        stringResource(R.string.settings_delete_all_error_wrong_pin)
+    SettingsDeleteAllNotesError.OPERATION_FAILED ->
+        stringResource(R.string.settings_delete_all_error_failed)
 }
 
 @Composable
@@ -1140,13 +1251,13 @@ private fun VaultChangePinForm(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = "Change PIN",
+            text = stringResource(R.string.settings_vault_change_pin),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         SettingsVaultPinField(
             value = currentPin,
-            label = "Current PIN",
+            label = stringResource(R.string.settings_vault_current_pin),
             enabled = !state.isBusy,
             isError = state.error != null,
             imeAction = ImeAction.Next,
@@ -1159,7 +1270,7 @@ private fun VaultChangePinForm(
         )
         SettingsVaultPinField(
             value = newPin,
-            label = "New PIN",
+            label = stringResource(R.string.settings_vault_new_pin),
             enabled = !state.isBusy,
             isError = state.error != null,
             imeAction = ImeAction.Next,
@@ -1172,7 +1283,7 @@ private fun VaultChangePinForm(
         )
         SettingsVaultPinField(
             value = confirmation,
-            label = "Confirm new PIN",
+            label = stringResource(R.string.settings_vault_confirm_new_pin),
             enabled = !state.isBusy,
             isError = state.error != null,
             imeAction = ImeAction.Done,
@@ -1204,7 +1315,7 @@ private fun VaultChangePinForm(
         }
         if (state.isSuccessful) {
             Text(
-                text = "PIN changed.",
+                text = stringResource(R.string.settings_vault_pin_changed),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -1236,7 +1347,7 @@ private fun VaultChangePinForm(
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f)
                 )
             } else {
-                Text("Change PIN")
+                Text(stringResource(R.string.settings_vault_change_pin))
             }
         }
     }
@@ -1290,14 +1401,24 @@ private fun submitVaultPinChange(
     }
 }
 
+@Composable
 private fun SettingsVaultPinChangeError.message(): String = when (this) {
-    SettingsVaultPinChangeError.EMPTY_CURRENT_PIN -> "Enter your current PIN."
-    SettingsVaultPinChangeError.EMPTY_NEW_PIN -> "Enter a new PIN."
-    SettingsVaultPinChangeError.PIN_MISMATCH -> "New PINs do not match."
-    SettingsVaultPinChangeError.VAULT_NOT_CONFIGURED -> "Set up the Vault first."
-    SettingsVaultPinChangeError.VAULT_LOCKED -> "Unlock the Vault before changing the PIN."
-    SettingsVaultPinChangeError.WRONG_CURRENT_PIN -> "Wrong current PIN."
-    SettingsVaultPinChangeError.OPERATION_FAILED -> "PIN change failed."
+    SettingsVaultPinChangeError.EMPTY_CURRENT_PIN ->
+        stringResource(R.string.settings_vault_error_empty_current)
+    SettingsVaultPinChangeError.EMPTY_NEW_PIN ->
+        stringResource(R.string.settings_vault_error_empty_new)
+    SettingsVaultPinChangeError.PIN_MISMATCH ->
+        stringResource(R.string.settings_vault_error_mismatch)
+    SettingsVaultPinChangeError.VAULT_NOT_CONFIGURED ->
+        stringResource(R.string.settings_vault_error_not_configured)
+    SettingsVaultPinChangeError.VAULT_LOCKED ->
+        stringResource(R.string.settings_vault_error_locked)
+    SettingsVaultPinChangeError.WRONG_CURRENT_PIN ->
+        stringResource(R.string.settings_vault_error_wrong_current)
+    SettingsVaultPinChangeError.PIN_RATE_LIMITED ->
+        stringResource(R.string.vault_error_rate_limited)
+    SettingsVaultPinChangeError.OPERATION_FAILED ->
+        stringResource(R.string.settings_vault_error_failed)
 }
 
 private fun LazyListScope.timezoneSection(
@@ -1306,7 +1427,7 @@ private fun LazyListScope.timezoneSection(
 ) {
     item {
         SettingsSectionSurface {
-            SettingsSectionHeader("Timezone")
+            SettingsSectionHeader(stringResource(R.string.settings_timezone))
             Spacer(Modifier.height(10.dp))
             TimezoneDropdown(
                 selectedId = uiState.timezoneId,
@@ -1323,12 +1444,12 @@ private fun LazyListScope.aboutSection(
 ) {
     item {
         SettingsSectionSurface {
-            SettingsSectionHeader("About")
+            SettingsSectionHeader(stringResource(R.string.settings_about))
             Spacer(Modifier.height(6.dp))
             SourceCodeRow(onClick = onOpenSourceCode)
             Spacer(Modifier.height(4.dp))
             AboutInfoRow(
-                label = "Version",
+                label = stringResource(R.string.settings_version),
                 value = versionName
             )
         }
@@ -1352,12 +1473,12 @@ private fun SourceCodeRow(onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Source code",
+                text = stringResource(R.string.settings_source_code),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "github.com/R0X4N-K/NexNote",
+                text = stringResource(R.string.settings_source_code_url),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1394,18 +1515,15 @@ private fun AboutInfoRow(
 }
 
 @Composable
-internal fun SettingsSectionSurface(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 1.dp
+internal fun SettingsSectionSurface(
+    position: GroupedItemPosition = GroupedItemPosition.ONLY,
+    content: @Composable () -> Unit
+) {
+    val endsGroup = position == GroupedItemPosition.LAST || position == GroupedItemPosition.ONLY
+    GroupedListItem(
+        position = position,
+        modifier = Modifier.padding(bottom = if (endsGroup) 12.dp else 2.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
-            content()
-        }
+        content()
     }
 }

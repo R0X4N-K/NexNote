@@ -69,13 +69,18 @@ internal fun ColumnScope.EditorContentModeBox(
     onContentSelectionChange: (TextRange) -> Unit,
     onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     onPreviewNoteLinkClick: (Long) -> Unit,
-    onPreviewTaskListItemClick: (Int) -> Unit = {}
+    onPreviewTaskListItemClick: (Int) -> Unit = {},
+    onIndent: () -> Unit = {},
+    onOutdent: () -> Unit = {}
 ) {
     val density = LocalDensity.current
     val previewWarmupKey = uiState.directPreviewWarmupKey(MaterialTheme.colorScheme.primary)
     val contentTarget = editorContentTarget(uiState, state, previewWarmupKey)
-    val bottomFadeVisible = editorBottomFadeVisible(uiState) &&
+    val fadeAvailable = editorBottomFadeVisible(uiState) &&
         contentTarget != EditorContentTarget.Loading
+    // The fade blends content into the empty bottom. While the IME toolbar is
+    // visible it would only veil the line being typed, so it is hidden there.
+    val bottomFadeVisible = fadeAvailable && !keyboardToolbarVisible
     val fadeBottomPadding = editorBottomFadePadding(bottomFadeVisible)
     val keyboardToolbarHeight = with(density) {
         state.keyboardToolbarHeightPx.toDp()
@@ -145,9 +150,11 @@ internal fun ColumnScope.EditorContentModeBox(
                         state = state,
                         readOnly = uiState.isReadOnly,
                         keyboardToolbarVisible = keyboardToolbarVisible,
-                        bottomFadeVisible = bottomFadeVisible,
+                        bottomFadeAvailable = fadeAvailable,
                         onContentEdited = onContentEdited,
-                        onContentSelectionChange = onContentSelectionChange
+                        onContentSelectionChange = onContentSelectionChange,
+                        onIndent = onIndent,
+                        onOutdent = onOutdent
                     )
                 }
             }
@@ -198,7 +205,7 @@ private fun editorContentTarget(
     previewWarmupKey: DirectPreviewWarmupKey?
 ): EditorContentTarget = when {
     uiState.isLoading ||
-        state.isDirectPreviewWarmupPending(previewWarmupKey) ||
+        state.shouldShowDirectPreviewLoading(previewWarmupKey) ||
         uiState.shouldDeferInitialEditContentSync(state.syncedContentVersion) -> {
         EditorContentTarget.Loading
     }
@@ -231,7 +238,7 @@ private fun EditorMarkdownPreview(
         activeHighlightRange = state.activeContentHighlightRange(),
         contentBottomPadding = fadeBottomPadding,
         onNoteLinkClick = onPreviewNoteLinkClick,
-        onTaskListItemClick = onPreviewTaskListItemClick
+        onTaskListItemClick = onPreviewTaskListItemClick.takeUnless { uiState.isReadOnly }
     )
 }
 
@@ -240,9 +247,11 @@ private fun EditorContentField(
     state: EditorScreenState,
     readOnly: Boolean,
     keyboardToolbarVisible: Boolean,
-    bottomFadeVisible: Boolean,
+    bottomFadeAvailable: Boolean,
     onContentEdited: () -> Unit,
-    onContentSelectionChange: (TextRange) -> Unit
+    onContentSelectionChange: (TextRange) -> Unit,
+    onIndent: () -> Unit,
+    onOutdent: () -> Unit
 ) {
     val density = LocalDensity.current
     val toolbarBottomPadding = with(density) {
@@ -259,11 +268,13 @@ private fun EditorContentField(
         readOnly = readOnly,
         onContentEdited = onContentEdited,
         onSelectionChange = onContentSelectionChange,
+        onIndent = onIndent,
+        onOutdent = onOutdent,
         onLayoutResult = { state.textLayoutResult = it },
         highlightRange = state.fallbackContentHighlightRange(),
         searchRanges = state.searchContentHighlightRanges(),
         activeSearchRange = state.activeSearchHighlightRange(),
-        trailingSpacerLines = editorContentTrailingSpacerLines(bottomFadeVisible),
+        trailingSpacerLines = editorContentTrailingSpacerLines(bottomFadeAvailable),
         modifier = Modifier
             .fillMaxSize()
             .padding(

@@ -47,10 +47,45 @@ object TagParser {
      * @return A set of lowercase tag names, without the leading '#'.
      */
     fun extractTags(content: String): Set<String> {
-        val sanitized = stripFencedCodeBlocks(content)
-        return TAG_PATTERN.findAll(sanitized)
-            .map { match -> match.groupValues[1].lowercase() }
-            .toSet()
+        if ('#' !in content) return emptySet()
+        val sanitized = if ("```" in content) stripFencedCodeBlocks(content) else content
+        // Keep the matcher alive across matches to avoid resetting large input
+        // for every hashtag on Android.
+        val matcher = TAG_PATTERN.toPattern().matcher(sanitized)
+        val tags = linkedSetOf<String>()
+        while (matcher.find()) {
+            tags.add(matcher.group(1)!!.lowercase())
+        }
+        return tags
+    }
+
+    /**
+     * Removes the '#' prefix from every hashtag in [content] while preserving the
+     * tag word itself, mirroring the global tag-deletion behaviour.
+     *
+     * Only real tags are touched: tags inside fenced code blocks are ignored, so
+     * code samples stay intact. Heading markers such as `# Title` are not matched
+     * because the pattern requires the '#' to be immediately followed by a letter.
+     *
+     * @param content Raw Markdown text from a note.
+     * @return The content with every indexed tag marker stripped.
+     */
+    fun stripAllTagMarkers(content: String): String {
+        if ('#' !in content) return content
+
+        var inFence = false
+        return content.lineSequence().joinToString("\n") { line ->
+            when {
+                line.isFenceDelimiter() -> {
+                    inFence = !inFence
+                    line
+                }
+                inFence -> line
+                else -> TAG_PATTERN.replace(line) { match ->
+                    match.value.replaceFirst("#", "")
+                }
+            }
+        }
     }
 
     /**

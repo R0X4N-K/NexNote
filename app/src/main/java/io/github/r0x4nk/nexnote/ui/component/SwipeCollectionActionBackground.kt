@@ -21,7 +21,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import kotlin.math.abs
 
 /** Draws the directional action revealed behind a collection card. */
@@ -107,9 +109,16 @@ private fun SwipeCollectionActionIcon(visualState: SwipeCollectionActionVisualSt
         }
     }
 
+    val contentDescription = when (val action = visualState.action) {
+        is SwipeCollectionAction.Delete -> action.label
+        is SwipeCollectionAction.TogglePin -> stringResource(
+            if (action.isCurrentlyPinned) R.string.common_unpin else R.string.common_pin_to_top
+        )
+    }
+
     Icon(
         imageVector = icon,
-        contentDescription = visualState.action.contentDescription,
+        contentDescription = contentDescription,
         tint = visualState.iconColor(),
         modifier = Modifier
             .size(SwipeCollectionActionTokens.IconSize)

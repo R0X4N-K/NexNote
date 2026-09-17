@@ -1,21 +1,22 @@
 package io.github.r0x4nk.nexnote.ui.screen.vault
 
+import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
+import io.github.r0x4nk.nexnote.domain.model.FontScale
+import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
+import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialAvailability
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
+import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
-import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
+import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
 import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultAndroidCredentialRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
-import io.github.r0x4nk.nexnote.domain.model.AccentColor
-import io.github.r0x4nk.nexnote.domain.model.FontScale
-import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
-import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
-import io.github.r0x4nk.nexnote.domain.model.ThemeMode
-import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.usecase.ConfigureVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultAndroidCredentialAvailabilityUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
@@ -548,6 +549,19 @@ class VaultAccessViewModelTest {
         assertEquals(0, viewModel.uiState.value.failedPinAttempts)
     }
 
+    @Test
+    fun `rate limited attempt displays a distinct error and wipes input`() = runViewModelTest {
+        fakeRepo.configureStoredPin("1234".toCharArray())
+        fakeRepo.pinFailure = io.github.r0x4nk.nexnote.domain.repository.VaultPinRateLimitException(30_000L)
+        advanceUntilIdle()
+        val pin = "1234".toCharArray()
+        viewModel.unlockWithPin(pin)
+        advanceUntilIdle()
+        assertEquals(VaultAccessError.PIN_RATE_LIMITED, viewModel.uiState.value.error)
+        assertEquals(0, viewModel.uiState.value.failedPinAttempts)
+        assertFalse(viewModel.uiState.value.isBusy)
+        assertCleared(pin)
+    }
     private fun assertCleared(pin: CharArray) {
         assertTrue(pin.all { it == '\u0000' })
     }
@@ -558,6 +572,7 @@ private class FakeVaultRepository : VaultRepository {
     private val hasProtectedMaterial = MutableStateFlow(false)
     private var storedPin: CharArray? = null
 
+    var pinFailure: Exception? = null
     var configureCalls = 0
         private set
     var unlockCalls = 0
@@ -580,6 +595,7 @@ private class FakeVaultRepository : VaultRepository {
 
     override suspend fun unlockWithPin(pin: CharArray): Boolean {
         unlockCalls += 1
+        pinFailure?.let { throw it }
         val unlocked = storedPin?.contentEquals(pin) == true
         vaultState.value = if (unlocked) VaultState.UNLOCKED else VaultState.LOCKED
         if (unlocked) {
@@ -652,6 +668,7 @@ private class FakeVaultAndroidCredentialRepository : VaultAndroidCredentialRepos
 
 private class FakePreferencesRepository : IUserPreferencesRepository {
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+    private val _appFont = MutableStateFlow(AppFont.SYSTEM)
     private val _fontScale = MutableStateFlow(FontScale.NORMAL)
     private val _timezoneId = MutableStateFlow("")
     private val _accentColor = MutableStateFlow(AccentColor.VIOLET)
@@ -664,8 +681,11 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     private val _unlockVaultWithAndroidCredential = MutableStateFlow(false)
 
     override val themeMode: Flow<ThemeMode> = _themeMode
+    override val appFont: Flow<AppFont> = _appFont
     override val fontScale: Flow<FontScale> = _fontScale
     override val timezoneId: Flow<String> = _timezoneId
+    override val dynamicColor = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override suspend fun setDynamicColor(enabled: Boolean) { dynamicColor.value = enabled }
     override val accentColor: Flow<AccentColor> = _accentColor
     override val noteCardStyle: Flow<NoteCardStyle> = _noteCardStyle
     override val tableLayoutMode: Flow<TableLayoutMode> = _tableLayoutMode
@@ -681,6 +701,10 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
 
     override suspend fun setFontScale(scale: FontScale) {
         _fontScale.value = scale
+    }
+
+    override suspend fun setAppFont(font: AppFont) {
+        _appFont.value = font
     }
 
     override suspend fun setTimezoneId(id: String) {

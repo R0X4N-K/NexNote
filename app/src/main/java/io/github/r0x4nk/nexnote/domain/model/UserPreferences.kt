@@ -6,6 +6,20 @@ enum class FontScale(val multiplier: Float) {
     SMALL(0.85f), NORMAL(1.0f), LARGE(1.15f)
 }
 
+/**
+ * Typeface applied to the whole application typography.
+ *
+ * [SYSTEM] keeps the platform default (Roboto), while the other entries map to
+ * bundled OFL font families resolved in the UI layer.
+ */
+enum class AppFont {
+    SYSTEM,
+    INTER,
+    LORA,
+    FIRA_CODE,
+    JETBRAINS_MONO
+}
+
 /** Determines whether Markdown tables fit the viewport or retain readable column widths. */
 enum class TableLayoutMode {
     FIT_SCREEN,
@@ -27,12 +41,12 @@ enum class AccentColor {
 
 /** Controls how much information is shown on each note card in list/grid views. */
 enum class NoteCardStyle {
-    /** Title and date only, the most compact option. */
+    /** Title only, the most compact option. */
     TITLE_ONLY,
-    /** Title plus up to two lines of content preview (default). */
+    /** Title plus up to three lines of content preview (default). */
     TITLE_AND_PREVIEW,
-    /** Title plus last-modified date prominently displayed. */
-    TITLE_DATE
+    /** Title, content preview, and the note metadata: date, tags, files and image count. */
+    TITLE_INFORMATION
 }
 
 /** Configurable timeout options for Vault auto-lock on resume. */

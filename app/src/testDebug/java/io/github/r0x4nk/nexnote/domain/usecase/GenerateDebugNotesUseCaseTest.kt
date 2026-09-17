@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.domain.usecase
 
+import io.github.r0x4nk.nexnote.domain.model.NOTE_COLOR_PALETTE
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.util.TagParser
 import kotlinx.coroutines.test.runTest
@@ -32,6 +33,7 @@ class GenerateDebugNotesUseCaseTest {
         assertEquals(40, savedNotes.size)
         assertEquals(40, indexedNotes.size)
         assertEquals(40, savedNotes.map(Note::title).distinct().size)
+        assertEquals(NOTE_COLOR_PALETTE.toSet(), savedNotes.map(Note::backgroundColor).toSet())
         assertTrue(savedNotes.all(Note::isMarkdown))
         assertTrue(savedNotes.all { it.creationDate <= now })
         assertTrue(savedNotes.map(Note::creationDate).distinct().size > 30)

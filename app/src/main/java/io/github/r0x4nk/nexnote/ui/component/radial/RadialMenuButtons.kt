@@ -1,6 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.component.radial
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,14 +25,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import kotlin.math.roundToInt
 
 private val SCROLL_BUTTON_SIZE_DP  = 36.dp
 private val SCROLL_BUTTON_GAP_DP   = 10.dp   // gap between scroll buttons and FAB top
 private val SCROLL_BUTTON_SPACE_DP =  6.dp   // vertical gap between the two scroll buttons
-private val FAB_SHAPE = RoundedCornerShape(18.dp)
 private const val SCROLL_SHORTCUT_ALPHA_ANIMATION_MS = 120
 private const val SCROLL_SHORTCUT_MIN_INTERACTIVE_ALPHA = 0.5f
 
@@ -76,7 +82,7 @@ internal fun ScrollShortcutButtons(
         sizePx      = layout.sizePx,
         alpha       = animatedAlpha,
         icon        = Icons.Default.ArrowUpward,
-        description = "Scroll to top",
+        description = stringResource(R.string.scroll_to_top),
         onClick     = onScrollToTop
     )
     ScrollShortcutButton(
@@ -85,7 +91,7 @@ internal fun ScrollShortcutButtons(
         sizePx      = layout.sizePx,
         alpha       = animatedAlpha,
         icon        = Icons.Default.ArrowDownward,
-        description = "Scroll to bottom",
+        description = stringResource(R.string.scroll_to_bottom),
         onClick     = onScrollToBottom
     )
 }
@@ -130,19 +136,19 @@ private fun ScrollShortcutButton(
             .alpha(alpha)
             .shadow(elevation = 3.dp, shape = CircleShape, clip = false)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .run {
                 if (alpha >= SCROLL_SHORTCUT_MIN_INTERACTIVE_ALPHA) {
-                    clickable(onClick = onClick)
+                    clickable(role = Role.Button, onClick = onClick)
                 } else {
-                    this
+                    clearAndSetSemantics { }
                 }
             }
     ) {
         Icon(
             imageVector        = icon,
             contentDescription = description,
-            tint               = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier           = Modifier.size(18.dp)
         )
     }
@@ -166,24 +172,34 @@ internal fun StaticMenuButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     closedIcon: ImageVector = Icons.Default.Add,
-    closedContentDescription: String = "Open menu"
+    closedContentDescription: String = stringResource(R.string.open_menu),
+    opensMenu: Boolean = true
 ) {
+    val menuStateDescription = stringResource(
+        if (isMenuOpen) R.string.menu_expanded else R.string.menu_collapsed
+    )
     val density      = LocalDensity.current
     val buttonSizeDp = with(density) { buttonSizePx.toDp() }
+    val cornerRadius = animateDpAsState(
+        targetValue = if (isMenuOpen) buttonSizeDp / 2 else 24.dp,
+        animationSpec = tween(220),
+        label = "menuButtonCorner"
+    ).value
+    val buttonShape = RoundedCornerShape(cornerRadius)
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .offset { IntOffset(fabX.roundToInt(), fabY.roundToInt()) }
             .size(buttonSizeDp)
-            .shadow(elevation = 8.dp, shape = FAB_SHAPE, clip = false)
-            .clip(FAB_SHAPE)
+            .clip(buttonShape)
             .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(onClick = onClick)
+            .semantics { if (opensMenu) stateDescription = menuStateDescription }
+            .clickable(role = Role.Button, onClick = onClick)
     ) {
         Icon(
             imageVector        = if (isMenuOpen) Icons.Default.Close else closedIcon,
-            contentDescription = if (isMenuOpen) "Close menu" else closedContentDescription,
+            contentDescription = if (isMenuOpen) stringResource(R.string.close_menu) else closedContentDescription,
             tint               = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier           = androidx.compose.ui.Modifier.size(24.dp)
         )

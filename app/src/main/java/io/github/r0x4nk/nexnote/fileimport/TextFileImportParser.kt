@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.fileimport
 
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
@@ -20,30 +22,39 @@ internal object TextFileImportParser {
     private const val UTF8_BOM_BYTE_COUNT = 3
     const val MAX_CONTENT_BYTES = MAX_CONTENT_CHARS * 4 + UTF8_BOM_BYTE_COUNT
 
-    private const val DEFAULT_TITLE = "Imported note"
     private const val MAX_TITLE_CHARS = 160
     private const val UTF8_BOM = "\uFEFF"
 
-    fun parse(displayName: String?, bytes: ByteArray): TextFileImportParseResult {
+    fun parse(
+        displayName: String?,
+        bytes: ByteArray,
+        strings: StringProvider
+    ): TextFileImportParseResult {
         val content = decodeUtf8(bytes)?.removePrefix(UTF8_BOM)
-            ?: return TextFileImportParseResult.Rejected("Unsupported file encoding")
+            ?: return TextFileImportParseResult.Rejected(
+                strings.get(R.string.import_error_unsupported_encoding)
+            )
 
         if (content.length > MAX_CONTENT_CHARS) {
-            return TextFileImportParseResult.Rejected("File is too large")
+            return TextFileImportParseResult.Rejected(
+                strings.get(R.string.import_error_file_too_large)
+            )
         }
         if (!content.hasOnlyTextControlCharacters()) {
-            return TextFileImportParseResult.Rejected("File does not look like text")
+            return TextFileImportParseResult.Rejected(
+                strings.get(R.string.import_error_not_text)
+            )
         }
 
         return TextFileImportParseResult.Parsed(
             ImportedTextFile(
-                title = titleFromDisplayName(displayName),
+                title = titleFromDisplayName(displayName, strings),
                 content = content
             )
         )
     }
 
-    fun titleFromDisplayName(displayName: String?): String {
+    fun titleFromDisplayName(displayName: String?, strings: StringProvider): String {
         val normalized = displayName
             ?.substringAfterLast('/')
             ?.substringAfterLast(':')
@@ -52,7 +63,7 @@ internal object TextFileImportParser {
 
         val withoutExtension = normalized.removeFinalExtension()
         return withoutExtension
-            .ifBlank { DEFAULT_TITLE }
+            .ifBlank { strings.get(R.string.imported_note_title) }
             .take(MAX_TITLE_CHARS)
     }
 

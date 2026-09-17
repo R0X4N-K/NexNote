@@ -181,8 +181,8 @@ class TagRepositoryImpl(
      * 5. Prune the [TagEntity] row only when no cross-refs remain.
      *
      * The '#' replacement uses a word-boundary regex to avoid partial matches:
-     *   - `#todo` in `#todo list` becomes `todo list` ✅
-     *   - `#to` does NOT match `#todo` ✅
+     *   - `#todo` in `#todo list` becomes `todo list`
+     *   - `#to` does NOT match `#todo`
      *
      * @param tagName Lowercase name of the tag to delete (without '#').
      */

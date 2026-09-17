@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialFabActionEffect
 
 @Composable
@@ -37,7 +39,7 @@ internal fun AgendaNewNoteFab(
     actions: AgendaActions
 ) {
     RadialFabActionEffect(
-        contentDescription = "Create note",
+        contentDescription = stringResource(R.string.agenda_create_note),
         onClick = remember(selectedDateMillis, actions) {
             { actions.onNewNote(selectedDateMillis) }
         }

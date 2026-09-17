@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.util.insertStandaloneMarkdownBlock
@@ -13,26 +15,31 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val IMAGE_INSERT_ERROR = "Could not insert image"
-private const val IMAGE_REMOVE_ERROR = "Could not remove image"
-private const val MARKDOWN_IMAGE_ALT_TEXT = "image"
-
 internal class EditorImageActions(
     private val uiState: MutableStateFlow<EditorUiState>,
     private val copyNoteImageToInternal: CopyNoteImageToInternalUseCase,
     private val deleteNoteImage: DeleteNoteImageUseCase,
     private val saveDelegate: EditorSaveDelegate,
     private val recordContentHistoryChange: (EditorContentSnapshot, EditorContentSnapshot) -> Unit,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val strings: StringProvider
 ) {
+    private val imageInsertError: String
+        get() = strings.get(R.string.editor_error_insert_image)
+
+    private val imageRemoveError: String
+        get() = strings.get(R.string.editor_error_remove_image)
+
+    private val imageAltText: String
+        get() = strings.get(R.string.markdown_image_alt_placeholder)
     fun onImagePicked(
         openImageInputStream: () -> InputStream?,
         insertionOffset: Int? = null
     ) {
-        if (uiState.value.isTemplateMode) return
+        if (uiState.value.isTemplateMode || uiState.value.isReadOnly) return
 
         scope.launch {
-            if (!ensureNoteExistsBeforeImageInsert()) return@launch
+            if (uiState.value.isReadOnly || !ensureNoteExistsBeforeImageInsert() || uiState.value.isReadOnly) return@launch
             insertImageIntoCurrentNote(openImageInputStream, insertionOffset)
         }
     }
@@ -70,6 +77,10 @@ internal class EditorImageActions(
         try {
             val relativePath = copyNoteImageToInternal(noteId, openImageInputStream)
             copiedRelativePath = relativePath
+            if (uiState.value.isReadOnly || uiState.value.noteId != noteId) {
+                withContext(NonCancellable) { deleteNoteImage(relativePath) }
+                return
+            }
             val beforeState = uiState.value
             val before = beforeState.toContentSnapshot()
             var after: EditorContentSnapshot? = null
@@ -94,13 +105,13 @@ internal class EditorImageActions(
                     }
                 }
             }
-            uiState.value = stateBeforeInsert.copy(isSaving = false)
+            if (!uiState.value.isVaultLocked) uiState.value = stateBeforeInsert.copy(isSaving = false)
             throw error
         } catch (e: Exception) {
             copiedRelativePath
                 ?.takeIf { uiState.value.isVaultNote }
                 ?.let { runCatchingPreservingCancellation { deleteNoteImage(it) } }
-            uiState.update { it.copy(isSaving = false, errorMessage = IMAGE_INSERT_ERROR) }
+            uiState.update { it.copy(isSaving = false, errorMessage = imageInsertError) }
         }
     }
 
@@ -110,12 +121,13 @@ internal class EditorImageActions(
     ) {
         runCatchingPreservingCancellation { deleteNoteImage(relativePath) }
         uiState.update { current ->
+            if (current.isVaultLocked) return@update current
             current.copy(
                 content = beforeState.content,
                 imagePaths = beforeState.imagePaths,
                 isDirty = beforeState.isDirty,
                 isSaving = false,
-                errorMessage = IMAGE_INSERT_ERROR,
+                errorMessage = imageInsertError,
                 contentVersion = current.contentVersion + 1,
                 contentSelectionOffset = beforeState.contentSelectionOffset
             )
@@ -128,7 +140,7 @@ internal class EditorImageActions(
     ): EditorUiState {
         val insertion = insertStandaloneMarkdownBlock(
             text = content,
-            block = "![$MARKDOWN_IMAGE_ALT_TEXT]($relativePath)",
+                    block = "![$imageAltText]($relativePath)",
             offset = insertionOffset ?: content.length
         )
         return copy(
@@ -184,12 +196,13 @@ internal class EditorImageActions(
 
     private fun rollbackFailedVaultImageRemoval(beforeState: EditorUiState) {
         uiState.update { current ->
+            if (current.isVaultLocked) return@update current
             current.copy(
                 content = beforeState.content,
                 imagePaths = beforeState.imagePaths,
                 isDirty = beforeState.isDirty,
                 isSaving = false,
-                errorMessage = IMAGE_REMOVE_ERROR,
+                errorMessage = imageRemoveError,
                 contentVersion = current.contentVersion + 1,
                 contentSelectionOffset = beforeState.contentSelectionOffset
             )

@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.r0x4nk.nexnote.data.db.NexNoteDatabase
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Template
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -25,7 +26,10 @@ class TemplateRepositoryTest {
         db = Room.inMemoryDatabaseBuilder(context, NexNoteDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = TemplateRepositoryImpl(db.templateDao())
+        repository = TemplateRepositoryImpl(
+            db.templateDao(),
+            StringProvider { id, formatArgs -> context.getString(id, *formatArgs) }
+        )
     }
 
     @After

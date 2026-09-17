@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.fileimport
 
+import io.github.r0x4nk.nexnote.testing.TestStringProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,7 +11,8 @@ class TextFileImportParserTest {
     fun `parse creates imported file with filename title and content`() {
         val result = TextFileImportParser.parse(
             displayName = "Meeting notes.md",
-            bytes = "# Agenda\n- One".toByteArray(Charsets.UTF_8)
+            bytes = "# Agenda\n- One".toByteArray(Charsets.UTF_8),
+            strings = TestStringProvider
         )
 
         val parsed = result as TextFileImportParseResult.Parsed
@@ -23,7 +25,8 @@ class TextFileImportParserTest {
         val result = TextFileImportParser.parse(
             displayName = "draft.txt",
             bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) +
-                "  keep surrounding whitespace  ".toByteArray(Charsets.UTF_8)
+                "  keep surrounding whitespace  ".toByteArray(Charsets.UTF_8),
+            strings = TestStringProvider
         )
 
         val parsed = result as TextFileImportParseResult.Parsed
@@ -32,25 +35,25 @@ class TextFileImportParserTest {
 
     @Test
     fun `title falls back when display name is blank`() {
-        assertEquals("Imported note", TextFileImportParser.titleFromDisplayName("   "))
+        assertEquals("Imported note", TextFileImportParser.titleFromDisplayName("   ", TestStringProvider))
     }
 
     @Test
     fun `title preserves hidden filenames`() {
-        assertEquals(".env", TextFileImportParser.titleFromDisplayName(".env"))
+        assertEquals(".env", TextFileImportParser.titleFromDisplayName(".env", TestStringProvider))
     }
 
     @Test
     fun `title removes only final extension from path-like fallback names`() {
         assertEquals(
             "archive.notes",
-            TextFileImportParser.titleFromDisplayName("primary:Download/archive.notes.md")
+            TextFileImportParser.titleFromDisplayName("primary:Download/archive.notes.md", TestStringProvider)
         )
     }
 
     @Test
     fun `title is capped to safe length`() {
-        val title = TextFileImportParser.titleFromDisplayName("a".repeat(240) + ".md")
+        val title = TextFileImportParser.titleFromDisplayName("a".repeat(240) + ".md", TestStringProvider)
 
         assertEquals(160, title.length)
     }
@@ -60,7 +63,8 @@ class TextFileImportParserTest {
         val result = TextFileImportParser.parse(
             displayName = "large.md",
             bytes = "a".repeat(TextFileImportParser.MAX_CONTENT_CHARS + 1)
-                .toByteArray(Charsets.UTF_8)
+                .toByteArray(Charsets.UTF_8),
+            strings = TestStringProvider
         )
 
         assertRejected(result, "File is too large")
@@ -70,7 +74,8 @@ class TextFileImportParserTest {
     fun `parse rejects invalid utf8`() {
         val result = TextFileImportParser.parse(
             displayName = "broken.md",
-            bytes = byteArrayOf(0xC3.toByte(), 0x28)
+            bytes = byteArrayOf(0xC3.toByte(), 0x28),
+            strings = TestStringProvider
         )
 
         assertRejected(result, "Unsupported file encoding")
@@ -80,7 +85,8 @@ class TextFileImportParserTest {
     fun `parse rejects binary control characters`() {
         val result = TextFileImportParser.parse(
             displayName = "binary.bin",
-            bytes = byteArrayOf(0x00, 0x01, 0x02)
+            bytes = byteArrayOf(0x00, 0x01, 0x02),
+            strings = TestStringProvider
         )
 
         assertRejected(result, "File does not look like text")

@@ -204,4 +204,52 @@ class TagParserTest {
         val result = extract("foo#bar is not a tag")
         assertFalse("bar" in result)
     }
+
+    // ── stripAllTagMarkers ────────────────────────────────────────────────────
+
+    @Test
+    fun `stripAllTagMarkers removes hashes and keeps words`() {
+        val content = "Learning #kotlin and #android today"
+
+        assertEquals("Learning kotlin and android today", TagParser.stripAllTagMarkers(content))
+    }
+
+    @Test
+    fun `stripAllTagMarkers handles a tag at the start of a line`() {
+        assertEquals("work item", TagParser.stripAllTagMarkers("#work item"))
+    }
+
+    @Test
+    fun `stripAllTagMarkers leaves headings untouched`() {
+        val content = "## Heading\n# Title\n### Subheading"
+
+        assertEquals(content, TagParser.stripAllTagMarkers(content))
+    }
+
+    @Test
+    fun `stripAllTagMarkers preserves fenced code blocks`() {
+        val content = """
+            |#real here
+            |```kotlin
+            |val x = #notATag
+            |```
+            |Done
+        """.trimMargin()
+        val expected = """
+            |real here
+            |```kotlin
+            |val x = #notATag
+            |```
+            |Done
+        """.trimMargin()
+
+        assertEquals(expected, TagParser.stripAllTagMarkers(content))
+    }
+
+    @Test
+    fun `stripAllTagMarkers returns content without hashes unchanged`() {
+        val content = "Just text without tags."
+
+        assertEquals(content, TagParser.stripAllTagMarkers(content))
+    }
 }

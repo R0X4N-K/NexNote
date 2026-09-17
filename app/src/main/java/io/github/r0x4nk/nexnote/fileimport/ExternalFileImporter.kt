@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
@@ -18,30 +20,36 @@ internal class ExternalFileImporter(
     private val contentResolver: ContentResolver,
     private val saveNote: SaveNoteUseCase,
     private val indexNoteTags: IndexNoteTagsUseCase,
+    private val strings: StringProvider,
     private val nowMillis: () -> Long = { System.currentTimeMillis() }
 ) {
     suspend fun importFrom(intent: Intent?): ExternalFileImportResult =
         withContext(Dispatchers.IO) {
             if (!canHandle(intent)) return@withContext ExternalFileImportResult.Ignored
 
-            val uri = intent?.data
-                ?: return@withContext ExternalFileImportResult.Failed("File is not available")
-            val displayName = queryDisplayName(uri) ?: Uri.decode(uri.lastPathSegment.orEmpty())
-            val mimeType = intent.type ?: contentResolver.getType(uri)
-            if (!ExternalTextFormat.isSupported(mimeType, displayName)) {
-                return@withContext ExternalFileImportResult.Failed("Unsupported file type")
+            runCatchingPreservingCancellation {
+                val uri = intent?.data
+                    ?: return@runCatchingPreservingCancellation ExternalFileImportResult.Failed(
+                        strings.get(R.string.import_error_file_unavailable)
+                    )
+                val displayName = queryDisplayName(uri) ?: Uri.decode(uri.lastPathSegment.orEmpty())
+                val mimeType = intent.type ?: contentResolver.getType(uri)
+                if (!ExternalTextFormat.isSupported(mimeType, displayName)) {
+                    return@runCatchingPreservingCancellation ExternalFileImportResult.Failed(
+                        strings.get(R.string.import_error_unsupported_type)
+                    )
+                }
+                importUri(uri, displayName)
             }
-
-            runCatchingPreservingCancellation { importUri(uri, displayName) }
                 .getOrElse { error ->
                     NexNoteDebugLog.persistence(
                         event = "externalFileImportFailed",
                         details = NexNoteDebugLog.throwableSummary(error)
                     )
                     val message = if (error is ImportedFileTooLargeException) {
-                        "File is too large"
+                        strings.get(R.string.import_error_file_too_large)
                     } else {
-                        "Could not import file"
+                        strings.get(R.string.import_error_import_failed)
                     }
                     ExternalFileImportResult.Failed(message)
                 }
@@ -50,14 +58,16 @@ internal class ExternalFileImporter(
     private suspend fun importUri(uri: Uri, displayName: String): ExternalFileImportResult {
         val declaredSize = querySize(uri)
         if (declaredSize != null && declaredSize > TextFileImportParser.MAX_CONTENT_BYTES) {
-            return ExternalFileImportResult.Failed("File is too large")
+            return ExternalFileImportResult.Failed(strings.get(R.string.import_error_file_too_large))
         }
 
         val bytes = contentResolver.openInputStream(uri)
             ?.use { it.readBounded(TextFileImportParser.MAX_CONTENT_BYTES) }
-            ?: return ExternalFileImportResult.Failed("File is not available")
+            ?: return ExternalFileImportResult.Failed(
+                strings.get(R.string.import_error_file_unavailable)
+            )
 
-        val importedFile = when (val parsed = TextFileImportParser.parse(displayName, bytes)) {
+        val importedFile = when (val parsed = TextFileImportParser.parse(displayName, bytes, strings)) {
             is TextFileImportParseResult.Parsed -> parsed.file
             is TextFileImportParseResult.Rejected ->
                 return ExternalFileImportResult.Failed(parsed.message)

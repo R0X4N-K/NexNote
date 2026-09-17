@@ -6,11 +6,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.common.NoteOperationRunner
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.nextIn
 import kotlinx.coroutines.CancellationException
@@ -46,7 +49,8 @@ data class TemplatesUiState(
 
 class TemplatesViewModel(
     private val observeTemplates: ObserveTemplatesUseCase,
-    private val deleteTemplate: DeleteTemplateUseCase
+    private val deleteTemplate: DeleteTemplateUseCase,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _searchQuery  = MutableStateFlow("")
@@ -112,9 +116,15 @@ class TemplatesViewModel(
      * Confirms and executes deletion of the selected template.
      * No-op if the active dialog is not ConfirmDelete (safe by construction).
      */
+    private val operations = NoteOperationRunner(viewModelScope)
+    val operationProgress = operations.progress
+
     fun confirmDelete() {
         val dialog = _extra.value.activeDialog
-        viewModelScope.launch {
+        if (dialog == TemplatesDialog.None) return
+        operations.launch(strings.get(R.string.templates_progress_delete), onError = {
+            _extra.update { it.copy(errorMessage = strings.get(R.string.templates_error_delete)) }
+        }) {
             try {
                 when (dialog) {
                     is TemplatesDialog.ConfirmDelete -> deleteTemplate(dialog.template)
@@ -133,9 +143,9 @@ class TemplatesViewModel(
                     it.copy(
                         activeDialog = TemplatesDialog.None,
                         errorMessage = if (dialog is TemplatesDialog.ConfirmDeleteSelection) {
-                            "Could not delete templates"
+                            strings.get(R.string.templates_error_delete)
                         } else {
-                            "Could not delete template"
+                            strings.get(R.string.templates_error_delete_single)
                         }
                     )
                 }
@@ -154,7 +164,8 @@ class TemplatesViewModel(
                 val templates = app.useCases.templates
                 TemplatesViewModel(
                     observeTemplates = templates.observeTemplates,
-                    deleteTemplate = templates.deleteTemplate
+                    deleteTemplate = templates.deleteTemplate,
+                    strings = app.strings
                 )
             }
         }

@@ -24,6 +24,9 @@ import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.VaultLockedException
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
 import io.github.r0x4nk.nexnote.testing.NoOpNoteImageStorage
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
@@ -81,6 +84,65 @@ class VaultNoteRepositoryImplTest {
     @After
     fun tearDown() {
         db.close()
+    }
+
+    @Test
+    fun vaultListsReuseUnchangedNotesAndDiscardCacheWhenLocked() = kotlinx.coroutines.runBlocking {
+        val id = repository.saveVaultNote(Note(title = "unchanged", content = "private"))
+        val emissions = Channel<List<Note>>(Channel.UNLIMITED)
+        val observer = launch(Dispatchers.Default) {
+            repository.vaultNotes.collect { emissions.send(it) }
+        }
+        try {
+            val first = withTimeout(5_000) { emissions.receive() }.single()
+            repository.saveVaultNote(Note(title = "another"))
+            val updated = withTimeout(5_000) { emissions.receive() }
+            org.junit.Assert.assertSame(first, updated.single { it.id == id })
+            keyProvider.lock()
+            assertTrue(withTimeout(5_000) { emissions.receive() }.isEmpty())
+            keyProvider.replaceKey(testVaultKey())
+            val unlocked = withTimeout(5_000) { emissions.receive() }
+            org.junit.Assert.assertNotSame(first, unlocked.single { it.id == id })
+        } finally {
+            observer.cancelAndJoin()
+            emissions.close()
+        }
+    }
+
+    @Test
+    fun attachments_surviveVaultDuplicatePinRotationTrashRestoreAndRemoval() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "attachment-lifecycle-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+        val storage = InternalNoteImageStorage(root, processImage = { _, _ -> error("Attachment must not be decoded") })
+        val vault = VaultNoteRepositoryImpl(db, db.noteDao(), db.tagDao(), keyProvider, storage, cipher)
+        try {
+            val bytes = ByteArray(12 * 1024 * 1024) { (it % 251).toByte() }
+            val path = storage.copyAttachmentToInternal(1, "private.pdf") { bytes.inputStream() }
+            val markdown = io.github.r0x4nk.nexnote.util.AttachmentMarkdown.format(
+                io.github.r0x4nk.nexnote.domain.model.NoteAttachment(path, "private.pdf")
+            )
+            val id = vault.saveVaultNote(Note(content = markdown, imagePaths = listOf(path)))
+            assertFalse(storage.getImageFile(path).readBytes().contentEquals(bytes))
+            val result = vault.duplicateVaultNote(id) as DuplicateVaultNoteResult.Success
+            val duplicate = requireNotNull(vault.getVaultNoteById(result.noteId))
+            val duplicatePath = duplicate.imagePaths.single()
+            assertNotEquals(path, duplicatePath)
+            assertTrue(duplicatePath.endsWith(".pdf"))
+            assertTrue(duplicate.content.contains(duplicatePath))
+            assertTrue(vault.decryptVaultImageBytes(duplicatePath)!!.contentEquals(bytes))
+            val newKey = SecretKeySpec(ByteArray(32) { 17 }, "AES")
+            vault.rewrapAndCommitForTest(keyProvider, newKey)
+            keyProvider.replaceKey(newKey)
+            assertTrue(vault.moveVaultNoteToTrash(id))
+            assertTrue(vault.restoreVaultNoteFromTrash(id))
+            assertTrue(vault.removeNoteFromVault(id))
+            assertTrue(storage.getImageFile(path).readBytes().contentEquals(bytes))
+            assertTrue(vault.decryptVaultImageBytes(duplicatePath)!!.contentEquals(bytes))
+            assertTrue(vault.moveVaultNoteToTrash(result.noteId))
+            assertTrue(vault.deleteVaultNotePermanently(result.noteId))
+            assertFalse(storage.getImageFile(duplicatePath).exists())
+            assertTrue(storage.getImageFile(path).exists())
+        } finally { root.deleteRecursively() }
     }
 
     @Test
@@ -1381,7 +1443,7 @@ class VaultNoteRepositoryImplTest {
             val noteId = physicalRepository.saveVaultNote(
                 Note(title = "DataStore old key", imagePaths = listOf(path))
             )
-            dataStore.failNextUpdate = true
+            dataStore.failNextPinChange = true
 
             val result = vaultRepository.changePin(
                 currentPin = "1111".toCharArray(),
@@ -2288,22 +2350,24 @@ private class PausingRewrapVaultImageFileStorage(
 private class FailingPreferencesDataStore(
     private val delegate: DataStore<Preferences>
 ) : DataStore<Preferences> {
-    var failNextUpdate: Boolean = false
+    var failNextPinChange: Boolean = false
 
     override val data: Flow<Preferences>
         get() = delegate.data
 
     override suspend fun updateData(
         transform: suspend (t: Preferences) -> Preferences
-    ): Preferences {
-        if (failNextUpdate) {
-            failNextUpdate = false
+    ): Preferences = delegate.updateData { current ->
+        val updated = transform(current)
+        // Throttle writes precede rewrapping; fail the actual key/verifier commit.
+        if (failNextPinChange &&
+            current[VaultRepositoryImpl.PIN_HASH_KEY] != updated[VaultRepositoryImpl.PIN_HASH_KEY]) {
+            failNextPinChange = false
             throw IOException("Forced DataStore commit failure.")
         }
-        return delegate.updateData(transform)
+        updated
     }
 }
-
 private class TestVaultKeyProvider : VaultUnlockedKeyProvider {
     private val key = MutableStateFlow<SecretKey?>(testVaultKey())
     override val unlockedVaultKey: StateFlow<SecretKey?> = key

@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
+import io.github.r0x4nk.nexnote.data.db.entity.PendingImageDeletionEntity
 import io.github.r0x4nk.nexnote.data.db.entity.NoteSearchFtsEntity
 import io.github.r0x4nk.nexnote.data.db.entity.NoteStatisticsIndexEntity
 import io.github.r0x4nk.nexnote.data.db.entity.NoteTagCrossRef
@@ -20,14 +21,16 @@ import io.github.r0x4nk.nexnote.data.db.entity.TemplateEntity
         TagEntity::class,
         NoteTagCrossRef::class,
         NoteStatisticsIndexEntity::class,
-        NoteSearchFtsEntity::class
+        NoteSearchFtsEntity::class,
+        PendingImageDeletionEntity::class
     ],
-    version  = 9,
+    version  = 10,
     exportSchema = true
 )
 abstract class NexNoteDatabase : RoomDatabase() {
 
     abstract fun noteDao(): NoteDao
+    abstract fun pendingImageDeletionDao(): PendingImageDeletionDao
     abstract fun homeNoteDao(): HomeNoteDao
     abstract fun noteContentPatchDao(): NoteContentPatchDao
     abstract fun noteStatisticsDao(): NoteStatisticsDao
@@ -128,6 +131,15 @@ abstract class NexNoteDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS pending_image_deletions " +
+                        "(relativePath TEXT NOT NULL, PRIMARY KEY(relativePath))"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): NexNoteDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
@@ -143,7 +155,8 @@ abstract class NexNoteDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
-                    MIGRATION_8_9
+                    MIGRATION_8_9,
+                    MIGRATION_9_10
                 )
                 .addCallback(NOTE_SEARCH_SYNC_CALLBACK)
                 .build()

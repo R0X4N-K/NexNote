@@ -92,6 +92,8 @@ internal class DeveloperToolsViewModel(
                         error = DeveloperToolsError.GENERATION_FAILED
                     )
                 }
+            } finally {
+                _uiState.update { it.copy(isGenerating = false) }
             }
         }
     }

@@ -18,6 +18,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.nextIn
 
@@ -26,7 +29,7 @@ internal fun NoteListOverflowMenu(
     viewMode: NoteListViewMode,
     onToggleViewMode: () -> Unit,
     availableViewModes: List<NoteListViewMode> = NoteListViewMode.noteModes,
-    contentDescription: String = "More options",
+    contentDescription: String? = null,
     extraItems: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -36,7 +39,7 @@ internal fun NoteListOverflowMenu(
     Box {
         NexIconButton(
             imageVector = Icons.Default.MoreVert,
-            contentDescription = contentDescription,
+            contentDescription = contentDescription ?: stringResource(R.string.more_options),
             onClick = { expanded = true },
             selected = expanded
         )
@@ -46,7 +49,7 @@ internal fun NoteListOverflowMenu(
         ) {
             if (availableViewModes.size > 1) {
                 DropdownMenuItem(
-                    text = { Text(nextViewMode.actionLabel()) },
+                    text = { Text(stringResource(nextViewMode.actionLabelRes())) },
                     leadingIcon = {
                         Icon(
                             imageVector = nextViewMode.icon(),
@@ -58,8 +61,8 @@ internal fun NoteListOverflowMenu(
                         dismiss()
                     }
                 )
+                HorizontalDivider()
             }
-            HorizontalDivider()
             extraItems(dismiss)
         }
     }
@@ -72,9 +75,10 @@ private fun NoteListViewMode.icon(): ImageVector =
         NoteListViewMode.TAGS -> Icons.Default.Folder
     }
 
-private fun NoteListViewMode.actionLabel(): String =
+@StringRes
+private fun NoteListViewMode.actionLabelRes(): Int =
     when (this) {
-        NoteListViewMode.LIST -> "List view"
-        NoteListViewMode.GRID -> "Grid view"
-        NoteListViewMode.TAGS -> "Tag folders"
+        NoteListViewMode.LIST -> R.string.list_view
+        NoteListViewMode.GRID -> R.string.common_grid_view
+        NoteListViewMode.TAGS -> R.string.common_tag_folders_view
     }

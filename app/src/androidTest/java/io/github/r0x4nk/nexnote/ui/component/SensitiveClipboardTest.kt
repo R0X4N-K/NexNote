@@ -12,7 +12,7 @@ class SensitiveClipboardTest {
 
     @Test
     fun noteClipDataContainsTextAndSensitivePreviewFlag() {
-        val clipData = sensitiveNoteClipData("private note")
+        val clipData = sensitiveNoteClipData("private note", "NexNote note")
 
         assertEquals("private note", clipData.getItemAt(0).text.toString())
         assertTrue(

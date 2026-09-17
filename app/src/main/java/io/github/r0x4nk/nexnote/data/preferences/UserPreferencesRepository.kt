@@ -3,23 +3,24 @@ package io.github.r0x4nk.nexnote.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
@@ -28,9 +29,11 @@ private val Flow<Preferences>.safe: Flow<Preferences>
 
 private inline fun <reified E : Enum<E>> Flow<Preferences>.observeEnum(
     key: Preferences.Key<String>,
-    default: E
+    default: E,
+    legacyNames: Map<String, String> = emptyMap()
 ): Flow<E> = safe.map { prefs ->
-    val name = prefs[key] ?: default.name
+    val stored = prefs[key] ?: default.name
+    val name = legacyNames[stored] ?: stored
     enumValues<E>().firstOrNull { it.name == name } ?: default
 }
 
@@ -38,8 +41,10 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
 
     companion object {
         val THEME_MODE_KEY       = stringPreferencesKey("theme_mode")
+        val APP_FONT_KEY         = stringPreferencesKey("app_font")
         val FONT_SCALE_KEY       = stringPreferencesKey("font_scale")
         val TIMEZONE_KEY         = stringPreferencesKey("timezone_id")
+        val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
         val ACCENT_COLOR_KEY     = stringPreferencesKey("accent_color")
         val NOTE_CARD_STYLE_KEY  = stringPreferencesKey("note_card_style")
         val TABLE_LAYOUT_MODE_KEY = stringPreferencesKey("table_layout_mode")
@@ -59,6 +64,9 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
     override val themeMode: Flow<ThemeMode> =
         context.dataStore.data.observeEnum(THEME_MODE_KEY, ThemeMode.SYSTEM)
 
+    override val appFont: Flow<AppFont> =
+        context.dataStore.data.observeEnum(APP_FONT_KEY, AppFont.SYSTEM)
+
     override val fontScale: Flow<FontScale> =
         context.dataStore.data.observeEnum(FONT_SCALE_KEY, FontScale.NORMAL)
 
@@ -66,11 +74,18 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         .safe
         .map { prefs -> prefs[TIMEZONE_KEY] ?: "" }
 
+    override val dynamicColor: Flow<Boolean> = context.dataStore.data.safe.map { it[DYNAMIC_COLOR_KEY] ?: false }
+
     override val accentColor: Flow<AccentColor> =
         context.dataStore.data.observeEnum(ACCENT_COLOR_KEY, AccentColor.VIOLET)
 
     override val noteCardStyle: Flow<NoteCardStyle> =
-        context.dataStore.data.observeEnum(NOTE_CARD_STYLE_KEY, NoteCardStyle.TITLE_AND_PREVIEW)
+        context.dataStore.data.observeEnum(
+            key = NOTE_CARD_STYLE_KEY,
+            default = NoteCardStyle.TITLE_AND_PREVIEW,
+            // "TITLE_DATE" was the legacy name of the information style.
+            legacyNames = mapOf("TITLE_DATE" to NoteCardStyle.TITLE_INFORMATION.name)
+        )
 
     override val tableLayoutMode: Flow<TableLayoutMode> =
         context.dataStore.data.observeEnum(TABLE_LAYOUT_MODE_KEY, TableLayoutMode.FIT_SCREEN)
@@ -97,12 +112,20 @@ class UserPreferencesRepository(private val context: Context) : IUserPreferences
         context.dataStore.edit { prefs -> prefs[THEME_MODE_KEY] = mode.name }
     }
 
+    override suspend fun setAppFont(font: AppFont) {
+        context.dataStore.edit { prefs -> prefs[APP_FONT_KEY] = font.name }
+    }
+
     override suspend fun setFontScale(scale: FontScale) {
         context.dataStore.edit { prefs -> prefs[FONT_SCALE_KEY] = scale.name }
     }
 
     override suspend fun setTimezoneId(id: String) {
         context.dataStore.edit { prefs -> prefs[TIMEZONE_KEY] = id }
+    }
+
+    override suspend fun setDynamicColor(enabled: Boolean) {
+        context.dataStore.edit { it[DYNAMIC_COLOR_KEY] = enabled }
     }
 
     override suspend fun setAccentColor(color: AccentColor) {

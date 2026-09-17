@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.data.local
 
+import io.github.r0x4nk.nexnote.domain.repository.NoteAttachmentStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.util.NoteImageProcessor
 import io.github.r0x4nk.nexnote.util.ImageFileManager
@@ -25,7 +26,7 @@ class InternalNoteImageStorage(
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
     private val processImage: (inputStreamProvider: () -> InputStream?, destination: File) -> Unit =
         NoteImageProcessor::processAndSave
-) : NoteImageStorage {
+) : NoteImageStorage, NoteAttachmentStorage by InternalNoteAttachmentStorage(filesDir) {
 
     override suspend fun copyImageToInternal(
         noteId: Long,

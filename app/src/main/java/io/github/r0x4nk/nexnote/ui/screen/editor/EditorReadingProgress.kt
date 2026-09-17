@@ -21,9 +21,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.MarkdownSourceRange
 
 private const val READING_PROGRESS_ANIMATION_MS = 120
@@ -55,7 +57,7 @@ internal fun EditorPreviewReadingProgressBar(
 
     EditorScrollPositionBar(
         state = state,
-        progressDescription = "Reading progress",
+        progressDescription = stringResource(R.string.editor_reading_progress),
         modifier = modifier
     )
 }
@@ -76,7 +78,7 @@ internal fun EditorEditReadingProgressBar(
 
     EditorScrollPositionBar(
         state = state,
-        progressDescription = "Editor scroll progress",
+        progressDescription = stringResource(R.string.editor_scroll_progress),
         modifier = modifier
     )
 }

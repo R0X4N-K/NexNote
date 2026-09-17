@@ -41,15 +41,3 @@ internal const val SWIPE_HORIZONTAL_DOMINANCE_RATIO = 1.2f
 internal const val BACKGROUND_PREPARSE_DEBOUNCE_MS = 800L
 // Skip background pre-parse for very short notes where parsing is trivially fast.
 internal const val PREPARSE_MIN_CHARS = 500
-
-// Ordered by hue. null represents "no custom color" (theme default surface).
-internal val NOTE_COLOR_PALETTE: List<Int?> = listOf(
-    null,
-    0xFFFFCDD2.toInt(), // Soft red
-    0xFFFFE0B2.toInt(), // Soft orange
-    0xFFFFF9C4.toInt(), // Soft yellow
-    0xFFC8E6C9.toInt(), // Soft green
-    0xFFBBDEFB.toInt(), // Soft blue
-    0xFFE1BEE7.toInt(), // Soft purple
-    0xFFD7CCC8.toInt(), // Warm grey
-)

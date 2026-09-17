@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.LabelOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,7 +15,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.TagChip
@@ -25,6 +28,7 @@ internal fun TagChipsEditorRow(
     selectedTag: String?,
     onTagClick: (String) -> Unit,
     onClearSelection: () -> Unit,
+    onClearAllTags: () -> Unit,
     isPinned: Boolean,
     onTogglePin: () -> Unit,
     modifier: Modifier = Modifier
@@ -53,7 +57,7 @@ internal fun TagChipsEditorRow(
             if (selectedTag != null) {
                 TextButton(onClick = onClearSelection) {
                     Text(
-                        text = "Clear",
+                        text = stringResource(R.string.editor_tag_row_clear),
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
@@ -61,12 +65,18 @@ internal fun TagChipsEditorRow(
         }
 
         NexIconButton(
+            imageVector = Icons.AutoMirrored.Outlined.LabelOff,
+            contentDescription = stringResource(R.string.editor_remove_all_tags),
+            onClick = onClearAllTags,
+            destructive = true
+        )
+
+        NexIconButton(
             imageVector = Icons.Default.PushPin,
-            contentDescription = if (isPinned) {
-                "Unpin tag row (enable auto-hide)"
-            } else {
-                "Pin tag row (disable auto-hide)"
-            },
+            contentDescription = stringResource(
+                if (isPinned) R.string.editor_unpin_tag_row
+                else R.string.editor_pin_tag_row
+            ),
             onClick = onTogglePin,
             selected = isPinned,
             modifier = Modifier.padding(end = 4.dp)

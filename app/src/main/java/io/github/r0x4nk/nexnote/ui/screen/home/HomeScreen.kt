@@ -1,5 +1,8 @@
 package io.github.r0x4nk.nexnote.ui.screen.home
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -11,37 +14,43 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarDefaults
+import io.github.r0x4nk.nexnote.ui.common.NoteCollectionSortEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
-import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
+import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
+import io.github.r0x4nk.nexnote.ui.component.NoteCreationDatePickerDialog
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
-import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
-import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteTagFolderExpansionState
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 
 private const val EXIT_BACK_PRESS_WINDOW_MS = 2000L
 
@@ -55,10 +64,13 @@ fun HomeScreen(
     onOpenStatistics: () -> Unit,
     onOpenVault: () -> Unit,
     onMoveNoteToVault: (noteId: Long) -> Unit,
+    onExportNote: ((Long) -> Unit)? = null,
     floatingBottomPadding: Dp = 0.dp,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val operationProgress by viewModel.operationProgress.collectAsStateWithLifecycle()
+    OperationProgressDialog(operationProgress)
     val allSelectionCandidateIds by viewModel.selectionCandidateIds.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -67,9 +79,12 @@ fun HomeScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val gridState = rememberLazyStaggeredGridState()
+    val tagFolderExpansion = rememberNoteTagFolderExpansionState()
+    NoteCollectionSortEffect(uiState.appliedSortOrder to uiState.appliedSearchSort, listState, gridState)
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    var dateEditNote by remember { mutableStateOf<Note?>(null) }
     var showSearchFilters by rememberSaveable { mutableStateOf(false) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
@@ -79,7 +94,16 @@ fun HomeScreen(
     val selectedNotes = remember(selectionState, selectableNotes) {
         selectionState.selectedItems(selectableNotes) { it.id }
     }
-    val hasUnloadedSelection = selectionState.selectedCount > selectedNotes.size
+    fun performSelectedAction(action: (Collection<Note>) -> Unit) {
+        val selectedIds = selectionState.selectedIds.toSet()
+        viewModel.withSelectedNotes(selectedIds) { notes ->
+            action(notes)
+            if (selectionState.selectedIds == selectedIds) {
+                selectionState = selectionState.exit()
+                activeActionsNote = null
+            }
+        }
+    }
 
     TrashSnackbarEffect(
         trashEvents = viewModel.trashEvents,
@@ -109,7 +133,8 @@ fun HomeScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground().nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { HomeSnackbarHost(snackbarHostState, floatingBottomPadding) },
         topBar = {
             if (selectionState.isActive) {
@@ -127,26 +152,17 @@ fun HomeScreen(
                     onDeselectAll = {
                         selectionState = selectionState.deselectAll()
                     },
-                    onShareSelected = if (hasUnloadedSelection) null else {
-                        {
-                            shareCallbacks.onShareNotes(selectedNotes)
-                            selectionState = selectionState.exit()
-                            activeActionsNote = null
-                        }
+                    onNoteActions = selectedNotes.singleOrNull()?.let { note ->
+                        { activeActionsNote = note }
                     },
-                    onCopySelectedAsText = if (hasUnloadedSelection) null else {
-                        {
-                            clipboardCallbacks.onCopyPlainTextNotes(selectedNotes)
-                            selectionState = selectionState.exit()
-                            activeActionsNote = null
-                        }
+                    onShareSelected = {
+                        performSelectedAction(shareCallbacks.onShareNotes)
                     },
-                    onCopySelectedAsMarkdown = if (hasUnloadedSelection) null else {
-                        {
-                            clipboardCallbacks.onCopyMarkdownNotes(selectedNotes)
-                            selectionState = selectionState.exit()
-                            activeActionsNote = null
-                        }
+                    onCopySelectedAsText = {
+                        performSelectedAction(clipboardCallbacks.onCopyPlainTextNotes)
+                    },
+                    onCopySelectedAsMarkdown = {
+                        performSelectedAction(clipboardCallbacks.onCopyMarkdownNotes)
                     },
                     onDeleteSelected = {
                         viewModel.requestTrashByIds(selectionState.selectedIds)
@@ -158,6 +174,7 @@ fun HomeScreen(
                 HomeTopAppBar(
                     uiState = uiState,
                     scrollBehavior = scrollBehavior,
+                    tagFolderExpansion = tagFolderExpansion,
                     searchFocusRequester = searchFocusRequester,
                     onSearchQueryChange = viewModel::onSearchQueryChange,
                     onSearchToggle = { active ->
@@ -185,6 +202,7 @@ fun HomeScreen(
             listState = listState,
             gridState = gridState,
             selectionState = selectionState,
+            tagFolderExpansion = tagFolderExpansion,
             vaultPullEnabled = !selectionState.isActive && !uiState.isSearchActive,
             onNoteClick = onNoteClick,
             onOpenVault = onOpenVault,
@@ -194,11 +212,6 @@ fun HomeScreen(
             onLoadMoreNotes = viewModel::loadMoreNotes,
             onTogglePin = viewModel::togglePin,
             onRequestTrash = viewModel::requestTrash,
-            onRequestNoteActions = { note ->
-                if (!selectionState.isActive) {
-                    activeActionsNote = note
-                }
-            },
             onToggleNoteSelection = { note ->
                 selectionState = selectionState.toggle(note.id)
                 activeActionsNote = null
@@ -210,15 +223,25 @@ fun HomeScreen(
 
     NoteActionsSheet(
         note = activeActionsNote,
+        onExport = onExportNote?.let { export -> { note -> export(note.id) } },
         clipboardCallbacks = clipboardCallbacks,
         shareCallbacks = shareCallbacks,
         onDuplicate = viewModel::duplicateNote,
         onDelete = viewModel::requestTrash,
         onMoveToVault = { note -> onMoveNoteToVault(note.id) },
-        onSelect = { note ->
-            selectionState = selectionState.select(note.id)
+        onEditCreationDate = { note -> dateEditNote = note },
+        onDismiss = {
+            activeActionsNote = null
+            selectionState = selectionState.exit()
+        }
+    )
+
+    NoteCreationDatePickerDialog(
+        note = dateEditNote,
+        onConfirm = { creationDate ->
+            dateEditNote?.let { note -> viewModel.updateCreationDate(note, creationDate) }
         },
-        onDismiss = { activeActionsNote = null }
+        onDismiss = { dateEditNote = null }
     )
 
     if (uiState.showTemplatePicker) {
@@ -259,6 +282,7 @@ private fun NoteActionMessagesEffect(
 @Composable
 private fun DoubleBackToExitHandler() {
     val context = LocalContext.current
+    val pressAgainMessage = stringResource(R.string.home_press_again_to_exit)
     var lastBackPressMs by remember { mutableLongStateOf(0L) }
 
     BackHandler {
@@ -267,7 +291,7 @@ private fun DoubleBackToExitHandler() {
             (context as? Activity)?.finish()
         } else {
             lastBackPressMs = now
-            Toast.makeText(context, "Press again to exit", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, pressAgainMessage, Toast.LENGTH_SHORT).show()
         }
     }
 }

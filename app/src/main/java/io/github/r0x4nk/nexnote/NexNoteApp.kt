@@ -1,11 +1,15 @@
 package io.github.r0x4nk.nexnote
 
 import android.app.Application
+import io.github.r0x4nk.nexnote.data.local.AttachmentImportRecovery
 import io.github.r0x4nk.nexnote.data.db.NexNoteDatabase
 import io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage
 import io.github.r0x4nk.nexnote.data.preferences.UserPreferencesRepository
 import io.github.r0x4nk.nexnote.data.security.AndroidVaultCredentialRepository
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
+import io.github.r0x4nk.nexnote.data.repository.PendingImageCleanup
+import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
+import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.data.repository.NoteStatisticsRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TagRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
@@ -13,6 +17,7 @@ import io.github.r0x4nk.nexnote.data.repository.VaultNoteRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.VaultRepositoryImpl
 import io.github.r0x4nk.nexnote.di.AppUseCases
 import io.github.r0x4nk.nexnote.di.AppDependencies
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
@@ -26,6 +31,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * Application class. Acts as the manual DI root for app dependencies.
@@ -42,13 +49,17 @@ internal class NexNoteApp : Application(), AppDependencies {
         EditorSaveCoordinator(ownerScope = appScope)
     }
 
+    override val strings: StringProvider = StringProvider { id, formatArgs ->
+        getString(id, *formatArgs)
+    }
+
     val database: NexNoteDatabase by lazy {
         NexNoteDatabase.getDatabase(this)
     }
 
-    val noteImageStorage: NoteImageStorage by lazy {
-        InternalNoteImageStorage(filesDir)
-    }
+    private val internalFileStorage by lazy { InternalNoteImageStorage(filesDir) }
+
+    val noteImageStorage: NoteImageStorage get() = internalFileStorage
 
     val noteRepository: NoteRepository by lazy {
         NoteRepositoryImpl(
@@ -57,7 +68,8 @@ internal class NexNoteApp : Application(), AppDependencies {
             appScope = appScope,
             database = database,
             statisticsDao = database.noteStatisticsDao(),
-            homeNoteDao = database.homeNoteDao()
+            homeNoteDao = database.homeNoteDao(),
+            pendingImageDeletionDao = database.pendingImageDeletionDao()
         )
     }
 
@@ -69,7 +81,7 @@ internal class NexNoteApp : Application(), AppDependencies {
     }
 
     private val templateRepositoryImpl: TemplateRepositoryImpl by lazy {
-        TemplateRepositoryImpl(database.templateDao())
+        TemplateRepositoryImpl(database.templateDao(), strings)
     }
 
     val templateRepository: TemplateRepository by lazy {
@@ -127,6 +139,7 @@ internal class NexNoteApp : Application(), AppDependencies {
             preferencesRepository = userPreferencesRepository,
             statisticsRepository = statisticsRepository,
             imageStorage = noteImageStorage,
+            attachmentStorage = internalFileStorage,
             vaultRepository = vaultRepository,
             vaultAndroidCredentialRepository = vaultAndroidCredentialRepository,
             vaultNoteRepository = vaultNoteRepository
@@ -137,7 +150,33 @@ internal class NexNoteApp : Application(), AppDependencies {
         super.onCreate()
         statisticsRepository.start()
         appScope.launch(Dispatchers.IO) {
+            val recovery = AttachmentImportRecovery(filesDir, database.noteDao())
+            vaultGraph.keyRepository.unlockedVaultKey.collect { key ->
+                runCatchingPreservingCancellation {
+                    if (key == null) recovery.run() else {
+                        vaultGraph.keyRepository.withUnlockedVaultKey { activeKey -> recovery.run(activeKey) }
+                    }
+                }.onFailure {
+                    NexNoteDebugLog.repositoryWarning(event = "attachmentImportRecoveryFailed") {
+                        "error=${it::class.java.simpleName}"
+                    }
+                }
+            }
+        }
+        appScope.launch(Dispatchers.IO) {
             ExportCache(cacheDir).cleanupExpired()
+        }
+        appScope.launch(Dispatchers.IO) {
+            val cleanup = PendingImageCleanup(database.pendingImageDeletionDao(), noteImageStorage)
+            while (isActive) {
+                runCatchingPreservingCancellation { cleanup.runOnce() }
+                    .onFailure { error ->
+                        NexNoteDebugLog.repositoryWarning(event = "pendingImageCleanupFailed") {
+                            NexNoteDebugLog.throwableSummary(error)
+                        }
+                    }
+                delay(15 * 60_000L)
+            }
         }
         appScope.launch {
             if (!userPreferencesRepository.hasSeededPredefinedTemplates()) {

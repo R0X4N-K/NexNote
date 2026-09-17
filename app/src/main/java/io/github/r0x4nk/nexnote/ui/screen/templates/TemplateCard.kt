@@ -1,7 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,16 +31,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NoteCollectionCardDefaults
 import io.github.r0x4nk.nexnote.ui.component.SelectionIndicator
 import io.github.r0x4nk.nexnote.ui.component.SwipeCollectionAction
 import io.github.r0x4nk.nexnote.ui.component.SwipeToCollectionActionsContainer
+import io.github.r0x4nk.nexnote.ui.component.buildNoteCardDisplayText
 import io.github.r0x4nk.nexnote.ui.component.roundedCombinedClickableTarget
-import io.github.r0x4nk.nexnote.util.MarkdownPlainText
+import io.github.r0x4nk.nexnote.ui.theme.rememberContentMarkdownColors
+import io.github.r0x4nk.nexnote.util.DateUtils
 
 @Composable
 internal fun TemplateCard(
@@ -48,6 +53,7 @@ internal fun TemplateCard(
     onApply: () -> Unit,
     onEdit: (() -> Unit)?,
     onDelete: (() -> Unit)?,
+    modifier: Modifier = Modifier,
     onLongPress: () -> Unit = {},
     selectionMode: Boolean = false,
     selected: Boolean = false
@@ -59,16 +65,18 @@ internal fun TemplateCard(
             onEdit = onEdit,
             onLongPress = onLongPress,
             selectionMode = selectionMode,
-            selected = selected
+            selected = selected,
+            modifier = modifier
         )
         return
     }
 
     SwipeToCollectionActionsContainer(
-        endToStartAction = SwipeCollectionAction.Delete("Delete template"),
+        endToStartAction = SwipeCollectionAction.Delete(stringResource(R.string.template_delete)),
         onEndToStart = onDelete,
         collapseBeforeEndToStart = false,
-        enabled = !selectionMode
+        enabled = !selectionMode,
+        modifier = modifier
     ) {
         TemplateCardSurface(
             template = template,
@@ -88,11 +96,12 @@ private fun TemplateCardSurface(
     onEdit: (() -> Unit)?,
     onLongPress: () -> Unit,
     selectionMode: Boolean,
-    selected: Boolean
+    selected: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val shape = NoteCollectionCardDefaults.shape
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .roundedCombinedClickableTarget(
                 shape = shape,
@@ -101,7 +110,7 @@ private fun TemplateCardSurface(
             ),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             } else {
                 NoteCollectionCardDefaults.containerColor()
             }
@@ -143,20 +152,14 @@ private fun TemplateCardBody(
         TemplateCardHeader(template, onEdit, selectionMode, selected)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = template.name.ifBlank { "Untitled template" },
+            text = template.name.ifBlank { stringResource(R.string.template_untitled) },
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
         Spacer(Modifier.height(5.dp))
-        Text(
-            text = rememberTemplatePreview(template),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
+        TemplateCardPreview(template)
         Spacer(Modifier.height(14.dp))
         TemplateCardFooter(template)
     }
@@ -176,7 +179,7 @@ private fun TemplateCardHeader(
             selectionMode -> SelectionIndicator(selected = selected)
             onEdit != null -> NexIconButton(
                 imageVector = Icons.Default.Edit,
-                contentDescription = "Edit ${template.name}",
+                contentDescription = stringResource(R.string.template_edit, template.name),
                 onClick = onEdit
             )
         }
@@ -228,7 +231,7 @@ private fun TemplateCardFooter(template: Template) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Use template",
+                text = stringResource(R.string.template_use),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -260,20 +263,46 @@ private fun TemplateBadge(text: String) {
 }
 
 @Composable
-private fun rememberTemplatePreview(template: Template): String =
-    remember(template.content, template.isMarkdown) {
-        val text = if (template.isMarkdown) {
-            MarkdownPlainText.fromMarkdown(template.content)
-        } else {
-            template.content
-        }
-        text.lineSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .joinToString(" · ")
-            .take(180)
-            .ifBlank { "A clean page, ready for your ideas." }
+private fun TemplateCardPreview(template: Template) {
+    val dateLabel = remember { DateUtils.formatDate(System.currentTimeMillis()) }
+    val source = remember(template.content, dateLabel) {
+        templatePreviewSource(template.content, dateLabel)
     }
+    if (source.isBlank()) {
+        TemplatePreviewText(
+            text = AnnotatedString(stringResource(R.string.template_empty_preview))
+        )
+        return
+    }
+
+    val markdownColors = rememberContentMarkdownColors()
+    val imagePlaceholder = stringResource(R.string.markdown_image_alt_fallback)
+    val highlightColor = MaterialTheme.colorScheme.primary
+    val preview = remember(source, template.isMarkdown, markdownColors, imagePlaceholder, highlightColor) {
+        buildNoteCardDisplayText(
+            sourceText = source,
+            ranges = emptyList(),
+            colors = markdownColors,
+            highlightColor = highlightColor,
+            renderMarkdown = template.isMarkdown,
+            imagePlaceholder = imagePlaceholder
+        )
+    }
+    TemplatePreviewText(text = preview)
+}
+
+@Composable
+private fun TemplatePreviewText(text: AnnotatedString) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = TemplatePreviewMaxLines,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+private const val TemplatePreviewMaxLines = 4
 
 /** Resolves persisted icon names without leaking storage strings into the UI layout. */
 private fun templateIcon(iconName: String): ImageVector = when (iconName) {

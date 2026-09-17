@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.component
 
+import io.github.r0x4nk.nexnote.util.AttachmentMarkdown
+
 internal data class MarkdownSourceRange(
     val start: Int,
     val end: Int
@@ -123,6 +125,7 @@ private class MarkdownSourceRangeBuilder(
             isBlockquoteLine -> addBlockquoteLine(start, end)
             previewHorizontalRule.matches(line.trim()) -> addSingleBlockRange(start, end)
             previewStandaloneImageLine.matchEntire(line) != null -> addSingleBlockRange(start, end)
+            AttachmentMarkdown.parse(line) != null -> addSingleBlockRange(start, end)
             isTableLine -> addTableLine(line, start, end)
             else -> addTextRange(start, end)
         }

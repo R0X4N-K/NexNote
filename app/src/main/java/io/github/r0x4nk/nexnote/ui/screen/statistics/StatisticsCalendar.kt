@@ -28,11 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.DailyWritingActivity
 import io.github.r0x4nk.nexnote.domain.model.NoteStatistics
 import java.time.DayOfWeek
@@ -184,7 +187,22 @@ private fun ActivityCell(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val label = remember(day) { day.accessibilityLabel() }
+    val dateLabel = remember(day.date) {
+        day.date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
+    }
+    val noteLabel = pluralStringResource(
+        R.plurals.statistics_a11y_notes,
+        day.noteCount,
+        day.noteCount
+    )
+    val wordCount = day.wordCount.toInt()
+    val wordLabel = pluralStringResource(R.plurals.statistics_a11y_words, wordCount, wordCount)
+    val tagLabel = pluralStringResource(
+        R.plurals.statistics_a11y_new_tags,
+        day.tagsCreated,
+        day.tagsCreated
+    )
+    val label = "$dateLabel: $noteLabel, $wordLabel, $tagLabel"
     Box(
         modifier = Modifier
             .size(CELL_SIZE)
@@ -218,7 +236,7 @@ private fun HeatmapLegend(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Less",
+            text = stringResource(R.string.statistics_legend_less),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -231,7 +249,7 @@ private fun HeatmapLegend(modifier: Modifier = Modifier) {
             )
         }
         Text(
-            text = "More",
+            text = stringResource(R.string.statistics_legend_more),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -275,18 +293,3 @@ private fun List<HeatmapWeek>.monthMarkers(locale: Locale): List<MonthMarker> {
         MonthMarker(weekIndex = weekIndex, label = date.format(formatter))
     }
 }
-
-private fun DailyWritingActivity.accessibilityLabel(): String {
-    val dateLabel = date.format(
-        DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())
-    )
-    return "$dateLabel: ${noteCount.counted("note", "notes")}, " +
-        "${wordCount.counted("word", "words")}, " +
-        tagsCreated.counted("new tag", "new tags")
-}
-
-private fun Int.counted(singular: String, plural: String): String =
-    "$this ${if (this == 1) singular else plural}"
-
-private fun Long.counted(singular: String, plural: String): String =
-    "$this ${if (this == 1L) singular else plural}"

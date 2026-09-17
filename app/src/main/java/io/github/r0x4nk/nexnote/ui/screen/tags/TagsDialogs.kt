@@ -4,7 +4,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.ui.component.NexDestructiveButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 
 @Composable
 internal fun TagsDialogHost(
@@ -30,16 +35,17 @@ private fun DeleteTagDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
-        title = { Text("Delete #$tagName?") },
+        title = { Text(stringResource(R.string.delete_tag_title, tagName)) },
         text = { DeleteTagDialogText(tagName, noteCount) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Delete", color = MaterialTheme.colorScheme.error)
+            NexDestructiveButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -47,12 +53,9 @@ private fun DeleteTagDialog(
 @Composable
 private fun DeleteTagDialogText(tagName: String, noteCount: Int) {
     Text(
-        text = buildString {
-            append("The tag #$tagName will be removed from ")
-            append(if (noteCount == 1) "1 note" else "$noteCount notes")
-            append(". The '#' prefix will be stripped from each occurrence, ")
-            append("but the word \"$tagName\" will remain in the note text.")
-        },
+        text = pluralStringResource(
+            R.plurals.delete_tag_message, noteCount, tagName, noteCount
+        ),
         style = MaterialTheme.typography.bodyMedium
     )
 }

@@ -36,17 +36,23 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.ui.common.EditorMotion
+import io.github.r0x4nk.nexnote.ui.theme.NoteContentTheme
+import io.github.r0x4nk.nexnote.ui.theme.rememberNoteColors
 import io.github.r0x4nk.nexnote.util.MarkdownInlineToggle
 import io.github.r0x4nk.nexnote.util.MarkdownLineToggle
 import io.github.r0x4nk.nexnote.util.MarkdownTextEdit
+import io.github.r0x4nk.nexnote.util.hasCheckedMarkdownTaskListItems
+import io.github.r0x4nk.nexnote.util.hasUncheckedMarkdownTaskListItems
 import java.io.File
 
 internal data class EditorScreenScaffoldContent(
@@ -66,16 +72,23 @@ internal data class EditorScreenScaffoldContent(
 internal data class EditorScreenActions(
     val onBack: () -> Unit,
     val onExport: (() -> Unit)?,
+    val onShare: (() -> Unit)? = null,
+    val onClearContent: (() -> Unit)? = null,
+    val onTrash: (() -> Unit)? = null,
+    val onMoveToVault: (() -> Unit)? = null,
     val onCopyNoteAsText: (() -> Unit)? = null,
     val onCopyNoteAsMarkdown: (() -> Unit)? = null,
     val onTogglePreview: () -> Unit,
-    val onInsertImage: () -> Unit,
+    val onInsertAttachment: () -> Unit,
     val onInsertNoteLink: () -> Unit,
     val insertAtCursor: (String) -> Unit,
     val applyMarkdownEdit: ((String, TextRange) -> MarkdownTextEdit) -> Unit,
     val onNoteLinkAutocompleteSelected: (NoteLinkAutocompleteMatch, NoteLinkTarget) -> Unit,
     val onPreviewNoteLinkClick: (Long) -> Unit,
     val onPreviewTaskListItemClick: (Int) -> Unit = {},
+    val onCheckAllTasks: () -> Unit = {},
+    val onUncheckAllTasks: () -> Unit = {},
+    val onClearAllTags: () -> Unit = {},
     val onToggleColorPicker: () -> Unit,
     val onBackgroundColorChange: (Int?) -> Unit,
     val onTitleChange: (String) -> Unit,
@@ -99,22 +112,29 @@ internal fun EditorScreenScaffold(
     content: EditorScreenScaffoldContent,
     actions: EditorScreenActions
 ) {
-    Scaffold(
-        containerColor = content.noteBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = {
-            EditorSnackbarHost(content.state)
-        },
-        topBar = {
-            EditorScreenTopBar(content, actions)
+    val storedColor = content.uiState.backgroundColor.takeUnless { content.uiState.isVaultLocked }
+    val colors = rememberNoteColors(storedColor)
+    NoteContentTheme(colors) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = {
+                EditorSnackbarHost(content.state)
+            },
+            topBar = {
+                EditorScreenTopBar(content, actions)
+            }
+        ) { innerPadding ->
+            EditorScreenBody(
+                content = content,
+                actions = actions,
+                modifier = Modifier.padding(innerPadding)
+            )
         }
-    ) { innerPadding ->
-        EditorScreenBody(
-            content = content,
-            actions = actions,
-            modifier = Modifier.padding(innerPadding)
-        )
     }
+    // Choosers live outside the note color theme so their surfaces use the
+    // application scheme instead of the current note's harmonized palette.
+    EditorToolChooserSheets(content, actions)
 }
 
 @Composable
@@ -134,15 +154,29 @@ private fun EditorScreenTopBar(
     val toolingState = EditorTopBarToolingState(
         hasCustomColor = content.uiState.backgroundColor != null,
     )
+    val canToggleAllTasks = editorCanToggleAllTasks(content.uiState)
     val toolingActions = EditorTopBarToolingActions(
         onToggleColorPicker = actions.onToggleColorPicker,
+        onClearContent = actions.onClearContent.takeIf { editorCanClearContent(content.uiState) },
+        onTrash = actions.onTrash.takeIf { editorCanMutateNormalNote(content.uiState) },
+        onMoveToVault = actions.onMoveToVault.takeIf { editorCanMutateNormalNote(content.uiState) },
+        onCheckAllTasks = actions.onCheckAllTasks.takeIf {
+            canToggleAllTasks && hasUncheckedMarkdownTaskListItems(content.uiState.content)
+        },
+        onUncheckAllTasks = actions.onUncheckAllTasks.takeIf {
+            canToggleAllTasks && hasCheckedMarkdownTaskListItems(content.uiState.content)
+        },
     )
     EditorTopBar(
-        isSaving = content.uiState.isSaving,
-        title = if (content.uiState.isVaultLocked) "Vault locked" else content.uiState.title,
+        isSaving = content.uiState.isSaving || content.uiState.isImportingAttachment,
+        title = if (content.uiState.isVaultLocked) {
+            stringResource(R.string.editor_vault_locked_title)
+        } else {
+            content.uiState.title
+        },
         isTemplateMode = content.uiState.isTemplateMode,
         isReadOnly = content.uiState.isReadOnly,
-        containerColor = content.noteBackground,
+        containerColor = MaterialTheme.colorScheme.surface,
         toolingState = toolingState,
         toolingActions = toolingActions,
         searchState = content.state.noteSearch,
@@ -154,6 +188,9 @@ private fun EditorScreenTopBar(
         onSearchQueryChange = actions.onSearchQueryChange,
         onSearchPrevious = actions.onSearchPrevious,
         onSearchNext = actions.onSearchNext,
+        onShare = actions.onShare.takeIf {
+            editorCanCopyVisibleNoteText(content.uiState) && !content.uiState.isTemplateMode
+        },
         onExport = editorExportAction(content, actions),
         onCopyNoteAsText = editorCopyAsTextAction(content, actions),
         onCopyNoteAsMarkdown = editorCopyAsMarkdownAction(content, actions),
@@ -183,7 +220,8 @@ private fun editorExportAction(
     content: EditorScreenScaffoldContent,
     actions: EditorScreenActions
 ): (() -> Unit)? {
-    return if (!content.uiState.isTemplateMode && content.noteId != EditorViewModel.NO_ID) {
+    return if (!content.uiState.isTemplateMode && !content.uiState.isVaultNote && !content.uiState.isLoading &&
+        (content.noteId != EditorViewModel.NO_ID || content.uiState.title.isNotBlank() || content.uiState.content.isNotBlank())) {
         actions.onExport
     } else {
         null
@@ -240,7 +278,7 @@ private fun EditorScreenBody(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(content.noteBackground)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         if (content.uiState.isVaultLocked) {
             LockedVaultEditorBody(
@@ -260,7 +298,6 @@ private fun EditorScreenBody(
             EditorColorPickerPanel(
                 content.uiState,
                 content.state,
-                content.noteBackground,
                 actions.onBackgroundColorChange
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -271,70 +308,120 @@ private fun EditorScreenBody(
                     content.selectedTagsInEditor,
                     content.state,
                     actions.onTagClick,
-                    actions.onClearTagSelection
+                    actions.onClearTagSelection,
+                    actions.onClearAllTags
                 )
             }
-            EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
-            EditorContentModeBox(
-                content.uiState,
-                content.noteBackground,
-                content.imageFileProvider,
-                content.vaultImageByteProvider,
-                content.noteLinkTargets,
-                content.state,
-                toolbarVisible,
-                actions.onTogglePreview,
-                actions.onContentEdited,
-                actions.onContentSelectionChange,
-                actions.onNoteLinkAutocompleteSelected,
-                actions.onPreviewNoteLinkClick,
-                actions.onPreviewTaskListItemClick
-            )
+            Column(Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                EditorTitleArea(content.uiState, content.state, actions.onTitleChange)
+                EditorContentModeBox(
+                    content.uiState,
+                    content.noteBackground,
+                    content.imageFileProvider,
+                    content.vaultImageByteProvider,
+                    content.noteLinkTargets,
+                    content.state,
+                    toolbarVisible,
+                    actions.onTogglePreview,
+                    actions.onContentEdited,
+                    actions.onContentSelectionChange,
+                    actions.onNoteLinkAutocompleteSelected,
+                    actions.onPreviewNoteLinkClick,
+                    actions.onPreviewTaskListItemClick,
+                    onIndent = { actions.applyMarkdownEdit(MarkdownLineToggle::indent) },
+                    onOutdent = { actions.applyMarkdownEdit(MarkdownLineToggle::outdent) }
+                )
+            }
         }
+        val placeholderText = stringResource(R.string.markdown_placeholder_text)
+        val placeholderCode = stringResource(R.string.markdown_placeholder_code)
         EditorKeyboardToolbar(
             visible = toolbarVisible,
             isTemplateMode = content.uiState.isTemplateMode,
-            canInsertImages = true,
+            canInsertAttachments = true,
             canUndo = content.undoRedoState.canUndo,
             canRedo = content.undoRedoState.canRedo,
             linkMenuExpanded = content.state.showLinkTypeMenu,
-            onLinkMenuExpandedChange = { expanded -> content.state.showLinkTypeMenu = expanded },
+            onOpenLinkMenu = { content.state.showLinkTypeMenu = true },
             headingMenuExpanded = content.state.showHeadingMenu,
-            onHeadingMenuExpandedChange = { expanded -> content.state.showHeadingMenu = expanded },
+            onOpenHeadingMenu = { content.state.showHeadingMenu = true },
             onUndo = actions.onUndo,
             onRedo = actions.onRedo,
-            onInsertImage = actions.onInsertImage,
+            onInsertAttachment = actions.onInsertAttachment,
             onInsertChecklist = { actions.applyMarkdownEdit(MarkdownLineToggle::taskList) },
-            onSetHeadingLevel = { level ->
-                content.state.showHeadingMenu = false
+            onIndent = { actions.applyMarkdownEdit(MarkdownLineToggle::indent) },
+            onOutdent = { actions.applyMarkdownEdit(MarkdownLineToggle::outdent) },
+            onToggleBold = {
                 actions.applyMarkdownEdit { text, range ->
-                    MarkdownLineToggle.setHeading(text, range, level)
+                    MarkdownInlineToggle.bold(text, range, placeholderText)
                 }
             },
-            onToggleBold = { actions.applyMarkdownEdit(MarkdownInlineToggle::bold) },
-            onToggleItalic = { actions.applyMarkdownEdit(MarkdownInlineToggle::italic) },
-            onToggleStrikethrough = { actions.applyMarkdownEdit(MarkdownInlineToggle::strikethrough) },
-            onToggleInlineCode = { actions.applyMarkdownEdit(MarkdownInlineToggle::inlineCode) },
+            onToggleItalic = {
+                actions.applyMarkdownEdit { text, range ->
+                    MarkdownInlineToggle.italic(text, range, placeholderText)
+                }
+            },
+            onToggleStrikethrough = {
+                actions.applyMarkdownEdit { text, range ->
+                    MarkdownInlineToggle.strikethrough(text, range, placeholderText)
+                }
+            },
+            onToggleInlineCode = {
+                actions.applyMarkdownEdit { text, range ->
+                    MarkdownInlineToggle.inlineCode(text, range, placeholderCode)
+                }
+            },
             onInsertCodeBlock = { actions.applyMarkdownEdit(MarkdownLineToggle::codeBlock) },
             onToggleQuote = { actions.applyMarkdownEdit(MarkdownLineToggle::quote) },
             onToggleUnorderedList = { actions.applyMarkdownEdit(MarkdownLineToggle::unorderedList) },
             onToggleOrderedList = { actions.applyMarkdownEdit(MarkdownLineToggle::orderedList) },
             onInsertHorizontalRule = { actions.applyMarkdownEdit(MarkdownLineToggle::horizontalRule) },
-            onInsertWebLink = {
-                // Close the chooser first so the toolbar can resume tracking the IME
-                // intent purely from the user's editing focus.
-                content.state.showLinkTypeMenu = false
-                actions.applyMarkdownEdit(MarkdownInlineToggle::link)
-            },
-            onInsertNoteLink = {
-                content.state.showLinkTypeMenu = false
-                actions.onInsertNoteLink()
-            },
             onHeightChanged = content.state::updateKeyboardToolbarHeight,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .imePadding()
                 .fillMaxWidth()
+        )
+    }
+}
+
+/**
+ * Hosts the toolbar's "pick one" choosers. Kept outside
+ * [io.github.r0x4nk.nexnote.ui.theme.NoteContentTheme] so a note with a custom
+ * color does not tint the modal surfaces.
+ */
+@Composable
+private fun EditorToolChooserSheets(
+    content: EditorScreenScaffoldContent,
+    actions: EditorScreenActions
+) {
+    if (content.state.showHeadingMenu) {
+        EditorHeadingSheet(
+            onDismissRequest = { content.state.showHeadingMenu = false },
+            onSelectLevel = { level ->
+                content.state.showHeadingMenu = false
+                actions.applyMarkdownEdit { text, range ->
+                    MarkdownLineToggle.setHeading(text, range, level)
+                }
+            }
+        )
+    }
+    if (content.state.showLinkTypeMenu) {
+        val placeholderText = stringResource(R.string.markdown_placeholder_text)
+        EditorLinkSheet(
+            onDismissRequest = { content.state.showLinkTypeMenu = false },
+            onInsertWebLink = {
+                // Close the chooser first so the toolbar can resume tracking
+                // the IME intent purely from the user's editing focus.
+                content.state.showLinkTypeMenu = false
+                actions.applyMarkdownEdit { text, range ->
+                    MarkdownInlineToggle.link(text, range, placeholderText)
+                }
+            },
+            onInsertNoteLink = {
+                content.state.showLinkTypeMenu = false
+                actions.onInsertNoteLink()
+            }
         )
     }
 }
@@ -381,13 +468,13 @@ private fun LockedVaultEditorBody(
             )
             Spacer(Modifier.height(14.dp))
             Text(
-                text = "Vault locked",
+                text = stringResource(R.string.editor_vault_locked_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Unlock the Vault to view this note.",
+                text = stringResource(R.string.editor_vault_locked_message),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -402,7 +489,7 @@ private fun LockedVaultEditorBody(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.size(8.dp))
-                Text("Unlock Vault")
+                Text(stringResource(R.string.vault_unlock_title))
             }
         }
     }
@@ -435,7 +522,6 @@ private fun EditorModeTabsArea(
 private fun EditorColorPickerPanel(
     uiState: EditorUiState,
     state: EditorScreenState,
-    noteBackground: Color,
     onBackgroundColorChange: (Int?) -> Unit
 ) {
     if (!uiState.isTemplateMode && !uiState.isReadOnly) {
@@ -450,7 +536,7 @@ private fun EditorColorPickerPanel(
                     onBackgroundColorChange(color)
                     state.showColorPicker = false
                 },
-                noteBackground = noteBackground
+                noteBackground = MaterialTheme.colorScheme.surface
             )
         }
     }
@@ -465,7 +551,9 @@ private fun EditorTitleArea(
     TitleField(
         value = uiState.title,
         onValueChange = onTitleChange,
-        placeholder = if (uiState.isTemplateMode) "Template name" else "Title",
+        placeholder = stringResource(
+            if (uiState.isTemplateMode) R.string.editor_template_name else R.string.editor_title
+        ),
         onNext = { state.contentFocusRequester.requestFocus() },
         readOnly = uiState.showPreview || uiState.isReadOnly,
         modifier = Modifier
@@ -481,7 +569,8 @@ private fun EditorTagsPanel(
     selectedTagsInEditor: String?,
     state: EditorScreenState,
     onTagClick: (String) -> Unit,
-    onClearTagSelection: () -> Unit
+    onClearTagSelection: () -> Unit,
+    onClearAllTags: () -> Unit
 ) {
     if (tagsForCurrentNote.isNotEmpty()) {
         AnimatedVisibility(
@@ -494,6 +583,7 @@ private fun EditorTagsPanel(
                 selectedTag = selectedTagsInEditor,
                 onTagClick = onTagClick,
                 onClearSelection = onClearTagSelection,
+                onClearAllTags = onClearAllTags,
                 isPinned = state.tagsPinned,
                 onTogglePin = {
                     state.tagsPinned = !state.tagsPinned
@@ -523,3 +613,26 @@ private fun editorExpandExit(): ExitTransition {
         targetOffsetY = { -it / 3 }
     ) + fadeOut(animationSpec = tween(durationMillis = EditorMotion.PANEL_COLLAPSE_FADE_MS))
 }
+
+private fun editorCanMutateNormalNote(state: EditorUiState): Boolean =
+    !state.isLoading && !state.isTemplateMode && !state.isReadOnly && !state.isVaultNote && !state.isImportingAttachment
+
+private fun editorCanClearContent(state: EditorUiState): Boolean =
+    !state.isLoading &&
+        !state.isTemplateMode &&
+        !state.isReadOnly &&
+        !state.isVaultLocked &&
+        !state.isImportingAttachment &&
+        state.content.isNotBlank()
+
+/**
+ * Whether the note body may be bulk-edited through the "check all"/"uncheck
+ * all" overflow entries. Unlocked Vault notes are editable like normal notes,
+ * while templates and locked/read-only notes are excluded.
+ */
+private fun editorCanToggleAllTasks(state: EditorUiState): Boolean =
+    !state.isLoading &&
+        !state.isTemplateMode &&
+        !state.isReadOnly &&
+        !state.isVaultLocked &&
+        !state.isImportingAttachment

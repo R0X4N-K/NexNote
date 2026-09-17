@@ -44,7 +44,6 @@ internal object VaultTagAggregator {
     fun aggregate(notes: List<Note>): List<Tag> {
         if (notes.isEmpty()) return emptyList()
 
-        // Mutable accumulator kept local to this function call.
         class Acc(var count: Int, var minCreated: Long, var maxUpdated: Long)
 
         val accumulators = LinkedHashMap<String, Acc>()

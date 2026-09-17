@@ -1,23 +1,31 @@
 package io.github.r0x4nk.nexnote.ui.component
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import android.content.ClipData
 import android.os.PersistableBundle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.TextSnippet
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.EditCalendar
 import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -29,26 +37,24 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.toClipEntry
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.common.copyAsMarkdown
 import io.github.r0x4nk.nexnote.ui.common.copyAsPlainText
 import io.github.r0x4nk.nexnote.ui.common.displayLabel
 import kotlinx.coroutines.launch
-
-private const val NOTE_CLIP_LABEL = "NexNote note"
 
 private enum class NoteActionsPage { Actions, Copy }
 
@@ -83,8 +89,10 @@ internal fun rememberNoteClipboardCallbacks(
 ): NoteClipboardCallbacks {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    val resources = LocalResources.current
 
-    return remember(clipboard, snackbarHostState, scope) {
+    return remember(clipboard, snackbarHostState, scope, resources) {
+        val clipLabel = resources.getString(R.string.note_clip_label)
         NoteClipboardCallbacks(
             onCopyPlainText = { note ->
                 scope.launch {
@@ -92,7 +100,8 @@ internal fun rememberNoteClipboardCallbacks(
                         clipboard = clipboard,
                         snackbarHostState = snackbarHostState,
                         text = note.copyAsPlainText(),
-                        snackbarMessage = "Copied as text"
+                        snackbarMessage = resources.getString(R.string.editor_copied_as_text),
+                        clipLabel = clipLabel
                     )
                 }
             },
@@ -102,7 +111,8 @@ internal fun rememberNoteClipboardCallbacks(
                         clipboard = clipboard,
                         snackbarHostState = snackbarHostState,
                         text = note.copyAsMarkdown(),
-                        snackbarMessage = "Copied as Markdown"
+                        snackbarMessage = resources.getString(R.string.editor_copied_as_markdown),
+                        clipLabel = clipLabel
                     )
                 }
             },
@@ -111,6 +121,7 @@ internal fun rememberNoteClipboardCallbacks(
                     copyNotesToClipboard(
                         clipboard = clipboard,
                         snackbarHostState = snackbarHostState,
+                        resources = resources,
                         notes = notes,
                         asMarkdown = false
                     )
@@ -121,6 +132,7 @@ internal fun rememberNoteClipboardCallbacks(
                     copyNotesToClipboard(
                         clipboard = clipboard,
                         snackbarHostState = snackbarHostState,
+                        resources = resources,
                         notes = notes,
                         asMarkdown = true
                     )
@@ -133,6 +145,7 @@ internal fun rememberNoteClipboardCallbacks(
 private suspend fun copyNotesToClipboard(
     clipboard: Clipboard,
     snackbarHostState: SnackbarHostState,
+    resources: android.content.res.Resources,
     notes: Collection<Note>,
     asMarkdown: Boolean
 ) {
@@ -144,16 +157,18 @@ private suspend fun copyNotesToClipboard(
         notes.copyAsPlainText()
     }
     val count = notes.size
-    val format = if (asMarkdown) "Markdown" else "text"
+    val message = when {
+        count == 1 && asMarkdown -> resources.getString(R.string.editor_copied_as_markdown)
+        count == 1 -> resources.getString(R.string.editor_copied_as_text)
+        asMarkdown -> resources.getQuantityString(R.plurals.copied_notes_as_markdown, count, count)
+        else -> resources.getQuantityString(R.plurals.copied_notes_as_text, count, count)
+    }
     copyTextToClipboard(
         clipboard = clipboard,
         snackbarHostState = snackbarHostState,
         text = text,
-        snackbarMessage = if (count == 1) {
-            "Copied as $format"
-        } else {
-            "Copied $count notes as $format"
-        }
+        snackbarMessage = message,
+        clipLabel = resources.getString(R.string.note_clip_label)
     )
 }
 
@@ -161,9 +176,10 @@ internal suspend fun copyTextToClipboard(
     clipboard: Clipboard,
     snackbarHostState: SnackbarHostState,
     text: String,
-    snackbarMessage: String
+    snackbarMessage: String,
+    clipLabel: String
 ) {
-    clipboard.setClipEntry(sensitiveNoteClipData(text).toClipEntry())
+    clipboard.setClipEntry(sensitiveNoteClipData(text, clipLabel).toClipEntry())
     snackbarHostState.showSnackbar(
         message = snackbarMessage,
         duration = SnackbarDuration.Short
@@ -175,8 +191,8 @@ internal suspend fun copyTextToClipboard(
  * system surfaces obscure the clipboard preview. This flag is a presentation
  * safeguard; it does not encrypt or isolate the clipboard contents.
  */
-internal fun sensitiveNoteClipData(text: String): ClipData =
-    ClipData.newPlainText(NOTE_CLIP_LABEL, text).apply {
+internal fun sensitiveNoteClipData(text: String, clipLabel: String): ClipData =
+    ClipData.newPlainText(clipLabel, text).apply {
         description.extras = PersistableBundle().apply {
             putBoolean(SENSITIVE_CLIPBOARD_EXTRA, true)
         }
@@ -200,7 +216,8 @@ internal fun NoteActionsSheet(
     onDuplicate: (Note) -> Unit,
     onDelete: (Note) -> Unit,
     onMoveToVault: ((Note) -> Unit)? = null,
-    onSelect: ((Note) -> Unit)? = null,
+    onExport: ((Note) -> Unit)? = null,
+    onEditCreationDate: ((Note) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     if (note == null) return
@@ -209,28 +226,37 @@ internal fun NoteActionsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        dragHandle = { NexSheetDragHandle() },
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
         sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(bottom = 12.dp)
         ) {
-            NoteActionsSheetHeader(
-                title = if (page == NoteActionsPage.Actions) "Note actions" else "Copy note",
-                noteLabel = note.displayLabel()
+            val onHeaderBack: () -> Unit = if (page == NoteActionsPage.Actions) {
+                onDismiss
+            } else {
+                { page = NoteActionsPage.Actions }
+            }
+            NexSheetHeader(
+                title = if (page == NoteActionsPage.Actions) {
+                    stringResource(R.string.common_note_actions)
+                } else {
+                    stringResource(R.string.common_copy_note)
+                },
+                subtitle = note.displayLabel(untitledLabel = stringResource(R.string.untitled_note)),
+                onBack = onHeaderBack
             )
-            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
             when (page) {
                 NoteActionsPage.Actions -> NoteActionsMainPage(
                     showMoveToVault = onMoveToVault != null && !note.isInVault,
-                    showSelect = onSelect != null,
                     showShare = shareCallbacks != null,
-                    onSelect = {
-                        onSelect?.invoke(note)
-                        onDismiss()
-                    },
+                    onExport = onExport?.let { export -> { export(note); onDismiss() } },
                     onShare = {
                         shareCallbacks?.onShareNote(note)
                         onDismiss()
@@ -244,6 +270,12 @@ internal fun NoteActionsSheet(
                         onDuplicate(note)
                         onDismiss()
                     },
+                    onEditCreationDate = onEditCreationDate?.let { edit ->
+                        {
+                            edit(note)
+                            onDismiss()
+                        }
+                    },
                     onDelete = {
                         onDelete(note)
                         onDismiss()
@@ -251,7 +283,6 @@ internal fun NoteActionsSheet(
                 )
 
                 NoteActionsPage.Copy -> NoteActionsCopyPage(
-                    onBack = { page = NoteActionsPage.Actions },
                     onCopyPlainText = {
                         clipboardCallbacks.onCopyPlainText(note)
                         onDismiss()
@@ -267,70 +298,57 @@ internal fun NoteActionsSheet(
 }
 
 @Composable
-internal fun NoteActionsSheetHeader(
-    title: String,
-    noteLabel: String
-) {
-    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge
-        )
-        Text(
-            text = noteLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
 private fun NoteActionsMainPage(
     showMoveToVault: Boolean,
-    showSelect: Boolean,
     showShare: Boolean,
-    onSelect: () -> Unit,
+    onExport: (() -> Unit)?,
     onShare: () -> Unit,
     onCopy: () -> Unit,
     onMoveToVault: () -> Unit,
     onDuplicate: () -> Unit,
+    onEditCreationDate: (() -> Unit)?,
     onDelete: () -> Unit
 ) {
-    if (showSelect) {
+    if (onExport != null) {
         NoteActionsSheetRow(
-            text = "Select",
-            icon = Icons.Outlined.CheckCircle,
-            onClick = onSelect
+            text = stringResource(R.string.common_export_note),
+            icon = Icons.Default.FileDownload,
+            onClick = onExport
         )
     }
     if (showShare) {
         NoteActionsSheetRow(
-            text = "Share",
+            text = stringResource(R.string.common_share),
             icon = Icons.Default.IosShare,
             onClick = onShare
         )
     }
     NoteActionsSheetRow(
-        text = "Copy",
+        text = stringResource(R.string.common_copy),
         icon = Icons.Outlined.ContentCopy,
         onClick = onCopy
     )
     NoteActionsSheetRow(
-        text = "Duplicate",
+        text = stringResource(R.string.common_duplicate),
         icon = Icons.Outlined.FileCopy,
         onClick = onDuplicate
     )
+    if (onEditCreationDate != null) {
+        NoteActionsSheetRow(
+            text = stringResource(R.string.edit_creation_date),
+            icon = Icons.Outlined.EditCalendar,
+            onClick = onEditCreationDate
+        )
+    }
     if (showMoveToVault) {
         NoteActionsSheetRow(
-            text = "Move to Vault",
+            text = stringResource(R.string.common_move_to_vault),
             icon = Icons.Outlined.Lock,
             onClick = onMoveToVault
         )
     }
     NoteActionsSheetRow(
-        text = "Delete",
+        text = stringResource(R.string.delete),
         icon = Icons.Outlined.Delete,
         destructive = true,
         onClick = onDelete
@@ -339,22 +357,16 @@ private fun NoteActionsMainPage(
 
 @Composable
 private fun NoteActionsCopyPage(
-    onBack: () -> Unit,
     onCopyPlainText: () -> Unit,
     onCopyMarkdown: () -> Unit
 ) {
     NoteActionsSheetRow(
-        text = "Back",
-        icon = Icons.AutoMirrored.Outlined.ArrowBack,
-        onClick = onBack
-    )
-    NoteActionsSheetRow(
-        text = "Copy as text",
+        text = stringResource(R.string.common_copy_as_text),
         icon = Icons.AutoMirrored.Outlined.TextSnippet,
         onClick = onCopyPlainText
     )
     NoteActionsSheetRow(
-        text = "Copy as Markdown",
+        text = stringResource(R.string.common_copy_as_markdown),
         icon = Icons.Outlined.Code,
         onClick = onCopyMarkdown
     )
@@ -389,9 +401,13 @@ internal fun NoteActionsSheetRow(
             )
         },
         colors = ListItemDefaults.colors(
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             headlineColor = contentColor
         ),
-        modifier = modifier.clickable(onClick = onClick)
+        modifier = modifier
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 2.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(role = Role.Button, onClick = onClick)
     )
 }

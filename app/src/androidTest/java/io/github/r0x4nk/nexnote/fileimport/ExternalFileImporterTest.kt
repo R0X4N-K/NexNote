@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.data.db.NexNoteDatabase
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
@@ -48,6 +49,7 @@ class ExternalFileImporterTest {
                 contentResolver = context.contentResolver,
                 saveNote = SaveNoteUseCase(noteRepository),
                 indexNoteTags = IndexNoteTagsUseCase(tagRepository),
+                strings = StringProvider { id, args -> context.getString(id, *args) },
                 nowMillis = { 1234L }
             )
             val uri = FileProvider.getUriForFile(
@@ -85,7 +87,8 @@ class ExternalFileImporterTest {
             val importer = ExternalFileImporter(
                 context.contentResolver,
                 SaveNoteUseCase(noteRepository),
-                IndexNoteTagsUseCase(RecordingTagRepository())
+                IndexNoteTagsUseCase(RecordingTagRepository()),
+                strings = StringProvider { id, args -> context.getString(id, *args) }
             )
 
             val result = importer.importFrom(
@@ -115,7 +118,8 @@ class ExternalFileImporterTest {
             val importer = ExternalFileImporter(
                 context.contentResolver,
                 SaveNoteUseCase(noteRepository),
-                IndexNoteTagsUseCase(RecordingTagRepository())
+                IndexNoteTagsUseCase(RecordingTagRepository()),
+                strings = StringProvider { id, args -> context.getString(id, *args) }
             )
             val uri = FileProvider.getUriForFile(
                 context,
@@ -158,6 +162,7 @@ class ExternalFileImporterTest {
                 contentResolver = context.contentResolver,
                 saveNote = SaveNoteUseCase(noteRepository),
                 indexNoteTags = IndexNoteTagsUseCase(CancellingTagRepository()),
+                strings = StringProvider { id, args -> context.getString(id, *args) },
                 nowMillis = { 1234L }
             )
             val uri = FileProvider.getUriForFile(

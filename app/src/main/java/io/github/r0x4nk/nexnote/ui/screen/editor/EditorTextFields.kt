@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,11 +28,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import io.github.r0x4nk.nexnote.util.markdownListContinuationForLine
 import kotlinx.coroutines.channels.BufferOverflow
@@ -87,7 +97,7 @@ internal fun TitleField(
     onValueChange: (String) -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Title",
+    placeholder: String = stringResource(R.string.editor_title),
     readOnly: Boolean = false
 ) {
     var hasFocus by remember { mutableStateOf(false) }
@@ -96,13 +106,38 @@ internal fun TitleField(
         readOnly = readOnly
     )
 
+    // Mirrors the String overload's internal TextFieldValue so the caret can be
+    // reset on focus loss. Without it, collapsing a multi-line title back to a
+    // single line keeps the last horizontal scroll offset and shows the end of
+    // the text instead of its beginning.
+    var textFieldValueState by remember { mutableStateOf(TextFieldValue(text = value)) }
+    val textFieldValue = textFieldValueState.copy(text = value)
+    SideEffect {
+        if (
+            textFieldValue.selection != textFieldValueState.selection ||
+                textFieldValue.composition != textFieldValueState.composition
+        ) {
+            textFieldValueState = textFieldValue
+        }
+    }
+    var lastTextValue by remember(value) { mutableStateOf(value) }
+
     BasicTextField(
-        value = value,
-        onValueChange = { nextValue ->
-            if (!readOnly) onValueChange(EditorTitleFieldPolicy.normalizeInput(nextValue))
+        value = textFieldValue,
+        onValueChange = { newValue ->
+            textFieldValueState = newValue
+            val stringChanged = lastTextValue != newValue.text
+            lastTextValue = newValue.text
+            if (stringChanged && !readOnly) {
+                onValueChange(EditorTitleFieldPolicy.normalizeInput(newValue.text))
+            }
         },
         modifier = modifier.onFocusChanged { focusState ->
+            val lostFocus = hasFocus && !focusState.isFocused
             hasFocus = focusState.isFocused
+            if (lostFocus) {
+                textFieldValueState = textFieldValueState.copy(selection = TextRange.Zero)
+            }
         },
         readOnly = readOnly,
         singleLine = !isExpanded,
@@ -119,7 +154,7 @@ internal fun TitleField(
                     Text(
                         text = placeholder,
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 inner()
@@ -138,6 +173,8 @@ internal fun ContentField(
     readOnly: Boolean = false,
     onSelectionChange: (TextRange) -> Unit = {},
     onLayoutResult: (TextLayoutResult) -> Unit = {},
+    onIndent: () -> Unit = {},
+    onOutdent: () -> Unit = {},
     highlightRange: IntRange? = null,
     searchRanges: List<IntRange> = emptyList(),
     activeSearchRange: IntRange? = null,
@@ -201,7 +238,9 @@ internal fun ContentField(
 
     BasicTextField(
         state = textFieldState,
-        modifier = modifier,
+        modifier = modifier.onPreviewKeyEvent { event ->
+            handleEditorTabKey(event, onIndent = onIndent, onOutdent = onOutdent)
+        },
         readOnly = readOnly,
         inputTransformation = inputTransformation,
         textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -217,6 +256,23 @@ internal fun ContentField(
             ContentFieldDecoration(textFieldState.text.isEmpty(), inner)
         }
     )
+}
+
+/**
+ * Intercepts the hardware Tab key so it indents the selected lines instead of
+ * moving focus, matching desktop Markdown editors. Shift+Tab removes one level.
+ *
+ * Returns `true` when the event was consumed, so the focus system does not move
+ * focus to the next field.
+ */
+private fun handleEditorTabKey(
+    event: KeyEvent,
+    onIndent: () -> Unit,
+    onOutdent: () -> Unit
+): Boolean {
+    if (event.type != KeyEventType.KeyDown || event.key != Key.Tab) return false
+    if (event.isShiftPressed) onOutdent() else onIndent()
+    return true
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -314,9 +370,9 @@ private fun ContentFieldDecoration(
     Box(contentAlignment = Alignment.TopStart) {
         if (isEmpty) {
             Text(
-                text = "Write something…",
+                text = stringResource(R.string.editor_placeholder),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()
             )
         }

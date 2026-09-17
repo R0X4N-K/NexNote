@@ -8,13 +8,14 @@ import android.content.IntentFilter
 import android.os.SystemClock
 import android.view.Window
 import android.view.WindowManager
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
@@ -56,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -70,6 +72,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.fileimport.ExternalFileOpenRequest
@@ -165,9 +168,8 @@ private fun ExternalFileOpenEffect(
     LaunchedEffect(request?.requestId, isNavigationReady) {
         if (!isNavigationReady) return@LaunchedEffect
         val openRequest = request ?: return@LaunchedEffect
-        navController.navigate(Screen.Editor.existingNoteRoute(openRequest.noteId)) {
-            launchSingleTop = true
-        }
+        // Each import owns a new note and needs a fresh editor ViewModel.
+        navController.navigate(Screen.Editor.existingNoteRoute(openRequest.noteId))
         onConsumed(openRequest.requestId)
     }
 }
@@ -211,7 +213,7 @@ private fun VaultAutoLockOnScreenOffEffect(
 }
 
 @Composable
-private fun VaultAutoLockOnStopEffect(
+internal fun VaultAutoLockOnStopEffect(
     vaultState: VaultState,
     lockImmediatelyOnBackground: Boolean,
     onLockVault: () -> Unit
@@ -256,7 +258,7 @@ private fun VaultAutoLockOnStopEffect(
  * never read by this effect.
  */
 @Composable
-private fun VaultAutoLockOnResumeEffect(
+internal fun VaultAutoLockOnResumeEffect(
     vaultState: VaultState,
     vaultAutoLockTimeout: VaultAutoLockTimeout,
     onLockVault: () -> Unit
@@ -365,18 +367,18 @@ private fun FloatingBottomBar(content: @Composable RowScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
             modifier = Modifier
                 .widthIn(max = 440.dp)
                 .fillMaxWidth(),
-            shape = RoundedCornerShape(30.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.98f),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 0.dp,
-            shadowElevation = 12.dp,
+            tonalElevation = 1.dp,
+            shadowElevation = 0.dp,
             border = BorderStroke(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
@@ -421,11 +423,12 @@ private fun RowScope.AppBottomNavItem(
         label = "bottom navigation content"
     )
     val shape = RoundedCornerShape(19.dp)
+    val label = stringResource(item.labelRes)
 
     Surface(
         modifier = Modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .semantics { contentDescription = item.label }
+            .semantics { contentDescription = label }
             .clip(shape)
             .selectable(
                 selected = selected,
@@ -475,7 +478,7 @@ private const val BOTTOM_NAV_COLOR_DURATION_MS = 100
 
 private data class BottomNavItem(
     val screen: Screen,
-    val label: String,
+    @param:StringRes val labelRes: Int,
     val icon: ImageVector,
     val selectedIcon: ImageVector
 )
@@ -483,26 +486,26 @@ private data class BottomNavItem(
 private val bottomNavItems = listOf(
     BottomNavItem(
         Screen.Home,
-        "Notes",
+        R.string.home_title,
         Icons.AutoMirrored.Outlined.Note,
         Icons.AutoMirrored.Filled.Note
     ),
     BottomNavItem(
         Screen.Agenda,
-        "Agenda",
+        R.string.agenda_title,
         Icons.Outlined.CalendarToday,
         Icons.Filled.CalendarToday
     ),
-    BottomNavItem(Screen.Tags, "Tags", Icons.Outlined.Tag, Icons.Filled.Tag),
+    BottomNavItem(Screen.Tags, R.string.tags_title, Icons.Outlined.Tag, Icons.Filled.Tag),
     BottomNavItem(
         Screen.Templates,
-        "Templates",
+        R.string.templates_title,
         Icons.Outlined.Description,
         Icons.Filled.Description
     ),
     BottomNavItem(
         Screen.Settings,
-        "Settings",
+        R.string.settings_title,
         Icons.Outlined.Settings,
         Icons.Filled.Settings
     )

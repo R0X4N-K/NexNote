@@ -1,19 +1,21 @@
 package io.github.r0x4nk.nexnote.ui.screen.agenda
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.SnackbarHostState
+import io.github.r0x4nk.nexnote.ui.common.NoteCollectionSortEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -23,38 +25,74 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
-import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.common.TrashSnackbarEffect
+import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheet
+import io.github.r0x4nk.nexnote.ui.component.NoteCreationDatePickerDialog
 import io.github.r0x4nk.nexnote.ui.component.NoteSearchFiltersSheet
+import io.github.r0x4nk.nexnote.ui.component.OperationLoadingState
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteTagFolderExpansionState
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.util.DateUtils
 
 @Composable
 fun AgendaScreen(
     onNoteClick: (Long) -> Unit,
     onNewNote: (Long) -> Unit,
+    onExportNote: ((Long) -> Unit)? = null,
+    onMoveNoteToVault: ((Long) -> Unit)? = null,
     floatingBottomPadding: Dp = 0.dp,
     viewModel: AgendaViewModel = viewModel(factory = AgendaViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val operationProgress by viewModel.operationProgress.collectAsStateWithLifecycle()
+    OperationProgressDialog(operationProgress)
     val noteCardStyle by viewModel.noteCardStyle.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
+    val timelineListState = rememberLazyListState()
+    val pagerState = rememberPagerState(pageCount = { AgendaTab.entries.size })
+    val selectedTab by remember {
+        derivedStateOf { AgendaTab.fromPage(pagerState.currentPage) }
+    }
+    val sectionExpansionState = rememberNoteTagFolderExpansionState()
+    val timelineSectionKeys = remember(uiState.timelineGroups) {
+        uiState.timelineGroups.map { section -> section.key }
+    }
+    LaunchedEffect(timelineSectionKeys) {
+        sectionExpansionState.syncFolderIds(timelineSectionKeys)
+    }
+    NoteCollectionSortEffect(
+        uiState.appliedSortOrder to uiState.appliedSearchSort,
+        listState,
+        firstItemIndex = CONTROLS_ROW_INDEX
+    )
     val searchFocusRequester = remember { FocusRequester() }
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    var dateEditNote by remember { mutableStateOf<Note?>(null) }
     var showSearchFilters by rememberSaveable { mutableStateOf(false) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
     }
-    val selectableNotes = uiState.notesForSelectedDate
-    val selectableNoteIds = remember(selectableNotes) { selectableNotes.map { it.id } }
-    val selectedNotes = remember(selectionState, selectableNotes) {
-        selectionState.selectedItems(selectableNotes) { it.id }
+    val activeNotes = remember(
+        selectedTab,
+        uiState.notesForSelectedDate,
+        uiState.timelineGroups
+    ) {
+        if (selectedTab == AgendaTab.CALENDAR) {
+            uiState.notesForSelectedDate
+        } else {
+            uiState.timelineGroups.flatMap { group -> group.notes }
+        }
+    }
+    val selectableNoteIds = remember(activeNotes) { activeNotes.map { it.id } }
+    val selectedNotes = remember(selectionState, activeNotes) {
+        selectionState.selectedItems(activeNotes) { it.id }
     }
     val actions = rememberAgendaActions(
         viewModel = viewModel,
@@ -62,9 +100,7 @@ fun AgendaScreen(
         onNewNote = onNewNote,
         onOpenSearchFilters = { showSearchFilters = true },
         onRequestNoteActions = { note ->
-            if (!selectionState.isActive) {
-                activeActionsNote = note
-            }
+            activeActionsNote = note
         },
         onStartNoteSelection = {
             selectionState = selectionState.enter()
@@ -140,7 +176,7 @@ fun AgendaScreen(
     }
     if (uiState.isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            OperationLoadingState()
         }
         return
     }
@@ -162,6 +198,11 @@ fun AgendaScreen(
             uiState = uiState,
             snackbarHostState = snackbarHostState,
             listState = listState,
+            timelineListState = timelineListState,
+            pagerState = pagerState,
+            selectedTab = selectedTab,
+            activeNotes = activeNotes,
+            sectionExpansionState = sectionExpansionState,
             noteCardStyle = noteCardStyle,
             isCalendarVisible = isCalendarVisible,
             isToolbarSticky = isToolbarSticky,
@@ -189,12 +230,25 @@ fun AgendaScreen(
 
     NoteActionsSheet(
         note = activeActionsNote,
+        onExport = onExportNote?.let { export -> { note -> export(note.id) } },
         clipboardCallbacks = clipboardCallbacks,
         shareCallbacks = shareCallbacks,
         onDuplicate = actions.onDuplicateNote,
         onDelete = actions.onRequestTrash,
-        onSelect = actions.onToggleNoteSelection,
-        onDismiss = { activeActionsNote = null }
+        onMoveToVault = onMoveNoteToVault?.let { move -> { note -> move(note.id) } },
+        onEditCreationDate = { note -> dateEditNote = note },
+        onDismiss = {
+            activeActionsNote = null
+            selectionState = selectionState.exit()
+        }
+    )
+
+    NoteCreationDatePickerDialog(
+        note = dateEditNote,
+        onConfirm = { creationDate ->
+            dateEditNote?.let { note -> viewModel.updateCreationDate(note, creationDate) }
+        },
+        onDismiss = { dateEditNote = null }
     )
 }
 

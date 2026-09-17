@@ -17,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +74,13 @@ private fun ExposedDropdownMenuBoxScope.TimezoneSearchField(
         value = searchQuery,
         onValueChange = onSearchQueryChange,
         label = {
-            Text(if (selectedId.isEmpty()) "Timezone (device default)" else "Timezone")
+            Text(
+                if (selectedId.isEmpty()) {
+                    stringResource(R.string.settings_timezone_device_default)
+                } else {
+                    stringResource(R.string.settings_timezone)
+                }
+            )
         },
         singleLine = true,
         shape = MaterialTheme.shapes.large,
@@ -98,7 +106,7 @@ private fun ExposedDropdownMenuBoxScope.TimezoneOptionsMenu(
 ) {
     ExposedDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
-            text = { Text("Auto (device default)") },
+            text = { Text(stringResource(R.string.settings_timezone_auto)) },
             onClick = { onSelect("") }
         )
         HorizontalDivider()

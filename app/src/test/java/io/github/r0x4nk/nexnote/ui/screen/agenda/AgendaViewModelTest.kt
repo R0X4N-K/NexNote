@@ -7,6 +7,7 @@ import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
@@ -53,6 +54,7 @@ class AgendaViewModelTest {
         val repository = NoteRepositoryImpl(fakeDao, imageStorage)
         viewModel = AgendaViewModel(
             observeDistinctLocalDays = ObserveDistinctLocalDaysUseCase(repository),
+            observeAllNotes = ObserveAllNotesUseCase(repository),
             observeNotesByDateRange = ObserveNotesByDateRangeUseCase(repository),
             moveNoteToTrash = MoveNoteToTrashUseCase(repository),
             restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),
@@ -62,8 +64,11 @@ class AgendaViewModelTest {
                 NoOpTagRepository,
                 imageStorage
             ),
+            updateNoteCreationDate =
+                io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase(repository),
             observeFilteredNoteIds = ObserveFilteredNoteIdsUseCase(NoOpTagRepository),
-            observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository)
+            observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository),
+            strings = io.github.r0x4nk.nexnote.testing.TestStringProvider
         )
     }
 
@@ -461,5 +466,25 @@ class AgendaViewModelTest {
         advanceUntilIdle()
 
         assertEquals(NoteListViewMode.LIST, viewModel.uiState.value.viewMode)
+    }
+
+    @Test
+    fun `timeline groups notes into the recent relative sections newest first`() = runViewModelTest {
+        val today = DateUtils.startOfDay(System.currentTimeMillis())
+        val yesterday = DateUtils.startOfDay(today - 1L)
+        fakeDao.addNote(NoteEntity(id = 1L, title = "Yesterday note", creationDate = yesterday))
+        fakeDao.addNote(
+            NoteEntity(id = 2L, title = "Today older", creationDate = today, lastModifiedDate = 2L)
+        )
+        fakeDao.addNote(
+            NoteEntity(id = 3L, title = "Today newer", creationDate = today, lastModifiedDate = 3L)
+        )
+        advanceUntilIdle()
+
+        val sections = viewModel.uiState.value.timelineGroups
+
+        assertEquals(listOf("today", "yesterday"), sections.map { section -> section.key })
+        assertEquals(listOf(3L, 2L), sections.first().notes.map { note -> note.id })
+        assertEquals(listOf(1L), sections.last().notes.map { note -> note.id })
     }
 }

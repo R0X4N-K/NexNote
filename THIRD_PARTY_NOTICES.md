@@ -1,14 +1,15 @@
 # NexNote third-party notices
 
-This inventory was verified on 2026-08-16 against the resolved
-`releaseRuntimeClasspath`. The exact dependency graph is also recorded by the
-Gradle dependency lock state. NexNote itself is distributed under
+This file lists third-party components and bundled font licenses. The exact
+dependency graph is recorded in the Gradle lockfiles. NexNote itself is distributed under
 GPL-3.0-only; the complete project license is packaged next to this file in the
 APK and remains available as the repository-root `LICENSE` file.
 
-This file does not assign copyright in NexNote or in its graphic assets. Those
-facts are tracked separately and are recorded only after confirmation by the
-relevant rights holder.
+This file does not assign copyright in NexNote or in its graphic assets. The
+maintainer has confirmed ownership of the original artwork and licenses it under
+`GPL-3.0-only`; the provenance record is kept in `artwork/README.md` and
+`docs/fdroid-asset-inventory.md`. Third-party component copyrights remain with
+their respective holders.
 
 ## Runtime components
 
@@ -117,16 +118,197 @@ Build-tool license sources:
 - Android Gradle Plugin: <https://android.googlesource.com/platform/tools/base>
 - KSP: <https://github.com/google/ksp>
 
-## NOTICE and packaging audit
+## License packaging
 
-The 95 unique resolved runtime archives were inspected for top-level
-`LICENSE`, `NOTICE`, and `COPYING` entries. Fifty-three Apache-2.0 `LICENSE.txt`
-entries were found and no upstream `NOTICE` entry was present. Before this
-inventory was packaged, only six of those identical AndroidX license entries
-survived Android resource packaging. The build now always adds this inventory
-and the complete GPL-3.0-only project license under `assets/legal/`; final APK
-inspection verifies their presence.
+The build packages this document and the complete GPL-3.0-only project license
+under `assets/legal/`. Check their presence when reviewing a release APK.
 
 The Apache License 2.0 text is retained by AndroidX entries under `META-INF/`
 and its upstream text is available at
 <https://www.apache.org/licenses/LICENSE-2.0>.
+
+## MaterialKolor color utilities
+
+NexNote uses `com.materialkolor:material-color-utilities:3.0.0` (Android
+variants) for HCT, tonal schemes and hue harmonization. This Kotlin port is
+maintained by Jordon de Hoog: https://github.com/jordond/MaterialKolor.
+Its Google Material Color Utilities algorithms retain their Apache-2.0
+copyright headers (Copyright 2021-2025 Google LLC); the Apache license is
+included under the APK's `META-INF/` entries described above. The Kotlin port
+is distributed under the following MIT license.
+The runtime dependency `dev.drewhamilton.poko:poko-annotations:0.19.0`
+is Apache-2.0: https://github.com/drewhamilton/Poko.
+
+MIT License
+
+Copyright (c) 2025 Jordon de Hoog
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Vault streaming cryptography
+
+Vault file encryption uses `com.google.crypto.tink:tink:1.18.0` (Apache-2.0),
+with Gson 2.10.1 and Error Prone annotations 2.22.0 (Apache-2.0), and
+`com.google.protobuf:protobuf-java:4.28.2` (BSD-3-Clause).
+Tink source and license: https://github.com/tink-crypto/tink-java/tree/v1.18.0
+
+Protocol Buffers license (https://github.com/protocolbuffers/protobuf/blob/v28.2/LICENSE):
+
+```text
+Copyright 2008 Google Inc.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+    * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+    * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Code generated by the Protocol Buffer compiler is owned by the owner
+of the input file used when generating it.  This code is not
+standalone and requires a support library to be linked with it.  This
+support library is itself covered by the above license.
+
+```
+
+## Bundled fonts
+
+The app offers a typeface preference in Settings. The
+non-system options are bundled as variable font resources under
+`app/src/main/res/font/`, taken unmodified from the `google/fonts`
+repository. All four families are licensed under the SIL Open Font
+License 1.1 (OFL-1.1), a free and open license compatible with
+GPL-3.0-only distribution. No reserved font name is used by NexNote for a
+modified version; the files are redistributed verbatim.
+
+| Resource | Family | Copyright holder | Upstream source |
+|---|---|---|---|
+| `res/font/inter_variable.ttf` | Inter | The Inter Project Authors | <https://github.com/rsms/inter> |
+| `res/font/lora_variable.ttf` | Lora | The Lora Project Authors, Reserved Font Name "Lora" | <https://github.com/cyrealtype/Lora-Cyrillic> |
+| `res/font/fira_code_variable.ttf` | Fira Code | The Fira Code Project Authors | <https://github.com/tonsky/FiraCode> |
+| `res/font/jetbrains_mono_variable.ttf` | JetBrains Mono | The JetBrains Mono Project Authors | <https://github.com/JetBrains/JetBrainsMono> |
+
+The exact files were fetched from
+<https://github.com/google/fonts> (`ofl/inter`, `ofl/lora`,
+`ofl/firacode`, `ofl/jetbrainsmono`) and are recorded with their SHA-256
+digests in `docs/fdroid-asset-inventory.md`.
+
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.

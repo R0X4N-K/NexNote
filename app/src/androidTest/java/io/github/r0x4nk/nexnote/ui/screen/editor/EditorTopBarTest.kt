@@ -20,6 +20,31 @@ class EditorTopBarTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun sharingIsDistinctFromExportAndInvokesItsOwnCallback() {
+        var shared = false
+        var exported = false
+        composeRule.setContent {
+            NexNoteTheme {
+                EditorTopBar(
+                    isSaving = false, title = "Note", isTemplateMode = false, isReadOnly = false,
+                    containerColor = Color.White,
+                    toolingState = EditorTopBarToolingState(false),
+                    toolingActions = EditorTopBarToolingActions({}),
+                    searchState = NoteSearchState(), searchFocusRequester = remember { FocusRequester() },
+                    onBack = {}, onSearchOpen = {}, onSearchClose = {}, onSearchQueryChange = {},
+                    onSearchPrevious = {}, onSearchNext = {},
+                    onShare = { shared = true }, onExport = { exported = true }
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Note options").performClick()
+        composeRule.onNodeWithText("Export note").assertIsDisplayed()
+        composeRule.onNodeWithText("Share note").performClick()
+        assertTrue(shared)
+        org.junit.Assert.assertFalse(exported)
+    }
+
+    @Test
     fun noteMetadataIsRenderedAsTopBarSubtitle() {
         composeRule.setContent {
             NexNoteTheme {
@@ -134,5 +159,144 @@ class EditorTopBarTest {
 
         assertTrue(copiedText)
         assertTrue(copiedMarkdown)
+    }
+
+    @Test
+    fun noteOptionsOffersClearContentWhenProvided() {
+        var clearRequested = false
+        composeRule.setContent {
+            NexNoteTheme {
+                EditorTopBar(
+                    isSaving = false,
+                    title = "Editable note",
+                    isTemplateMode = false,
+                    isReadOnly = false,
+                    containerColor = Color.White,
+                    toolingState = EditorTopBarToolingState(hasCustomColor = false),
+                    toolingActions = EditorTopBarToolingActions(
+                        onToggleColorPicker = {},
+                        onClearContent = { clearRequested = true }
+                    ),
+                    searchState = NoteSearchState(),
+                    searchFocusRequester = remember { FocusRequester() },
+                    onBack = {},
+                    onSearchOpen = {},
+                    onSearchClose = {},
+                    onSearchQueryChange = {},
+                    onSearchPrevious = {},
+                    onSearchNext = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Note options").performClick()
+        composeRule.onNodeWithText("Clear content")
+            .assertIsDisplayed()
+            .performClick()
+
+        assertTrue(clearRequested)
+    }
+
+    @Test
+    fun noteOptionsHidesClearContentWhenUnavailable() {
+        composeRule.setContent {
+            NexNoteTheme {
+                EditorTopBar(
+                    isSaving = false,
+                    title = "Template name",
+                    isTemplateMode = false,
+                    isReadOnly = false,
+                    containerColor = Color.White,
+                    toolingState = EditorTopBarToolingState(hasCustomColor = false),
+                    toolingActions = EditorTopBarToolingActions(onToggleColorPicker = {}),
+                    searchState = NoteSearchState(),
+                    searchFocusRequester = remember { FocusRequester() },
+                    onBack = {},
+                    onSearchOpen = {},
+                    onSearchClose = {},
+                    onSearchQueryChange = {},
+                    onSearchPrevious = {},
+                    onSearchNext = {},
+                    onShare = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Note options").performClick()
+        composeRule.onNodeWithText("Clear content").assertDoesNotExist()
+    }
+
+    @Test
+    fun noteOptionsOffersBulkTaskActionsWhenProvided() {
+        var checked = false
+        var unchecked = false
+        composeRule.setContent {
+            NexNoteTheme {
+                EditorTopBar(
+                    isSaving = false,
+                    title = "Checklist note",
+                    isTemplateMode = false,
+                    isReadOnly = false,
+                    containerColor = Color.White,
+                    toolingState = EditorTopBarToolingState(hasCustomColor = false),
+                    toolingActions = EditorTopBarToolingActions(
+                        onToggleColorPicker = {},
+                        onCheckAllTasks = { checked = true },
+                        onUncheckAllTasks = { unchecked = true }
+                    ),
+                    searchState = NoteSearchState(),
+                    searchFocusRequester = remember { FocusRequester() },
+                    onBack = {},
+                    onSearchOpen = {},
+                    onSearchClose = {},
+                    onSearchQueryChange = {},
+                    onSearchPrevious = {},
+                    onSearchNext = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Note options").performClick()
+        composeRule.onNodeWithText("Check all tasks")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.onNodeWithContentDescription("Note options").performClick()
+        composeRule.onNodeWithText("Uncheck all tasks")
+            .assertIsDisplayed()
+            .performClick()
+
+        assertTrue(checked)
+        assertTrue(unchecked)
+    }
+
+    @Test
+    fun noteOptionsHidesBulkTaskActionsWhenUnavailable() {
+        composeRule.setContent {
+            NexNoteTheme {
+                EditorTopBar(
+                    isSaving = false,
+                    title = "Plain note",
+                    isTemplateMode = false,
+                    isReadOnly = false,
+                    containerColor = Color.White,
+                    toolingState = EditorTopBarToolingState(hasCustomColor = false),
+                    toolingActions = EditorTopBarToolingActions(onToggleColorPicker = {}),
+                    searchState = NoteSearchState(),
+                    searchFocusRequester = remember { FocusRequester() },
+                    onBack = {},
+                    onSearchOpen = {},
+                    onSearchClose = {},
+                    onSearchQueryChange = {},
+                    onSearchPrevious = {},
+                    onSearchNext = {},
+                    onShare = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Note options").performClick()
+        composeRule.onNodeWithText("Check all tasks").assertDoesNotExist()
+        composeRule.onNodeWithText("Uncheck all tasks").assertDoesNotExist()
     }
 }

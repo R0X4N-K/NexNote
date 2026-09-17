@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
@@ -13,12 +14,14 @@ import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveDistinctLocalDaysUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFilteredNoteIdsUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListActionsDelegate
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
@@ -37,13 +40,16 @@ import kotlinx.coroutines.flow.update
 
 class AgendaViewModel(
     private val observeDistinctLocalDays: ObserveDistinctLocalDaysUseCase,
+    observeAllNotes: ObserveAllNotesUseCase,
     private val observeNotesByDateRange: ObserveNotesByDateRangeUseCase,
     moveNoteToTrash: MoveNoteToTrashUseCase,
     restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     toggleNotePin: ToggleNotePinUseCase,
     duplicateNoteUseCase: DuplicateNoteUseCase,
+    updateNoteCreationDate: UpdateNoteCreationDateUseCase,
     private val observeFilteredNoteIds: ObserveFilteredNoteIdsUseCase,
-    observeNoteCardStyle: ObserveNoteCardStyleUseCase
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val initialDate = currentAgendaInitialDate()
@@ -77,12 +83,17 @@ class AgendaViewModel(
         restoreNoteFromTrash = restoreNoteFromTrash,
         toggleNotePin = toggleNotePin,
         duplicateNoteUseCase = duplicateNoteUseCase,
+        updateNoteCreationDate = updateNoteCreationDate,
         sortOrder = _sortOrder,
         viewMode = _viewMode,
         selectedTagFilters = _selectedTagFilters,
         trashEvents = _trashEvents,
-        noteActionMessages = _noteActionMessages
+        noteActionMessages = _noteActionMessages,
+        strings = strings
     )
+
+    val operationProgress get() = noteListActions.operationProgress
+
 
     val noteCardStyle: StateFlow<NoteCardStyle> = observeNoteCardStyle().stateIn(
         scope = viewModelScope,
@@ -97,6 +108,9 @@ class AgendaViewModel(
     /** Raw notes for the currently selected day, re-emitted on every day change. */
     private val rawNotesForDay: Flow<List<Note>> =
         buildAgendaRawNotesForDayFlow(_selectedDate, observeNotesByDateRange)
+
+    /** Single subscription shared by the Agenda timeline and its tag suggestions. */
+    private val allNotes: Flow<List<Note>> = observeAllNotes()
 
     /**
      * Note IDs matching the active tag filters. Emits an empty set when no
@@ -122,6 +136,26 @@ class AgendaViewModel(
         )
 
     /**
+     * Every active note after the same tag filter, search and sort as the
+     * calendar day, used to build the Agenda timeline.
+     */
+    private val processedTimelineNotes: Flow<AgendaProcessedNotes> =
+        buildAgendaProcessedNotesFlow(
+            rawNotesForDay = allNotes,
+            filteredNoteIds = filteredNoteIds,
+            searchQuery = _searchQuery,
+            sortOrder = _sortOrder,
+            searchSort = _searchSort,
+            searchScope = _searchScope,
+            pinnedFilter = _pinnedFilter,
+            searchDebounceMs = SEARCH_DEBOUNCE_MS
+        )
+
+    /** [processedTimelineNotes] grouped by creation day, most-recent first. */
+    private val timelineGroups: Flow<List<AgendaTimelineSection>> =
+        buildAgendaTimelineFlow(processedTimelineNotes)
+
+    /**
      * Room flows are the single source of truth for the note list. No in-memory
      * pending-trash filter is applied here — [requestTrash] writes to the database
      * immediately, so the DAO query (WHERE isDeleted = 0) automatically excludes
@@ -134,6 +168,7 @@ class AgendaViewModel(
             daysWithNotes = _daysWithNotes,
             selectedDate = _selectedDate,
             processedNotes = processedNotes,
+            timelineGroups = timelineGroups,
             searchQuery = _searchQuery,
             isSearchActive = _isSearchActive,
             sortOrder = _sortOrder,
@@ -198,6 +233,10 @@ class AgendaViewModel(
 
     fun duplicateNote(note: Note) {
         noteListActions.duplicateNote(note)
+    }
+
+    fun updateCreationDate(note: Note, creationDate: Long) {
+        noteListActions.updateCreationDate(note, creationDate)
     }
 
     // ── Search ────────────────────────────────────────────────────────────────
@@ -297,13 +336,16 @@ class AgendaViewModel(
                 val useCases = app.useCases
                 AgendaViewModel(
                     observeDistinctLocalDays = useCases.notes.observeDistinctLocalDays,
+                    observeAllNotes = useCases.notes.observeAllNotes,
                     observeNotesByDateRange = useCases.notes.observeNotesByDateRange,
                     moveNoteToTrash = useCases.notes.moveNoteToTrash,
                     restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,
                     toggleNotePin = useCases.notes.toggleNotePin,
                     duplicateNoteUseCase = useCases.notes.duplicateNote,
+                    updateNoteCreationDate = useCases.notes.updateNoteCreationDate,
                     observeFilteredNoteIds = useCases.tags.observeFilteredNoteIds,
-                    observeNoteCardStyle = useCases.preferences.observeNoteCardStyle
+                    observeNoteCardStyle = useCases.preferences.observeNoteCardStyle,
+                    strings = app.strings
                 )
             }
         }

@@ -18,6 +18,7 @@ internal data class AgendaUiStateFlows(
     val daysWithNotes: Flow<Set<Long>>,
     val selectedDate: Flow<SelectedDate>,
     val processedNotes: Flow<AgendaProcessedNotes>,
+    val timelineGroups: Flow<List<AgendaTimelineSection>>,
     val searchQuery: Flow<String>,
     val isSearchActive: Flow<Boolean>,
     val sortOrder: Flow<SortOrder>,
@@ -76,9 +77,10 @@ internal fun buildAgendaUiStateFlow(
                 pinnedFilter = advanced.pinnedFilter
             )
         },
-        combine(flows.viewMode, flows.selectedTagFilters, ::AgendaViewFilterData)
-    ) { display, selection, search, viewFilter ->
-        buildAgendaUiState(display, selection, search, viewFilter)
+        combine(flows.viewMode, flows.selectedTagFilters, ::AgendaViewFilterData),
+        flows.timelineGroups
+    ) { display, selection, search, viewFilter, timelineGroups ->
+        buildAgendaUiState(display, selection, search, viewFilter, timelineGroups)
     }.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -90,7 +92,8 @@ private fun buildAgendaUiState(
     display: AgendaDisplayData,
     selection: AgendaSelectionData,
     search: AgendaSearchData,
-    viewFilter: AgendaViewFilterData
+    viewFilter: AgendaViewFilterData,
+    timelineGroups: List<AgendaTimelineSection>
 ): AgendaUiState {
     return AgendaUiState(
         displayedYear = display.displayedMonth.year,
@@ -100,10 +103,13 @@ private fun buildAgendaUiState(
         selectedDay = selection.selectedDate.day,
         daysWithNotes = display.daysWithNotes,
         notesForSelectedDate = selection.processedNotes.notes,
+        timelineGroups = timelineGroups,
         scoredResults = selection.processedNotes.scoredResults,
         searchQuery = search.query,
         isSearchActive = search.isActive,
         sortOrder = search.sortOrder,
+        appliedSortOrder = selection.processedNotes.appliedSortOrder,
+        appliedSearchSort = selection.processedNotes.appliedSearchSort,
         searchSort = search.resultSort,
         searchScope = search.scope,
         pinnedFilter = search.pinnedFilter,

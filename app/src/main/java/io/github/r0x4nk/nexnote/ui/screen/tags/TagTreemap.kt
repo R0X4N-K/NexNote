@@ -24,13 +24,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import kotlin.math.roundToInt
@@ -101,11 +108,11 @@ private fun TagTreemapCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = "Tag usage",
+                text = stringResource(R.string.tag_usage),
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Rectangle area represents the number of notes",
+                text = stringResource(R.string.tag_treemap_explanation),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -129,6 +136,7 @@ private fun TagTreemap(
     onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val chartDescription = stringResource(R.string.tag_treemap)
     val chartShape = MaterialTheme.shapes.medium
     Layout(
         content = {
@@ -143,7 +151,7 @@ private fun TagTreemap(
         modifier = modifier
             .clip(chartShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .semantics { contentDescription = "Tag usage treemap" }
+            .semantics { contentDescription = chartDescription }
     ) { measurables, constraints ->
         val chartWidth = constraints.maxWidth
         val chartHeight = constraints.maxHeight
@@ -178,7 +186,12 @@ private fun TagTreemapTile(
     onClick: () -> Unit
 ) {
     val colors = tagTreemapTileColors(tag, isSelected)
-    val noteLabel = if (tag.noteCount == 1) "note" else "notes"
+    val description = pluralStringResource(
+        R.plurals.tag_note_count, tag.noteCount, tag.name, tag.noteCount
+    )
+    val selectionDescription = stringResource(
+        if (isSelected) R.string.tag_selected else R.string.tag_not_selected
+    )
 
     Box(
         modifier = Modifier
@@ -190,7 +203,9 @@ private fun TagTreemapTile(
             modifier = Modifier
                 .fillMaxSize()
                 .semantics {
-                    contentDescription = "#${tag.name}, ${tag.noteCount} $noteLabel"
+                    contentDescription = description
+                    role = Role.Button
+                    stateDescription = selectionDescription
                     selected = isSelected
                 },
             shape = MaterialTheme.shapes.small,
@@ -202,7 +217,7 @@ private fun TagTreemapTile(
                 null
             }
         ) {
-            TagTreemapTileLabel(tag)
+            Box(Modifier.clearAndSetSemantics { }) { TagTreemapTileLabel(tag) }
         }
     }
 }
@@ -221,7 +236,8 @@ private fun TagTreemapTileLabel(tag: Tag) {
                     Text(
                         text = "#${tag.name}",
                         style = MaterialTheme.typography.labelLarge,
-                        maxLines = 2,
+                        maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(

@@ -87,7 +87,7 @@ object ImageFileManager {
      */
     fun ensureImageDir(filesDir: File): File =
         File(filesDir.canonicalFile, IMAGES_DIR).also { directory ->
-            if (!directory.exists() && !directory.mkdirs()) {
+            if (!directory.isDirectory && !directory.mkdirs() && !directory.isDirectory) {
                 throw IOException("Could not create image directory")
             }
             if (!directory.isDirectory || directory.canonicalFile != directory.absoluteFile) {

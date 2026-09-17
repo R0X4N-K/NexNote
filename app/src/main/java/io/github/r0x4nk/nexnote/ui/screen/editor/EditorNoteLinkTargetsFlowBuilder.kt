@@ -17,6 +17,7 @@ internal fun buildNoteLinkTargetsFlow(
     uiState: StateFlow<EditorUiState>,
     observeNoteLinkCandidates: ObserveNoteLinkCandidatesUseCase,
     observeVaultNoteLinkCandidates: ObserveVaultNoteLinkCandidatesUseCase,
+    untitledLabel: String,
     scope: CoroutineScope
 ): StateFlow<List<NoteLinkTarget>> {
     val normalCandidatesFlow = observeNoteLinkCandidates()
@@ -31,7 +32,7 @@ internal fun buildNoteLinkTargetsFlow(
         } else {
             normalCandidatesFlow
         }
-        candidatesFlow.map { candidates -> candidates.toNoteLinkTargets(linkScope.noteId) }
+        candidatesFlow.map { candidates -> candidates.toNoteLinkTargets(linkScope.noteId, untitledLabel) }
     }.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -44,15 +45,18 @@ private data class NoteLinkTargetScope(
     val noteId: Long
 )
 
-private fun List<NoteLinkCandidate>.toNoteLinkTargets(currentNoteId: Long): List<NoteLinkTarget> =
+private fun List<NoteLinkCandidate>.toNoteLinkTargets(
+    currentNoteId: Long,
+    untitledLabel: String
+): List<NoteLinkTarget> =
     asSequence()
         .filter { candidate -> currentNoteId == EditorViewModel.NO_ID || candidate.id != currentNoteId }
-        .map { candidate -> candidate.toNoteLinkTarget() }
+        .map { candidate -> candidate.toNoteLinkTarget(untitledLabel) }
         .sortedWith(compareBy<NoteLinkTarget> { it.title.lowercase() }.thenBy { it.id })
         .toList()
 
-private fun NoteLinkCandidate.toNoteLinkTarget(): NoteLinkTarget =
+private fun NoteLinkCandidate.toNoteLinkTarget(untitledLabel: String): NoteLinkTarget =
     NoteLinkTarget(
         id = id,
-        title = title.trim().ifBlank { "Untitled note" }
+        title = title.trim().ifBlank { untitledLabel }
     )

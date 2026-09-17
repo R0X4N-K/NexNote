@@ -32,6 +32,7 @@ data class EditorUiState(
     val isReadOnly: Boolean = false,
     val isDirty: Boolean = false,
     val isSaving: Boolean = false,
+    val isImportingAttachment: Boolean = false,
     val errorMessage: String? = null,
     val contentVersion: Int = 0,
     val contentSelectionOffset: Int? = null

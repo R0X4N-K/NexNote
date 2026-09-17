@@ -19,7 +19,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
 
@@ -67,7 +69,7 @@ private fun InlineSearchBarContent(
         NexSearchField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = "Search tags",
+            placeholder = stringResource(R.string.search_tags),
             focusRequester = focusRequester,
             textStyle = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
@@ -75,7 +77,7 @@ private fun InlineSearchBarContent(
         Spacer(Modifier.size(8.dp))
         NexIconButton(
             imageVector = Icons.Default.Close,
-            contentDescription = "Clear search",
+            contentDescription = stringResource(R.string.clear_search),
             onClick = onClose
         )
     }

@@ -92,7 +92,7 @@ class NoteListActionsDelegateTest {
         val trashEvent = fixture.trashEvents.receive()
         assertEquals(listOf(7L, 8L), fixture.repository.trashedIds)
         assertEquals(listOf(7L, 8L), trashEvent.noteIds)
-        assertEquals("Moved 2 notes to trash", trashEvent.snackbarMessage())
+        assertEquals("First", trashEvent.noteLabel)
     }
 
     @Test
@@ -141,6 +141,29 @@ class NoteListActionsDelegateTest {
         assertEquals(emptyList<Pair<Long, String>>(), fixture.tagRepository.indexedNotes)
     }
 
+    @Test
+    fun `updateCreationDate persists the new date and reports success`() = runTest {
+        val fixture = newFixture(this)
+        fixture.repository.savedNotes[2L] = Note(id = 2L, title = "Plan", creationDate = 1_000L)
+
+        fixture.delegate.updateCreationDate(Note(id = 2L), 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(5_000L, fixture.repository.savedNotes.getValue(2L).creationDate)
+        assertEquals("Creation date updated", fixture.noteActionMessages.receive())
+    }
+
+    @Test
+    fun `updateCreationDate rejects Vault note without touching storage`() = runTest {
+        val fixture = newFixture(this)
+        fixture.repository.savedNotes[2L] = Note(id = 2L, isInVault = true, creationDate = 1_000L)
+
+        fixture.delegate.updateCreationDate(Note(id = 2L, isInVault = true), 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(1_000L, fixture.repository.savedNotes.getValue(2L).creationDate)
+    }
+
     private fun newFixture(
         scope: CoroutineScope,
         repository: FakeNoteListRepository = FakeNoteListRepository(),
@@ -148,7 +171,8 @@ class NoteListActionsDelegateTest {
         duplicateNote: DuplicateNoteUseCase = DuplicateNoteUseCase(
             noteRepository = repository,
             tagRepository = tagRepository,
-            imageStorage = NoOpNoteImageStorage()
+            imageStorage = NoOpNoteImageStorage(),
+            dispatcher = scope.coroutineContext[kotlin.coroutines.ContinuationInterceptor] as kotlinx.coroutines.CoroutineDispatcher
         )
     ): NoteListActionsFixture {
         val sortOrder = MutableStateFlow(SortOrder.MODIFIED_DESC)
@@ -171,11 +195,14 @@ class NoteListActionsDelegateTest {
                 restoreNoteFromTrash = RestoreNoteFromTrashUseCase(repository),
                 toggleNotePin = ToggleNotePinUseCase(repository),
                 duplicateNoteUseCase = duplicateNote,
+                updateNoteCreationDate =
+                    io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase(repository),
                 sortOrder = sortOrder,
                 viewMode = viewMode,
                 selectedTagFilters = selectedTagFilters,
                 trashEvents = trashEvents,
-                noteActionMessages = noteActionMessages
+                noteActionMessages = noteActionMessages,
+                strings = io.github.r0x4nk.nexnote.testing.TestStringProvider
             )
         )
     }

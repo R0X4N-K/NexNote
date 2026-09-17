@@ -52,7 +52,8 @@ class ExportViewModelTest {
             getNoteById = GetNoteByIdUseCase(repository),
             observeAllNotes = ObserveAllNotesUseCase(repository),
             observeNotesByDateRange = ObserveNotesByDateRangeUseCase(repository),
-            initialNoteId = noteId
+            initialNoteId = noteId,
+            strings = io.github.r0x4nk.nexnote.testing.TestStringProvider
         )
 
     // ── Initial scope ────────────────────────────────────────────────────────
@@ -193,6 +194,7 @@ class ExportViewModelTest {
 
     @Test
     fun `onExportError sets error message and clears isExporting`() = runTest {
+        fakeDao.addNote(NoteEntity(id = 1L))
         val vm = viewModel()
         advanceUntilIdle()
 
@@ -216,6 +218,8 @@ class ExportViewModelTest {
 // ── Fake ─────────────────────────────────────────────────────────────────────
 
 private class FakeNoteDao : NoteDao {
+    override suspend fun getNoteForAttachmentRecovery(id: Long): NoteEntity? = getNoteById(id)
+
 
     private val _notes = MutableStateFlow<List<NoteEntity>>(emptyList())
 

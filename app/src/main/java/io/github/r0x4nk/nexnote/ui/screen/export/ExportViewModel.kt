@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
@@ -13,6 +15,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNotesByDateRangeUseCase
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 import io.github.r0x4nk.nexnote.util.DateUtils
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +45,7 @@ data class ExportUiState(
     val notes: List<Note> = emptyList(),
     val isLoading: Boolean = true,
     val isExporting: Boolean = false,
+    val includeMedia: Boolean = true,
     val error: String? = null
 )
 
@@ -50,9 +54,10 @@ data class ExportUiState(
 class ExportViewModel(
     private val getNoteById: GetNoteByIdUseCase,
     private val observeAllNotes: ObserveAllNotesUseCase,
-    private val observeNotesByDateRange: ObserveNotesByDateRangeUseCase,
+    private val     observeNotesByDateRange: ObserveNotesByDateRangeUseCase,
     /** noteId of the note navigated from; Screen.NO_ID when opened from the global menu. */
-    val initialNoteId: Long
+    val initialNoteId: Long,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -72,11 +77,18 @@ class ExportViewModel(
     // ── User actions ─────────────────────────────────────────────────────────
 
     fun selectScope(scope: ExportScope) {
+        if (_uiState.value.isExporting) return
         _uiState.update { it.copy(scope = scope) }
         loadNotes()
     }
 
+    fun selectIncludeMedia(include: Boolean) {
+        if (_uiState.value.isExporting) return
+        _uiState.update { it.copy(includeMedia = include) }
+    }
+
     fun selectFormat(format: ExportFormat) {
+        if (_uiState.value.isExporting) return
         _uiState.update { it.copy(format = format) }
     }
 
@@ -86,6 +98,7 @@ class ExportViewModel(
      * upper bound so all notes created on [to] are included.
      */
     fun selectDateRange(from: Long, to: Long) {
+        if (_uiState.value.isExporting) return
         val normalizedFrom = DateUtils.startOfDay(from)
         val normalizedTo = DateUtils.startOfDay(to)
         _uiState.update { it.copy(dateFrom = normalizedFrom, dateTo = normalizedTo) }
@@ -94,8 +107,10 @@ class ExportViewModel(
 
     // ── Callbacks from the UI layer (ExportManager) ──────────────────────────
 
-    fun onExportStart() {
-        _uiState.update { it.copy(isExporting = true, error = null) }
+    fun onExportStart(): Boolean {
+        val state = _uiState.value
+        if (state.isExporting || state.isLoading || state.notes.isEmpty()) return false
+        return _uiState.compareAndSet(state, state.copy(isExporting = true, error = null))
     }
 
     fun onExportComplete() {
@@ -117,27 +132,39 @@ class ExportViewModel(
         val state = _uiState.value
         loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val notes: List<Note> = when (state.scope) {
-                ExportScope.SingleNote -> listOfNotNull(
-                    if (initialNoteId != Screen.NO_ID) getNoteById(initialNoteId)
-                    else null
-                )
+            try {
+                val notes: List<Note> = when (state.scope) {
+                    ExportScope.SingleNote -> listOfNotNull(
+                        if (initialNoteId != Screen.NO_ID) getNoteById(initialNoteId)
+                        else null
+                    )
 
-                ExportScope.AllNotes -> observeAllNotes().first()
-                ExportScope.DateRange -> {
-                    val from = state.dateFrom
-                    val to = state.dateTo
-                    if (from != null && to != null) {
-                        // Exclusive upper bound = start of the day after [to], so notes
-                        // created up to 23:59:59 on [to] are all included.
-                        observeNotesByDateRange(
-                            startMs = from,
-                            endMs = DateUtils.startOfNextDay(to)
-                        ).first()
-                    } else emptyList()
+                    ExportScope.AllNotes -> observeAllNotes().first()
+                    ExportScope.DateRange -> {
+                        val from = state.dateFrom
+                        val to = state.dateTo
+                        if (from != null && to != null) {
+                            // Exclusive upper bound = start of the day after [to], so notes
+                            // created up to 23:59:59 on [to] are all included.
+                            observeNotesByDateRange(
+                                startMs = from,
+                                endMs = DateUtils.startOfNextDay(to)
+                            ).first()
+                        } else emptyList()
+                    }
+                }
+                _uiState.update { it.copy(notes = notes, isLoading = false) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(
+                        notes = emptyList(),
+                        isLoading = false,
+                        error = strings.get(R.string.export_error_load)
+                    )
                 }
             }
-            _uiState.update { it.copy(notes = notes, isLoading = false) }
         }
     }
 
@@ -153,7 +180,8 @@ class ExportViewModel(
                     getNoteById = notes.getNoteById,
                     observeAllNotes = notes.observeAllNotes,
                     observeNotesByDateRange = notes.observeNotesByDateRange,
-                    initialNoteId = Screen.NO_ID
+                    initialNoteId = Screen.NO_ID,
+                    strings = app.strings
                 )
             }
         }
@@ -167,7 +195,8 @@ class ExportViewModel(
                     getNoteById = notes.getNoteById,
                     observeAllNotes = notes.observeAllNotes,
                     observeNotesByDateRange = notes.observeNotesByDateRange,
-                    initialNoteId = noteId
+                    initialNoteId = noteId,
+                    strings = app.strings
                 )
             }
         }

@@ -37,8 +37,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 
@@ -49,12 +51,13 @@ internal fun TemplatePickerDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
-        title = { Text("Choose a template") },
+        title = { Text(stringResource(R.string.home_choose_template)) },
         text = { TemplatePickerContent(templates, onSelect) },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -111,12 +114,12 @@ private fun TemplateSearchField(
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Clear template search"
+                        contentDescription = stringResource(R.string.clear_search)
                     )
                 }
             }
         },
-        placeholder = { Text("Search templates") }
+        placeholder = { Text(stringResource(R.string.home_search_templates)) }
     )
 }
 
@@ -128,12 +131,12 @@ private fun TemplatePickerResults(
 ) {
     when {
         templates.isEmpty() -> TemplatePickerEmptyState(
-            title = "No templates available",
-            message = "Create a template first"
+            title = stringResource(R.string.home_no_templates),
+            message = stringResource(R.string.home_no_templates_message)
         )
         filteredTemplates.isEmpty() -> TemplatePickerEmptyState(
-            title = "No matching templates",
-            message = "Try a different name, category, or phrase"
+            title = stringResource(R.string.home_no_matching_templates),
+            message = stringResource(R.string.home_no_matching_templates_message)
         )
         else -> LazyColumn(
             modifier = Modifier.heightIn(max = 360.dp),
@@ -221,7 +224,7 @@ private fun TemplateText(
 ) {
     Column(modifier = modifier) {
         Text(
-            text = template.name.ifBlank { "Untitled template" },
+            text = template.name.ifBlank { stringResource(R.string.template_untitled) },
             style = MaterialTheme.typography.titleSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

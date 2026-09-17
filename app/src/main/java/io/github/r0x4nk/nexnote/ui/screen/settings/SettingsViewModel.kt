@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.NoteStatisticsIndexState
@@ -17,6 +18,7 @@ import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
+import io.github.r0x4nk.nexnote.domain.repository.VaultPinRateLimitException
 import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
@@ -26,6 +28,8 @@ import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNormalNoteCountUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllVaultNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAppFontUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveDynamicColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteStatisticsIndexStateUseCase
@@ -37,10 +41,12 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAutoLockTimeoutUseCas
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultLockOnBackgroundUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultRecentPreviewsProtectionUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SetAppFontUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SetDynamicColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetTableLayoutModeUseCase
@@ -63,9 +69,11 @@ import kotlinx.coroutines.launch
 @Immutable
 data class SettingsUiState(
     val themeMode:          ThemeMode     = ThemeMode.SYSTEM,
+    val appFont:            AppFont       = AppFont.SYSTEM,
     val fontScale:          FontScale     = FontScale.NORMAL,
     val timezoneId:         String        = "",
     val availableTimezones: List<String>  = emptyList(),
+    val dynamicColor: Boolean = false,
     val accentColor:        AccentColor   = AccentColor.VIOLET,
     val noteCardStyle:      NoteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
     val tableLayoutMode:    TableLayoutMode = TableLayoutMode.FIT_SCREEN,
@@ -90,6 +98,7 @@ enum class SettingsVaultPinChangeError {
     VAULT_NOT_CONFIGURED,
     VAULT_LOCKED,
     WRONG_CURRENT_PIN,
+    PIN_RATE_LIMITED,
     OPERATION_FAILED
 }
 
@@ -145,8 +154,10 @@ private enum class SettingsAndroidCredentialRefreshReason {
 
 class SettingsViewModel(
     private val observeThemeMode: ObserveThemeModeUseCase,
+    private val observeAppFont: ObserveAppFontUseCase,
     private val observeFontScale: ObserveFontScaleUseCase,
     private val observeTimezoneId: ObserveTimezoneIdUseCase,
+    private val observeDynamicColor: ObserveDynamicColorUseCase,
     private val observeAccentColor: ObserveAccentColorUseCase,
     private val observeNoteCardStyle: ObserveNoteCardStyleUseCase,
     private val observeTableLayoutMode: ObserveTableLayoutModeUseCase,
@@ -169,8 +180,10 @@ class SettingsViewModel(
     private val clearVaultAndroidCredentialProtectedMaterialUseCase:
         ClearVaultAndroidCredentialProtectedMaterialUseCase,
     private val setThemeModeUseCase: SetThemeModeUseCase,
+    private val setAppFontUseCase: SetAppFontUseCase,
     private val setFontScaleUseCase: SetFontScaleUseCase,
     private val setTimezoneIdUseCase: SetTimezoneIdUseCase,
+    private val setDynamicColorUseCase: SetDynamicColorUseCase,
     private val setAccentColorUseCase: SetAccentColorUseCase,
     private val setNoteCardStyleUseCase: SetNoteCardStyleUseCase,
     private val setTableLayoutModeUseCase: SetTableLayoutModeUseCase,
@@ -190,8 +203,10 @@ class SettingsViewModel(
     val uiState: StateFlow<SettingsUiState> = buildSettingsUiStateFlow(
         flows = SettingsUiStateFlows(
             themeMode = observeThemeMode(),
+            appFont = observeAppFont(),
             fontScale = observeFontScale(),
             timezoneId = observeTimezoneId(),
+            dynamicColor = observeDynamicColor(),
             accentColor = observeAccentColor(),
             noteCardStyle = observeNoteCardStyle(),
             tableLayoutMode = observeTableLayoutMode(),
@@ -248,8 +263,16 @@ class SettingsViewModel(
         viewModelScope.launch { setFontScaleUseCase(scale) }
     }
 
+    fun setAppFont(font: AppFont) {
+        viewModelScope.launch { setAppFontUseCase(font) }
+    }
+
     fun setTimezoneId(id: String) {
         viewModelScope.launch { setTimezoneIdUseCase(id) }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch { setDynamicColorUseCase(enabled) }
     }
 
     fun setAccentColor(color: AccentColor) {
@@ -407,7 +430,10 @@ class SettingsViewModel(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                setVaultPinChangeError(SettingsVaultPinChangeError.OPERATION_FAILED)
+                setVaultPinChangeError(
+                    if (e is VaultPinRateLimitException) SettingsVaultPinChangeError.PIN_RATE_LIMITED
+                    else SettingsVaultPinChangeError.OPERATION_FAILED
+                )
             } finally {
                 currentPinCopy.wipe()
                 newPinCopy.wipe()
@@ -728,8 +754,10 @@ class SettingsViewModel(
                 val vault = app.useCases.vault
                 SettingsViewModel(
                     observeThemeMode = preferences.observeThemeMode,
+                    observeAppFont = preferences.observeAppFont,
                     observeFontScale = preferences.observeFontScale,
                     observeTimezoneId = preferences.observeTimezoneId,
+                    observeDynamicColor = preferences.observeDynamicColor,
                     observeAccentColor = preferences.observeAccentColor,
                     observeNoteCardStyle = preferences.observeNoteCardStyle,
                     observeTableLayoutMode = preferences.observeTableLayoutMode,
@@ -756,8 +784,10 @@ class SettingsViewModel(
                     clearVaultAndroidCredentialProtectedMaterialUseCase =
                         vault.clearVaultAndroidCredentialProtectedMaterial,
                     setThemeModeUseCase = preferences.setThemeMode,
+                    setAppFontUseCase = preferences.setAppFont,
                     setFontScaleUseCase = preferences.setFontScale,
                     setTimezoneIdUseCase = preferences.setTimezoneId,
+                    setDynamicColorUseCase = preferences.setDynamicColor,
                     setAccentColorUseCase = preferences.setAccentColor,
                     setNoteCardStyleUseCase = preferences.setNoteCardStyle,
                     setTableLayoutModeUseCase = preferences.setTableLayoutMode,

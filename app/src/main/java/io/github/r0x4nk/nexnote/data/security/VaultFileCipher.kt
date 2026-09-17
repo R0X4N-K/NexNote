@@ -90,6 +90,13 @@ class VaultFileCipher(
     }
 
     fun decryptToByteArray(encrypted: ByteArray, key: SecretKey): ByteArray {
+        if (VaultFileStreams.isStreaming(encrypted)) {
+            try {
+                return VaultFileStreams(this).decrypting(encrypted.inputStream(), key).use { it.readBytes() }
+            } catch (error: Exception) {
+                throw VaultDecryptionException("Vault file could not be decrypted.", error)
+            }
+        }
         val file = VaultEncryptedFile.decode(encrypted)
         if (file.version != FILE_ENVELOPE_VERSION || file.algorithm != ALGORITHM) {
             throw VaultDecryptionException("Vault file envelope is unsupported.")

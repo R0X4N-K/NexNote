@@ -17,9 +17,14 @@ import io.github.r0x4nk.nexnote.data.local.VaultImageFileStorage
 import io.github.r0x4nk.nexnote.data.security.VaultDecryptionException
 import io.github.r0x4nk.nexnote.data.security.VaultFieldCipher
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteAttachment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.copyStoredNoteFile
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import io.github.r0x4nk.nexnote.domain.repository.VaultLockedException
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
@@ -139,33 +144,38 @@ internal class VaultNoteRepositoryImpl(
     override val allVaultNoteCount: Flow<Int> =
         dao.observeAllVaultNoteCount().distinctUntilChanged()
 
-    override val vaultNotes: Flow<List<Note>> =
-        combine(
-            dao.getAllVaultNotes().distinctUntilChanged(),
-            keyProvider.unlockedVaultKey
-        ) { entities, key ->
-            if (key == null) {
-                emptyList()
-            } else {
-                entities.mapNotNull { entity ->
-                    entity.toDecryptedDomainOrNull(key, event = "vaultNoteDecryptionSkipped")
-                }
-            }
-        }.distinctUntilChanged()
+    override val vaultNotes: Flow<List<Note>> = observeDecryptedNotes(
+        dao.getAllVaultNotes(), "vaultNoteDecryptionSkipped"
+    )
 
-    override val vaultTrashedNotes: Flow<List<Note>> =
-        combine(
-            dao.getDeletedVaultNotes().distinctUntilChanged(),
-            keyProvider.unlockedVaultKey
-        ) { entities, key ->
-            if (key == null) {
-                emptyList()
-            } else {
-                entities.mapNotNull { entity ->
-                    entity.toDecryptedDomainOrNull(key, event = "vaultTrashDecryptionSkipped")
+    override val vaultTrashedNotes: Flow<List<Note>> = observeDecryptedNotes(
+        dao.getDeletedVaultNotes(), "vaultTrashDecryptionSkipped"
+    )
+
+    /** Cache only within a subscription and key session; never read file payloads for lists. */
+    private fun observeDecryptedNotes(entities: Flow<List<NoteEntity>>, event: String): Flow<List<Note>> = flow {
+        var cachedKey: SecretKey? = null
+        val cache = mutableMapOf<Long, Pair<NoteEntity, Note?>>()
+        combine(entities.distinctUntilChanged(), keyProvider.unlockedVaultKey) { rows, key ->
+            if (key !== cachedKey) {
+                cache.clear()
+                cachedKey = key
+            }
+            if (key == null) emptyList() else {
+                val present = rows.mapTo(HashSet()) { it.id }
+                cache.keys.retainAll(present)
+                rows.mapNotNull { entity ->
+                    currentCoroutineContext().ensureActive()
+                    val previous = cache[entity.id]
+                    if (previous?.first == entity) previous.second else {
+                        entity.toDecryptedDomainOrNull(key, event).also { note ->
+                            cache[entity.id] = entity to note
+                        }
+                    }
                 }
             }
-        }.distinctUntilChanged()
+        }.collect { emit(it) }
+    }.distinctUntilChanged().flowOn(Dispatchers.Default)
 
     override val vaultNoteLinkCandidates: Flow<List<NoteLinkCandidate>> =
         combine(
@@ -182,7 +192,7 @@ internal class VaultNoteRepositoryImpl(
                     )
                 }
             }
-        }.distinctUntilChanged()
+        }.distinctUntilChanged().flowOn(Dispatchers.Default)
 
     override suspend fun getVaultNoteById(id: Long): Note? =
         keyProvider.withUnlockedVaultKey { key ->
@@ -258,10 +268,13 @@ internal class VaultNoteRepositoryImpl(
                         content = draft.content.rewriteMappedPaths(imagePathMap),
                         imagePaths = draft.imagePaths.map { path -> imagePathMap[path] ?: path }
                     )
-                    dao.updateNote(duplicate.toEncryptedEntity(key = key, lastModifiedDate = now))
+                    if (duplicate.content != draft.content || duplicate.imagePaths != draft.imagePaths) {
+                        dao.updateNote(duplicate.toEncryptedEntity(key = key, lastModifiedDate = now))
+                    }
                     DuplicateVaultNoteResult.Success(duplicateId)
                 }
             } catch (error: CancellationException) {
+                withContext(NonCancellable) { deleteVaultImages(copiedImagePaths) }
                 throw error
             } catch (_: Exception) {
                 if (copiedImagePaths.isNotEmpty()) {
@@ -773,17 +786,19 @@ internal class VaultNoteRepositoryImpl(
             .filter { it.isNotBlank() }
             .distinct()
             .forEach { sourcePath ->
-                val bytes = when (val decrypted = vaultImageFileStorage.decryptToByteArray(sourcePath, key)) {
-                    is VaultImageFileDecryptionResult.Decrypted -> decrypted.bytes
-                    VaultImageFileDecryptionResult.Missing ->
-                        throw IOException("Vault image file is missing.")
-                }
-                val duplicatePath = try {
-                    imageStorage.copyImageToInternal(newNoteId) {
-                        ByteArrayInputStream(bytes)
+                val duplicatePath = if (NoteAttachment.isAttachmentPath(sourcePath)) {
+                    imageStorage.copyStoredNoteFile(newNoteId, sourcePath) {
+                        vaultImageFileStorage.openDecryptedStream(sourcePath, key)
+                            ?: throw IOException("Vault attachment file is missing.")
                     }
-                } finally {
-                    bytes.fill(0)
+                } else {
+                    val bytes = when (val decrypted = vaultImageFileStorage.decryptToByteArray(sourcePath, key)) {
+                        is VaultImageFileDecryptionResult.Decrypted -> decrypted.bytes
+                        VaultImageFileDecryptionResult.Missing -> throw IOException("Vault image file is missing.")
+                    }
+                    try {
+                        imageStorage.copyStoredNoteFile(newNoteId, sourcePath) { ByteArrayInputStream(bytes) }
+                    } finally { bytes.fill(0) }
                 }
                 copiedPaths += duplicatePath
                 result[sourcePath] = duplicatePath

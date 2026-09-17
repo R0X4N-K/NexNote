@@ -12,6 +12,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface NoteDao {
 
+    /** Recovery lookup includes trash and Vault; encrypted manifests require an unlocked key. */
+    @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
+    suspend fun getNoteForAttachmentRecovery(id: Long): NoteEntity?
+
+
     /** Count every normal note, including rows currently in the trash. */
     @Query("SELECT COUNT(*) FROM notes WHERE isInVault = 0")
     fun observeAllNormalNoteCount(): Flow<Int>

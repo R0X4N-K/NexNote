@@ -8,6 +8,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -21,10 +24,14 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.component.TAG_FILTER_BAR_TAG
+import io.github.r0x4nk.nexnote.ui.component.noteTagFolderHeaderTag
 import io.github.r0x4nk.nexnote.ui.theme.NexNoteTheme
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -36,10 +43,38 @@ class VaultNotesCollectionTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /**
+     * Scope a tag lookup to the top-tags row: note cards now also render the
+     * note's tags in their footer, so a bare text match is ambiguous.
+     */
+    private fun topTag(text: String) = composeRule.onNode(
+        hasText(text) and hasAnyAncestor(hasTestTag(VAULT_TOP_TAGS_TAG))
+    )
+
     @Test
-    fun activeVaultList_usesSwipeToPinWithoutCardButton() {
+    fun selectedVaultNote_isMarkedAsSelected() {
+        composeRule.setContent {
+            NexNoteTheme {
+                VaultNotesCollection(
+                    notes = listOf(Note(id = 11L, title = "Selected Vault note", isInVault = true)),
+                    viewMode = NoteListViewMode.LIST,
+                    noteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
+                    isTrashVisible = false,
+                    selectionState = SelectionUiState().select(11L),
+                    onNoteClick = {},
+                    onMoveToTrash = {},
+                    onTogglePin = {},
+                    onRestoreFromTrash = {},
+                    onRequestDeletePermanentlyFromTrash = {}
+                )
+            }
+        }
+        composeRule.onNodeWithText("Selected Vault note").assertIsDisplayed()
+    }
+
+    @Test
+    fun activeVaultList_opensOnTapSelectsOnLongPressAndSwipesToPin() {
         var clickedNoteId: Long? = null
-        var actionRequestedNoteId: Long? = null
         var selectedNoteId: Long? = null
         var pinnedNoteId: Long? = null
         composeRule.setVaultNotesCollection(
@@ -54,14 +89,13 @@ class VaultNotesCollectionTest {
             ),
             isTrashVisible = false,
             onNoteClick = { clickedNoteId = it },
-            onRequestNoteActions = { actionRequestedNoteId = it.id },
             onToggleNoteSelection = { selectedNoteId = it.id },
             onTogglePin = { pinnedNoteId = it.id }
         )
 
         composeRule.onNodeWithText("Active Vault note").assertIsDisplayed()
         composeRule.onNodeWithText("Active body preview").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Pin to top").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Note actions").assertDoesNotExist()
 
         composeRule.onNodeWithText("Active Vault note").performClick()
         assertEquals(11L, clickedNoteId)
@@ -69,9 +103,6 @@ class VaultNotesCollectionTest {
         composeRule.onNodeWithText("Active Vault note")
             .performTouchInput { longClick() }
         assertEquals(11L, selectedNoteId)
-
-        composeRule.onNodeWithContentDescription("Note actions").performClick()
-        assertEquals(11L, actionRequestedNoteId)
 
         composeRule.onNodeWithTag(VAULT_NOTE_ROW_TAG)
             .performTouchInput { swipeRight() }
@@ -100,7 +131,6 @@ class VaultNotesCollectionTest {
                         noteCardStyle = NoteCardStyle.TITLE_AND_PREVIEW,
                         isTrashVisible = false,
                         onNoteClick = {},
-                        onRequestNoteActions = {},
                         onMoveToTrash = {},
                         onTogglePin = { currentNote ->
                             toggleCount++
@@ -197,10 +227,10 @@ class VaultNotesCollectionTest {
             onToggleTagFilter = { toggledTags += it }
         )
 
-        composeRule.onNodeWithText("#alpha")
+        topTag("#alpha")
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithText("#beta").assertIsDisplayed()
+        topTag("#beta").assertIsDisplayed()
 
         assertEquals(listOf("alpha"), toggledTags)
     }
@@ -278,7 +308,9 @@ class VaultNotesCollectionTest {
         composeRule.onNodeWithText("Search filtered Vault note").assertIsDisplayed()
         composeRule.onAllNodesWithText("#beta").assertCountEquals(0)
         composeRule.onNodeWithText("Filter").assertIsDisplayed()
-        composeRule.onNodeWithText("#alpha").assertIsDisplayed()
+        composeRule.onNode(
+            hasText("#alpha") and hasAnyAncestor(hasTestTag(TAG_FILTER_BAR_TAG))
+        ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Remove #alpha filter")
             .assertIsDisplayed()
             .performClick()
@@ -365,12 +397,12 @@ class VaultNotesCollectionTest {
             isTrashVisible = false
         )
 
-        composeRule.onNodeWithText("#alpha").assertIsDisplayed()
+        composeRule.onNodeWithTag(noteTagFolderHeaderTag("alpha")).assertIsDisplayed()
         composeRule.onNodeWithText("Untagged").assertIsDisplayed()
         composeRule.onNodeWithText("Tagged folder note").assertIsDisplayed()
         composeRule.onNodeWithText("Plain folder note").assertIsDisplayed()
 
-        composeRule.onNodeWithText("#alpha").performClick()
+        composeRule.onNodeWithTag(noteTagFolderHeaderTag("alpha")).performClick()
         composeRule.waitForIdle()
 
         composeRule.onAllNodesWithText("Tagged folder note").assertCountEquals(0)
@@ -392,12 +424,19 @@ class VaultNotesCollectionTest {
                 )
             ),
             isTrashVisible = true,
+            viewMode = NoteListViewMode.GRID,
             onRestoreFromTrash = { restoredNoteId = it.id },
             onRequestDeletePermanentlyFromTrash = { deleteRequestedNoteId = it.id }
         )
 
         composeRule.onNodeWithText("Deleted Vault note").assertIsDisplayed()
         composeRule.onNodeWithText("Deleted body preview").assertIsDisplayed()
+        val restoreBounds = composeRule.onNodeWithContentDescription("Restore note")
+            .fetchSemanticsNode().boundsInRoot
+        val deleteBounds = composeRule.onNodeWithContentDescription("Delete permanently")
+            .fetchSemanticsNode().boundsInRoot
+        assertEquals(restoreBounds.top, deleteBounds.top, 1f)
+        assertTrue(restoreBounds.right <= deleteBounds.left)
         composeRule.onNodeWithContentDescription("Delete permanently")
             .assertIsDisplayed()
             .performClick()
@@ -546,7 +585,6 @@ class VaultNotesCollectionTest {
         topTags: List<Tag> = emptyList(),
         selectedTagFilters: Set<String> = emptySet(),
         onNoteClick: (Long) -> Unit = {},
-        onRequestNoteActions: (Note) -> Unit = {},
         onToggleNoteSelection: (Note) -> Unit = {},
         onMoveToTrash: (Note) -> Unit = {},
         onTogglePin: (Note) -> Unit = {},
@@ -568,7 +606,6 @@ class VaultNotesCollectionTest {
                         topTags = topTags,
                         selectedTagFilters = selectedTagFilters,
                         onNoteClick = onNoteClick,
-                        onRequestNoteActions = onRequestNoteActions,
                         onToggleNoteSelection = onToggleNoteSelection,
                         onMoveToTrash = onMoveToTrash,
                         onTogglePin = onTogglePin,

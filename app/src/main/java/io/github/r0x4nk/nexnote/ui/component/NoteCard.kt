@@ -2,6 +2,8 @@ package io.github.r0x4nk.nexnote.ui.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 
@@ -14,12 +16,18 @@ import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
  * Long-press → [onLongPress].
  *
  * [noteCardStyle] controls how much information is shown:
- *   - TITLE_ONLY: title and date only (most compact).
- *   - TITLE_AND_PREVIEW: title, content preview, and date (default).
- *   - TITLE_DATE: title and date with the date shown more prominently.
+ *   - TITLE_ONLY: title only (most compact).
+ *   - TITLE_AND_PREVIEW: title and content preview (default).
+ *   - TITLE_INFORMATION: title, content preview, and note metadata
+ *     (date, tags, attachments and image count).
  *
  * [titleHighlightRanges] and [contentHighlightRanges] highlight search matches.
  * Pinned notes expose a compact status badge without recoloring the card.
+ *
+ * [swipeActionsEnabled] is turned off inside a horizontal pager (e.g. the Agenda
+ * tabs) so the page swipe is never captured by a card. Cards never expose their
+ * own overflow button: note actions live in the selection top bar, which opens
+ * when the note is long-pressed.
  */
 @Composable
 fun NoteCard(
@@ -32,24 +40,23 @@ fun NoteCard(
     contentHighlightRanges: List<IntRange> = emptyList(),
     onPin: () -> Unit = {},
     onLongPress: () -> Unit = {},
-    onActions: (() -> Unit)? = null,
     selectionMode: Boolean = false,
-    selected: Boolean = false
+    selected: Boolean = false,
+    swipeActionsEnabled: Boolean = true
 ) {
     SwipeToCollectionActionsContainer(
-        endToStartAction = SwipeCollectionAction.Delete("Move to trash"),
+        endToStartAction = SwipeCollectionAction.Delete(stringResource(R.string.common_move_to_trash)),
         onEndToStart = onTrash,
         startToEndAction = SwipeCollectionAction.TogglePin(note.isPinned),
         onStartToEnd = onPin,
         modifier = modifier,
         collapseBeforeEndToStart = true,
-        enabled = !selectionMode
+        enabled = !selectionMode && swipeActionsEnabled
     ) {
         NoteCardContent(
             note = note,
             onClick = onClick,
             onLongPress = onLongPress,
-            onActions = onActions,
             selectionMode = selectionMode,
             selected = selected,
             noteCardStyle = noteCardStyle,

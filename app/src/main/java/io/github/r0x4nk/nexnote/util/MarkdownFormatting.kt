@@ -11,25 +11,25 @@ data class MarkdownTextEdit(
 )
 
 object MarkdownInlineToggle {
-    fun bold(text: String, selection: TextRange): MarkdownTextEdit =
-        toggleDelimited(text, selection.normalized(), "**", "**", placeholder = "text")
+    fun bold(text: String, selection: TextRange, placeholder: String): MarkdownTextEdit =
+        toggleDelimited(text, selection.normalized(), "**", "**", placeholder = placeholder)
 
-    fun italic(text: String, selection: TextRange): MarkdownTextEdit =
-        toggleDelimited(text, selection.normalized(), "*", "*", placeholder = "text")
+    fun italic(text: String, selection: TextRange, placeholder: String): MarkdownTextEdit =
+        toggleDelimited(text, selection.normalized(), "*", "*", placeholder = placeholder)
 
-    fun inlineCode(text: String, selection: TextRange): MarkdownTextEdit =
-        toggleDelimited(text, selection.normalized(), "`", "`", placeholder = "code")
+    fun inlineCode(text: String, selection: TextRange, placeholder: String): MarkdownTextEdit =
+        toggleDelimited(text, selection.normalized(), "`", "`", placeholder = placeholder)
 
-    fun strikethrough(text: String, selection: TextRange): MarkdownTextEdit =
-        toggleDelimited(text, selection.normalized(), "~~", "~~", placeholder = "text")
+    fun strikethrough(text: String, selection: TextRange, placeholder: String): MarkdownTextEdit =
+        toggleDelimited(text, selection.normalized(), "~~", "~~", placeholder = placeholder)
 
-    fun highlight(text: String, selection: TextRange): MarkdownTextEdit =
-        toggleDelimited(text, selection.normalized(), "==", "==", placeholder = "text")
+    fun highlight(text: String, selection: TextRange, placeholder: String): MarkdownTextEdit =
+        toggleDelimited(text, selection.normalized(), "==", "==", placeholder = placeholder)
 
-    fun link(text: String, selection: TextRange): MarkdownTextEdit {
+    fun link(text: String, selection: TextRange, placeholder: String): MarkdownTextEdit {
         val safeSelection = selection.normalized().coerceIn(text.length)
         val selectedText = text.substring(safeSelection.start, safeSelection.end)
-        val label = selectedText.ifEmpty { "text" }
+        val label = selectedText.ifEmpty { placeholder }
         val insertion = "[$label](url)"
         val nextText = text.replaceRange(safeSelection.start, safeSelection.end, insertion)
         val selectionStart = if (selectedText.isEmpty()) {
@@ -190,6 +190,24 @@ object MarkdownLineToggle {
         return MarkdownTextEdit(nextText, TextRange(cursor))
     }
 
+    /**
+     * Increases the indentation of every selected line by one level.
+     *
+     * Two spaces match [NEST_INDENT_WIDTH] in the Markdown renderer, so nested
+     * bullets and checklists round-trip cleanly between editing and preview.
+     * Applies at the line level, which also indents task-list items.
+     */
+    fun indent(text: String, selection: TextRange): MarkdownTextEdit =
+        changeSelectedLineIndentation(text, selection, increase = true)
+
+    /**
+     * Decreases the indentation of every selected line by one level, removing up
+     * to [INDENTATION_WIDTH] leading spaces per line. Lines indented less than a
+     * full level are outdented by whatever whitespace they actually have.
+     */
+    fun outdent(text: String, selection: TextRange): MarkdownTextEdit =
+        changeSelectedLineIndentation(text, selection, increase = false)
+
     private fun toggleLinePrefix(
         text: String,
         selection: TextRange,
@@ -259,7 +277,78 @@ object MarkdownLineToggle {
         val nextText = text.replaceRange(start, end, next)
         return MarkdownTextEdit(nextText, TextRange(start + next.length))
     }
+
+    /**
+     * Indents or outdents the lines touched by [selection], keeping the caret
+     * anchored to the same text rather than letting it drift to the line end.
+     *
+     * The selection is mapped through the edit per line: leading whitespace
+     * inserted (or removed) before an offset shifts that offset, so a caret at
+     * the start of a line ends up after the new indentation and a caret inside
+     * the text keeps its position relative to the words.
+     */
+    private fun changeSelectedLineIndentation(
+        text: String,
+        selection: TextRange,
+        increase: Boolean
+    ): MarkdownTextEdit {
+        val safeSelection = selection.normalized().coerceIn(text.length)
+        val start = text.lineStartFor(safeSelection.start)
+        val effectiveEnd = if (!safeSelection.collapsed && safeSelection.end > 0 &&
+            text.getOrNull(safeSelection.end - 1) == '\n'
+        ) {
+            safeSelection.end - 1
+        } else {
+            safeSelection.end
+        }
+        val end = text.lineEndFor(effectiveEnd)
+        val lines = text.substring(start, end).split("\n")
+
+        val removedPerLine = IntArray(lines.size)
+        val nextLines = ArrayList<String>(lines.size)
+        lines.forEachIndexed { index, line ->
+            if (increase) {
+                nextLines.add(INDENTATION + line)
+            } else {
+                val removable = line.takeWhile { it == ' ' }.length.coerceAtMost(INDENTATION_WIDTH)
+                removedPerLine[index] = removable
+                nextLines.add(line.substring(removable))
+            }
+        }
+
+        val nextText = text.replaceRange(start, end, nextLines.joinToString("\n"))
+
+        fun mapOffset(offset: Int): Int {
+            val target = offset.coerceIn(start, end)
+            var shift = 0
+            var lineStart = start
+            for (index in lines.indices) {
+                val lineEnd = lineStart + lines[index].length
+                if (target >= lineEnd) {
+                    shift += if (increase) INDENTATION_WIDTH else -removedPerLine[index]
+                } else {
+                    val positionInLine = target - lineStart
+                    shift += if (increase) {
+                        INDENTATION_WIDTH
+                    } else {
+                        -removedPerLine[index].coerceAtMost(positionInLine)
+                    }
+                    break
+                }
+                lineStart = lineEnd + 1
+            }
+            return (offset + shift).coerceIn(0, nextText.length)
+        }
+
+        return MarkdownTextEdit(
+            text = nextText,
+            selection = TextRange(mapOffset(safeSelection.start), mapOffset(safeSelection.end))
+        )
+    }
 }
+
+private const val INDENTATION_WIDTH = 2
+private const val INDENTATION = "  "
 
 private val HEADING = Regex("""^(#{1,3})\s+(.*)$""")
 private val ANY_HEADING = Regex("""^#{1,6}\s+""")

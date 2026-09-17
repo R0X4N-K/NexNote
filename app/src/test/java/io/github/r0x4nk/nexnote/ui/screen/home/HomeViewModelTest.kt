@@ -60,6 +60,7 @@ class HomeViewModelTest {
         val repository = NoteRepositoryImpl(fakeDao, imageStorage)
         viewModel = HomeViewModel(
             observeHomeNotes = ObserveHomeNotesUseCase(repository),
+            getNoteById = io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase(repository),
             observeHomeNoteIds = ObserveHomeNoteIdsUseCase(repository),
             observeActiveNoteCount = ObserveActiveNoteCountUseCase(repository),
             moveNoteToTrash = MoveNoteToTrashUseCase(repository),
@@ -68,12 +69,26 @@ class HomeViewModelTest {
             duplicateNoteUseCase = DuplicateNoteUseCase(
                 repository,
                 NoOpTagRepository,
-                imageStorage
+                imageStorage,
+                dispatcher = testDispatcher
             ),
+            updateNoteCreationDate =
+                io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase(repository),
             observeTemplates = ObserveTemplatesUseCase(NoOpTemplateRepository),
             observeMostUsedTags = ObserveMostUsedTagsUseCase(NoOpTagRepository),
-            observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository)
+            observeNoteCardStyle = ObserveNoteCardStyleUseCase(NoOpPreferencesRepository),
+            strings = io.github.r0x4nk.nexnote.testing.TestStringProvider
         )
+    }
+
+    @Test
+    fun `selection actions load notes beyond the home page`() = runViewModelTest {
+        fakeDao.emitAllNotes((1L..100L).map { NoteEntity(id = it, title = "Note $it", content = "Body") })
+        advanceUntilIdle()
+        var resolved: List<Long>? = null
+        viewModel.withSelectedNotes(setOf(1L, 100L)) { resolved = it.map(Note::id) }
+        advanceUntilIdle()
+        assertEquals(listOf(1L, 100L), resolved)
     }
 
     @After
@@ -340,6 +355,8 @@ class HomeViewModelTest {
 // ── Fake ─────────────────────────────────────────────────────────────────────
 
 private class FakeNoteDao : NoteDao {
+    override suspend fun getNoteForAttachmentRecovery(id: Long): NoteEntity? = getNoteById(id)
+
 
     private val _allNotes    = MutableStateFlow<List<NoteEntity>>(emptyList())
     private val _deletedNotes = MutableStateFlow<List<NoteEntity>>(emptyList())
@@ -371,7 +388,7 @@ private class FakeNoteDao : NoteDao {
         MutableStateFlow(emptyList())
     override fun getAllCreationDates(): Flow<List<Long>> = MutableStateFlow(emptyList())
 
-    override suspend fun getNoteById(id: Long): NoteEntity? = null
+    override suspend fun getNoteById(id: Long): NoteEntity? = _allNotes.value.firstOrNull { it.id == id }
     override fun getAllVaultNotes(): Flow<List<NoteEntity>> = MutableStateFlow(emptyList())
     override suspend fun getVaultNoteById(id: Long): NoteEntity? = null
     override suspend fun getAllVaultNotesForWipeOnce(): List<NoteEntity> = emptyList()

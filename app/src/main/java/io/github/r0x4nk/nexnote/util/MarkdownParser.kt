@@ -62,12 +62,10 @@ object MarkdownParser {
     fun getCached(text: String, colors: MarkdownColors): List<MarkdownBlock>? {
         val key = CacheKey(text, colors)
 
-        // Check single-slot last-parse first (works for any content size)
         lastParse?.let { entry ->
             if (entry.key == key) return entry.blocks
         }
 
-        // Fall back to the bounded LRU cache for smaller notes
         if (!text.isCacheable()) return null
         return synchronized(blocksCache) { blocksCache[key] }
     }
@@ -101,7 +99,6 @@ object MarkdownParser {
     fun parseBlocks(text: String, colors: MarkdownColors): List<MarkdownBlock> {
         val key = CacheKey(text, colors)
 
-        // Check LRU cache first
         if (text.isCacheable()) {
             synchronized(blocksCache) { blocksCache[key] }?.let {
                 lastParse = LastParseEntry(key, it)
@@ -111,11 +108,9 @@ object MarkdownParser {
 
         val result = parseMarkdownBlocks(text, colors)
 
-        // Store in bounded LRU cache if within size limit
         if (text.isCacheable()) {
             synchronized(blocksCache) { blocksCache[key] = result }
         }
-        // Always update single-slot holder so the next getCached() hits
         lastParse = LastParseEntry(key, result)
 
         return result

@@ -7,16 +7,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalResources
+import io.github.r0x4nk.nexnote.R
 import kotlinx.coroutines.flow.Flow
 
-internal const val VAULT_TRASH_SNACKBAR_MESSAGE = "Moved to Vault trash"
-internal const val VAULT_RESTORE_SNACKBAR_MESSAGE = "Restored to Vault"
-internal const val VAULT_TRASH_SNACKBAR_UNDO_LABEL = "Undo"
-
+/**
+ * Vault-specific trash snackbar event stream.
+ *
+ * The snackbar copy is resolved from resources so the effect never carries the
+ * decrypted note title or preview. Only the note id travels through the event
+ * to wire up the undo action.
+ */
 internal sealed interface VaultTrashSnackbarEvent {
     val noteId: Long
     val noteIds: List<Long>
-    val message: String
 
     data class MovedToTrash(
         override val noteId: Long,
@@ -24,13 +28,6 @@ internal sealed interface VaultTrashSnackbarEvent {
     ) : VaultTrashSnackbarEvent {
         override val noteIds: List<Long>
             get() = listOf(noteId) + additionalNoteIds
-
-        override val message: String
-            get() = if (noteIds.size == 1) {
-                VAULT_TRASH_SNACKBAR_MESSAGE
-            } else {
-                "Moved ${noteIds.size} notes to Vault trash"
-            }
     }
 
     data class RestoredFromTrash(
@@ -39,13 +36,6 @@ internal sealed interface VaultTrashSnackbarEvent {
     ) : VaultTrashSnackbarEvent {
         override val noteIds: List<Long>
             get() = listOf(noteId) + additionalNoteIds
-
-        override val message: String
-            get() = if (noteIds.size == 1) {
-                VAULT_RESTORE_SNACKBAR_MESSAGE
-            } else {
-                "Restored ${noteIds.size} notes to Vault"
-            }
     }
 }
 
@@ -69,17 +59,47 @@ internal fun VaultTrashSnackbarEffect(
     onUndoTrashEvent: (VaultTrashSnackbarEvent) -> Unit
 ) {
     val currentOnUndoTrashEvent by rememberUpdatedState(onUndoTrashEvent)
+    val resources = LocalResources.current
 
-    LaunchedEffect(trashEvents, snackbarHostState) {
+    LaunchedEffect(trashEvents, snackbarHostState, resources) {
         trashEvents.collect { event ->
             val result = snackbarHostState.showSnackbar(
-                message = event.message,
-                actionLabel = VAULT_TRASH_SNACKBAR_UNDO_LABEL,
+                message = event.localizedMessage(resources),
+                actionLabel = resources.getString(R.string.common_undo),
                 duration = SnackbarDuration.Long
             )
             if (result == SnackbarResult.ActionPerformed) {
                 currentOnUndoTrashEvent(event)
             }
         }
+    }
+}
+
+private fun VaultTrashSnackbarEvent.localizedMessage(
+    resources: android.content.res.Resources
+): String {
+    val count = noteIds.size
+    return when (this) {
+        is VaultTrashSnackbarEvent.MovedToTrash ->
+            if (count == 1) {
+                resources.getString(R.string.vault_trash_snackbar_moved)
+            } else {
+                resources.getQuantityString(
+                    R.plurals.vault_trash_snackbar_moved_many,
+                    count,
+                    count
+                )
+            }
+
+        is VaultTrashSnackbarEvent.RestoredFromTrash ->
+            if (count == 1) {
+                resources.getString(R.string.vault_trash_snackbar_restored)
+            } else {
+                resources.getQuantityString(
+                    R.plurals.vault_trash_snackbar_restored_many,
+                    count,
+                    count
+                )
+            }
     }
 }

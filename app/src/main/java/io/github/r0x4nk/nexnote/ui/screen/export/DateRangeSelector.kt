@@ -22,7 +22,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,8 +40,10 @@ internal fun DateRangeSelector(
     val fmt = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     DateRangeButtons(
-        fromText = dateFrom?.let { fmt.format(Date(it)) } ?: "From",
-        toText = dateTo?.let { fmt.format(Date(it)) } ?: "To",
+        fromText = dateFrom?.let { fmt.format(Date(it)) }
+            ?: stringResource(R.string.export_date_from),
+        toText = dateTo?.let { fmt.format(Date(it)) }
+            ?: stringResource(R.string.export_date_to),
         onFromClick = { showFromPicker = true },
         onToClick = { showToPicker = true }
     )
@@ -172,10 +176,10 @@ private fun DateRangePickerDialog(
             TextButton(onClick = {
                 val selected = pickerState.selectedDateMillis ?: return@TextButton
                 onConfirm(selected)
-            }) { Text("OK") }
+            }) { Text(stringResource(R.string.common_ok)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     ) {
         DatePicker(state = pickerState)

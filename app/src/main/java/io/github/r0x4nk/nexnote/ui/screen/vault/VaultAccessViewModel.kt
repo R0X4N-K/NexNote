@@ -11,6 +11,7 @@ import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialAvailability
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
+import io.github.r0x4nk.nexnote.domain.repository.VaultPinRateLimitException
 import io.github.r0x4nk.nexnote.domain.usecase.ConfigureVaultPinUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultAndroidCredentialAvailabilityUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
@@ -32,6 +33,7 @@ enum class VaultAccessError {
     EMPTY_PIN,
     PIN_MISMATCH,
     WRONG_PIN,
+    PIN_RATE_LIMITED,
     VAULT_NOT_CONFIGURED,
     ANDROID_CREDENTIAL_UNAVAILABLE,
     ANDROID_CREDENTIAL_CANCELED,
@@ -204,7 +206,13 @@ class VaultAccessViewModel(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 operationState.update {
-                    it.copy(error = VaultAccessError.OPERATION_FAILED)
+                    it.copy(
+                        error = if (e is VaultPinRateLimitException) {
+                            VaultAccessError.PIN_RATE_LIMITED
+                        } else {
+                            VaultAccessError.OPERATION_FAILED
+                        }
+                    )
                 }
             } finally {
                 pinCopy.wipe()

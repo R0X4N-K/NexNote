@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import io.github.r0x4nk.nexnote.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -11,15 +13,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
+import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.CheckBox
@@ -31,10 +34,8 @@ import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.HorizontalRule
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -52,32 +53,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.r0x4nk.nexnote.ui.common.EditorMotion
 
 /**
- * Base container alpha for the IME toolbar.
- *
- * The toolbar stays slightly translucent for scroll context, but opaque enough
- * to avoid noisy text popping through the controls.
+ * Horizontal inset for the leading/trailing controls. The container itself is
+ * edge-to-edge: this only keeps the first and last ripple from touching the
+ * rounded screen corners.
  */
-private const val EditorToolbarSurfaceAlpha = 0.94f
-
-/**
- * Compact vertical padding keeps the rectangle visually attached to the IME
- * instead of turning it into a floating panel.
- */
-private val EditorToolbarVerticalPadding = 0.dp
-
-/**
- * Horizontal content padding only affects the tool row; the container itself
- * still spans the full screen width.
- */
-private val EditorToolbarHorizontalPadding = 8.dp
-
-private val EditorToolbarHistoryGap = 4.dp
+private val EditorToolbarHorizontalPadding = 4.dp
 
 internal val EditorKeyboardToolbarMinHeight = 44.dp
 
@@ -87,19 +76,19 @@ private val EditorToolbarIconSize = 21.dp
 
 private val EditorToolbarHeadingTextSize = 17.sp
 
+private val EditorToolbarSeparatorHeight = 22.dp
+
 /**
  * Compact editor actions anchored above the IME while editing.
  *
- * The toolbar keeps editing-history controls pinned to the left while
- * Markdown formatting tools scroll independently on the right.
+ * The toolbar is a single, edge-to-edge surface attached to the keyboard —
+ * deliberately not a floating panel, because it belongs to the writing surface
+ * rather than hovering over it. History controls stay pinned to the left while
+ * the Markdown formatting tools scroll independently on the right.
  *
- * The link-type and heading-level choosers are exposed via the
- * [linkMenuExpanded]/[onLinkMenuExpandedChange] and
- * [headingMenuExpanded]/[onHeadingMenuExpandedChange] pairs so the parent can
- * keep the toolbar mounted while either dropdown is open. This prevents the
- * dropdowns' focusable popups — which collapse the IME for a moment — from
- * also tearing the toolbar (and the menu itself) down before the user can
- * pick an option.
+ * The link and heading choosers are hosted as modal bottom sheets by the parent
+ * (see [EditorLinkSheet] and [EditorHeadingSheet]) so the toolbar only needs to
+ * report which chooser the user opened.
  *
  * The button order follows research-based priorities for mobile Markdown
  * note-taking: bold → heading → bullets → checkbox → link → italic → numbered
@@ -109,18 +98,19 @@ private val EditorToolbarHeadingTextSize = 17.sp
 internal fun EditorKeyboardToolbar(
     visible: Boolean,
     isTemplateMode: Boolean,
-    canInsertImages: Boolean,
+    canInsertAttachments: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
     linkMenuExpanded: Boolean,
-    onLinkMenuExpandedChange: (Boolean) -> Unit,
+    onOpenLinkMenu: () -> Unit,
     headingMenuExpanded: Boolean,
-    onHeadingMenuExpandedChange: (Boolean) -> Unit,
+    onOpenHeadingMenu: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onInsertImage: () -> Unit,
+    onInsertAttachment: () -> Unit,
     onInsertChecklist: () -> Unit,
-    onSetHeadingLevel: (Int) -> Unit,
+    onIndent: () -> Unit,
+    onOutdent: () -> Unit,
     onToggleBold: () -> Unit,
     onToggleItalic: () -> Unit,
     onToggleStrikethrough: () -> Unit,
@@ -130,8 +120,6 @@ internal fun EditorKeyboardToolbar(
     onToggleUnorderedList: () -> Unit,
     onToggleOrderedList: () -> Unit,
     onInsertHorizontalRule: () -> Unit,
-    onInsertWebLink: () -> Unit,
-    onInsertNoteLink: () -> Unit,
     modifier: Modifier = Modifier,
     onHeightChanged: (Int) -> Unit = {}
 ) {
@@ -153,26 +141,21 @@ internal fun EditorKeyboardToolbar(
             onDispose { onHeightChangedState.value(0) }
         }
 
-        // A plain translucent surface keeps the toolbar calm and avoids extra
-        // decorative color around the outer edges.
+        // A solid, full-width surface keeps the bar visually attached to the
+        // keyboard instead of reading as a detached floating panel.
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .onSizeChanged { size -> onHeightChangedState.value(size.height) },
             shape = RectangleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-                alpha = EditorToolbarSurfaceAlpha
-            ),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(
-                        horizontal = EditorToolbarHorizontalPadding,
-                        vertical = EditorToolbarVerticalPadding
-                    ),
+                    .padding(horizontal = EditorToolbarHorizontalPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 EditorToolbarHistoryActions(
@@ -181,17 +164,18 @@ internal fun EditorKeyboardToolbar(
                     onUndo = onUndo,
                     onRedo = onRedo
                 )
-                Spacer(Modifier.width(EditorToolbarHistoryGap))
+                EditorToolbarSeparator()
                 EditorToolbarScrollableActions(
                     isTemplateMode = isTemplateMode,
-                    canInsertImages = canInsertImages,
+                    canInsertAttachments = canInsertAttachments,
                     linkMenuExpanded = linkMenuExpanded,
-                    onLinkMenuExpandedChange = onLinkMenuExpandedChange,
+                    onOpenLinkMenu = onOpenLinkMenu,
                     headingMenuExpanded = headingMenuExpanded,
-                    onHeadingMenuExpandedChange = onHeadingMenuExpandedChange,
-                    onInsertImage = onInsertImage,
+                    onOpenHeadingMenu = onOpenHeadingMenu,
+                    onInsertAttachment = onInsertAttachment,
                     onInsertChecklist = onInsertChecklist,
-                    onSetHeadingLevel = onSetHeadingLevel,
+                    onIndent = onIndent,
+                    onOutdent = onOutdent,
                     onToggleBold = onToggleBold,
                     onToggleItalic = onToggleItalic,
                     onToggleStrikethrough = onToggleStrikethrough,
@@ -201,8 +185,6 @@ internal fun EditorKeyboardToolbar(
                     onToggleUnorderedList = onToggleUnorderedList,
                     onToggleOrderedList = onToggleOrderedList,
                     onInsertHorizontalRule = onInsertHorizontalRule,
-                    onInsertWebLink = onInsertWebLink,
-                    onInsertNoteLink = onInsertNoteLink,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -225,16 +207,30 @@ private fun EditorToolbarHistoryActions(
         EditorToolbarIcon(
             onClick = onUndo,
             imageVector = Icons.AutoMirrored.Filled.Undo,
-            contentDescription = "Undo",
+            contentDescription = stringResource(R.string.common_undo),
             enabled = canUndo
         )
         EditorToolbarIcon(
             onClick = onRedo,
             imageVector = Icons.AutoMirrored.Filled.Redo,
-            contentDescription = "Redo",
+            contentDescription = stringResource(R.string.editor_redo),
             enabled = canRedo
         )
     }
+}
+
+/**
+ * Thin material separator between the pinned history controls and the
+ * scrollable formatting tools. It replaces the previous floating-pill groups.
+ */
+@Composable
+private fun EditorToolbarSeparator() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(EditorToolbarSeparatorHeight)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 
 /**
@@ -244,14 +240,15 @@ private fun EditorToolbarHistoryActions(
 @Composable
 private fun EditorToolbarScrollableActions(
     isTemplateMode: Boolean,
-    canInsertImages: Boolean,
+    canInsertAttachments: Boolean,
     linkMenuExpanded: Boolean,
-    onLinkMenuExpandedChange: (Boolean) -> Unit,
+    onOpenLinkMenu: () -> Unit,
     headingMenuExpanded: Boolean,
-    onHeadingMenuExpandedChange: (Boolean) -> Unit,
-    onInsertImage: () -> Unit,
+    onOpenHeadingMenu: () -> Unit,
+    onInsertAttachment: () -> Unit,
     onInsertChecklist: () -> Unit,
-    onSetHeadingLevel: (Int) -> Unit,
+    onIndent: () -> Unit,
+    onOutdent: () -> Unit,
     onToggleBold: () -> Unit,
     onToggleItalic: () -> Unit,
     onToggleStrikethrough: () -> Unit,
@@ -261,8 +258,6 @@ private fun EditorToolbarScrollableActions(
     onToggleUnorderedList: () -> Unit,
     onToggleOrderedList: () -> Unit,
     onInsertHorizontalRule: () -> Unit,
-    onInsertWebLink: () -> Unit,
-    onInsertNoteLink: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -270,162 +265,117 @@ private fun EditorToolbarScrollableActions(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Order chosen from research: high-frequency actions first.
-        EditorToolbarIcon(onToggleBold, Icons.Default.FormatBold, "Bold")
-        EditorHeadingMenu(
+        EditorToolbarIcon(onToggleBold, Icons.Default.FormatBold, stringResource(R.string.editor_bold))
+        EditorToolbarHeadingButton(
             expanded = headingMenuExpanded,
-            onExpandedChange = onHeadingMenuExpandedChange,
-            onSelectLevel = onSetHeadingLevel
+            onClick = onOpenHeadingMenu
         )
         EditorToolbarIcon(
             onClick = onToggleUnorderedList,
             imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
-            contentDescription = "Bulleted list"
+            contentDescription = stringResource(R.string.editor_bulleted_list)
         )
-        EditorToolbarIcon(onInsertChecklist, Icons.Default.CheckBox, "Checklist")
-        EditorLinkMenu(
+        EditorToolbarIcon(
+            onInsertChecklist,
+            Icons.Default.CheckBox,
+            stringResource(R.string.editor_checklist)
+        )
+        EditorToolbarIcon(
+            onIndent,
+            Icons.AutoMirrored.Filled.FormatIndentIncrease,
+            stringResource(R.string.editor_indent)
+        )
+        EditorToolbarIcon(
+            onOutdent,
+            Icons.AutoMirrored.Filled.FormatIndentDecrease,
+            stringResource(R.string.editor_outdent)
+        )
+        EditorToolbarLinkButton(
             expanded = linkMenuExpanded,
-            onExpandedChange = onLinkMenuExpandedChange,
-            onInsertWebLink = onInsertWebLink,
-            onInsertNoteLink = onInsertNoteLink
+            onClick = onOpenLinkMenu
         )
-        EditorToolbarIcon(onToggleItalic, Icons.Default.FormatItalic, "Italic")
+        EditorToolbarIcon(onToggleItalic, Icons.Default.FormatItalic, stringResource(R.string.editor_italic))
         EditorToolbarIcon(
             onClick = onToggleOrderedList,
             imageVector = Icons.Default.FormatListNumbered,
-            contentDescription = "Numbered list"
+            contentDescription = stringResource(R.string.editor_numbered_list)
         )
-        EditorToolbarIcon(onToggleInlineCode, Icons.Default.Code, "Inline code")
-        EditorToolbarIcon(onInsertCodeBlock, Icons.Default.DataObject, "Code block")
-        EditorToolbarIcon(onToggleQuote, Icons.Default.FormatQuote, "Quote")
-        if (!isTemplateMode && canInsertImages) {
-            EditorToolbarIcon(onInsertImage, Icons.Default.Image, "Insert image")
-        }
-        EditorToolbarIcon(onInsertHorizontalRule, Icons.Default.HorizontalRule, "Horizontal rule")
-        EditorToolbarIcon(onToggleStrikethrough, Icons.Default.FormatStrikethrough, "Strikethrough")
-    }
-}
-
-/**
- * Inline link-type chooser anchored to the toolbar's link button.
- *
- * State is fully hoisted: the parent owns [expanded] so it can keep the toolbar
- * (and therefore this dropdown anchor) composed even when the IME briefly collapses
- * after the focusable popup grabs window focus.
- */
-@Composable
-private fun EditorLinkMenu(
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onInsertWebLink: () -> Unit,
-    onInsertNoteLink: () -> Unit
-) {
-    Box {
         EditorToolbarIcon(
-            onClick = { onExpandedChange(true) },
-            imageVector = Icons.Default.Link,
-            contentDescription = "Insert link",
-            selected = expanded
+            onToggleInlineCode,
+            Icons.Default.Code,
+            stringResource(R.string.editor_inline_code)
         )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { onExpandedChange(false) }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Web link") },
-                onClick = {
-                    onExpandedChange(false)
-                    onInsertWebLink()
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Note link") },
-                onClick = {
-                    onExpandedChange(false)
-                    onInsertNoteLink()
-                }
-            )
+        EditorToolbarIcon(
+            onInsertCodeBlock,
+            Icons.Default.DataObject,
+            stringResource(R.string.editor_code_block)
+        )
+        EditorToolbarIcon(
+            onToggleQuote,
+            Icons.Default.FormatQuote,
+            stringResource(R.string.editor_quote)
+        )
+        if (!isTemplateMode && canInsertAttachments) {
+            EditorToolbarIcon(onInsertAttachment, Icons.Default.AttachFile, stringResource(R.string.attachment_add))
         }
+        EditorToolbarIcon(
+            onInsertHorizontalRule,
+            Icons.Default.HorizontalRule,
+            stringResource(R.string.editor_horizontal_rule)
+        )
+        EditorToolbarIcon(
+            onToggleStrikethrough,
+            Icons.Default.FormatStrikethrough,
+            stringResource(R.string.editor_strikethrough)
+        )
     }
 }
 
-/**
- * Heading-level picker that replaces the previous opaque "T" / Title icon.
- *
- * The trigger uses a textual "H" (with a small caret) so the affordance is
- * immediately readable on the toolbar — the previous icon was easy to mistake
- * for plain text formatting. Tapping opens a menu offering H1 through H6 so
- * users can pick a specific level instead of cycling through them blindly.
- */
+/** Trigger for the link-type chooser hosted by [EditorLinkSheet]. */
 @Composable
-private fun EditorHeadingMenu(
+private fun EditorToolbarLinkButton(
     expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onSelectLevel: (Int) -> Unit
+    onClick: () -> Unit
 ) {
-    Box {
-        HeadingTriggerButton(
-            expanded = expanded,
-            onClick = { onExpandedChange(true) }
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { onExpandedChange(false) }
-        ) {
-            HeadingLevels.forEach { level ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = "H$level",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = headingPreviewSize(level)
-                            )
-                        )
-                    },
-                    onClick = {
-                        onExpandedChange(false)
-                        onSelectLevel(level)
-                    }
-                )
-            }
-        }
-    }
-}
-
-private val HeadingLevels: IntRange = 1..6
-
-private fun headingPreviewSize(level: Int) = when (level) {
-    1 -> 22.sp
-    2 -> 19.sp
-    3 -> 17.sp
-    4 -> 16.sp
-    5 -> 15.sp
-    else -> 14.sp
+    EditorToolbarIcon(
+        onClick = onClick,
+        imageVector = Icons.Default.Link,
+        contentDescription = stringResource(R.string.editor_insert_link),
+        selected = expanded
+    )
 }
 
 /**
- * Custom textual trigger for the heading menu. Renders a stylized "H" so the
- * affordance is unambiguous even at a glance.
+ * Trigger for the heading-level chooser hosted by [EditorHeadingSheet].
+ *
+ * The trigger uses a textual "H" so the affordance is immediately readable on
+ * the toolbar — a plain "T" glyph was easy to mistake for text formatting.
  */
 @Composable
-private fun HeadingTriggerButton(
+private fun EditorToolbarHeadingButton(
     expanded: Boolean,
     onClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val containerColor = if (expanded) colorScheme.primaryContainer else Color.Transparent
     val contentColor = if (expanded) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant
+    val headingDescription = stringResource(R.string.editor_heading_level)
+    val expansionDescription = stringResource(if (expanded) R.string.menu_expanded else R.string.menu_collapsed)
 
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
         IconButton(
             onClick = onClick,
             modifier = Modifier
                 .size(EditorToolbarButtonSize)
-                .clip(CircleShape)
+                .clip(MaterialTheme.shapes.medium)
                 .background(containerColor)
+                .semantics {
+                    contentDescription = headingDescription
+                    stateDescription = expansionDescription
+                }
         ) {
             Box(
-                modifier = Modifier.size(EditorToolbarIconSize),
+                modifier = Modifier.size(EditorToolbarButtonSize),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -452,7 +402,7 @@ private fun EditorToolbarIcon(
     val colorScheme = MaterialTheme.colorScheme
     val containerColor = if (selected) colorScheme.primaryContainer else Color.Transparent
     val contentColor = when {
-        !enabled -> colorScheme.onSurface.copy(alpha = 0.24f)
+        !enabled -> colorScheme.onSurface.copy(alpha = 0.38f)
         selected -> colorScheme.onPrimaryContainer
         else -> colorScheme.onSurfaceVariant
     }
@@ -463,7 +413,7 @@ private fun EditorToolbarIcon(
             enabled = enabled,
             modifier = Modifier
                 .size(EditorToolbarButtonSize)
-                .clip(CircleShape)
+                .clip(MaterialTheme.shapes.medium)
                 .background(containerColor)
         ) {
             Icon(

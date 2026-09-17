@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.ui.component
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -13,6 +14,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 
 /** Sort choices shared by every note-search surface. */
@@ -25,7 +28,10 @@ fun NoteSearchSortMenu(
     Box {
         NexIconButton(
             imageVector = Icons.AutoMirrored.Filled.Sort,
-            contentDescription = "Sort search results: ${selected.label}",
+            contentDescription = stringResource(
+                R.string.common_sort_results,
+                stringResource(selected.labelRes)
+            ),
             selected = selected != NoteSearchSort.RELEVANCE,
             onClick = { expanded = true }
         )
@@ -35,7 +41,7 @@ fun NoteSearchSortMenu(
         ) {
             NoteSearchSort.entries.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option.label) },
+                    text = { Text(stringResource(option.labelRes)) },
                     trailingIcon = if (option == selected) {
                         { Icon(imageVector = Icons.Default.Check, contentDescription = null) }
                     } else {
@@ -51,11 +57,12 @@ fun NoteSearchSortMenu(
     }
 }
 
-private val NoteSearchSort.label: String
+private val NoteSearchSort.labelRes: Int
+    @StringRes
     get() = when (this) {
-        NoteSearchSort.RELEVANCE -> "Relevance"
-        NoteSearchSort.MODIFIED_DESC -> "Newest modified"
-        NoteSearchSort.MODIFIED_ASC -> "Oldest modified"
-        NoteSearchSort.TITLE_ASC -> "Title A–Z"
-        NoteSearchSort.TITLE_DESC -> "Title Z–A"
+        NoteSearchSort.RELEVANCE -> R.string.search_sort_relevance
+        NoteSearchSort.MODIFIED_DESC -> R.string.search_sort_modified_desc
+        NoteSearchSort.MODIFIED_ASC -> R.string.search_sort_modified_asc
+        NoteSearchSort.TITLE_ASC -> R.string.search_sort_title_asc
+        NoteSearchSort.TITLE_DESC -> R.string.search_sort_title_desc
     }

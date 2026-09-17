@@ -2,7 +2,9 @@ package io.github.r0x4nk.nexnote.domain.model
 
 /**
  * Domain model for a note, decoupled from the Room entity.
- * [imagePaths] holds paths relative to filesDir (e.g. "images/note_1_img_0.jpg").
+ * [imagePaths] is the legacy persisted asset manifest: images AND opaque attachments.
+ * Paths are relative to filesDir. Keeping one manifest makes Vault, trash and undo
+ * retain ownership of every payload without a database or encrypted-field migration.
  * [creationDate] is user-editable; [lastModifiedDate] is managed exclusively by the app.
  */
 data class Note(

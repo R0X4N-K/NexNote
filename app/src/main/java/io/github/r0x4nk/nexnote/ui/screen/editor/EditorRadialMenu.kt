@@ -9,12 +9,14 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuScrollEffect
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -53,7 +55,11 @@ internal fun EditorRadialMenuBindings(
             onSearchOpen
         ),
         fabIcon = if (showPreview) Icons.Default.Tune else null,
-        fabContentDescription = if (showPreview) "Open preview tools" else null
+        fabContentDescription = if (showPreview) {
+            stringResource(R.string.editor_open_preview_tools)
+        } else {
+            null
+        }
     )
 }
 
@@ -150,42 +156,50 @@ private fun rememberEditorPreviewRadialMenuItems(
     onToggleColorPicker: () -> Unit,
     onCreationDateEdit: () -> Unit,
     onSearchOpen: () -> Unit
-): List<RadialMenuItem> = remember(
-    showPreview,
-    isTemplateMode,
-    isReadOnly,
-    onToggleColorPicker,
-    onCreationDateEdit,
-    onSearchOpen
-) {
-    if (!showPreview) return@remember emptyList()
+): List<RadialMenuItem> {
+    val backgroundLabel = stringResource(R.string.note_background_color)
+    val creationDateLabel = stringResource(R.string.edit_creation_date)
+    val searchLabel = stringResource(R.string.search_in_note)
+    return remember(
+        backgroundLabel,
+        creationDateLabel,
+        searchLabel,
+        showPreview,
+        isTemplateMode,
+        isReadOnly,
+        onToggleColorPicker,
+        onCreationDateEdit,
+        onSearchOpen
+    ) {
+        if (!showPreview) return@remember emptyList()
 
-    buildList {
-        if (!isTemplateMode && !isReadOnly) {
-            add(
-                RadialMenuItem(
-                    icon = Icons.Default.Palette,
-                    label = "",
-                    action = onToggleColorPicker,
-                    contentDescription = "Note background color"
+        buildList {
+            if (!isTemplateMode && !isReadOnly) {
+                add(
+                    RadialMenuItem(
+                        icon = Icons.Default.Palette,
+                        label = "",
+                        action = onToggleColorPicker,
+                        contentDescription = backgroundLabel
+                    )
                 )
-            )
+                add(
+                    RadialMenuItem(
+                        icon = Icons.Default.CalendarToday,
+                        label = "",
+                        action = onCreationDateEdit,
+                        contentDescription = creationDateLabel
+                    )
+                )
+            }
             add(
                 RadialMenuItem(
-                    icon = Icons.Default.CalendarToday,
+                    icon = Icons.Default.Search,
                     label = "",
-                    action = onCreationDateEdit,
-                    contentDescription = "Edit creation date"
+                    action = onSearchOpen,
+                    contentDescription = searchLabel
                 )
             )
         }
-        add(
-            RadialMenuItem(
-                icon = Icons.Default.Search,
-                label = "",
-                action = onSearchOpen,
-                contentDescription = "Search in note"
-            )
-        )
     }
 }

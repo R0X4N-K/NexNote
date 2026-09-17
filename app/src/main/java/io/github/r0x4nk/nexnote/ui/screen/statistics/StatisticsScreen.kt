@@ -32,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,13 +41,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.DailyWritingActivity
 import io.github.r0x4nk.nexnote.domain.model.NoteStatistics
 import io.github.r0x4nk.nexnote.domain.model.TagUsageStatistic
@@ -69,18 +74,22 @@ fun StatisticsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground(),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Statistics",
-                        style = MaterialTheme.typography.headlineSmall
+                        text = stringResource(R.string.statistics_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 },
                 navigationIcon = {
                     NexIconButton(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Go back",
+                        contentDescription = stringResource(R.string.common_back),
                         onClick = onBack
                     )
                 },
@@ -192,18 +201,18 @@ private fun StatisticsCalculationStatus(
                 Column {
                 Text(
                     text = if (isRetryingAfterError) {
-                        "Preparation paused briefly; retrying in background"
+                        stringResource(R.string.statistics_status_retrying)
                     } else if (hasVisibleStatistics) {
-                            "Updating statistics"
-                        } else {
-                            "Preparing statistics"
-                        },
-                        style = MaterialTheme.typography.titleSmall
-                    )
+                        stringResource(R.string.statistics_status_updating)
+                    } else {
+                        stringResource(R.string.statistics_status_preparing)
+                    },
+                    style = MaterialTheme.typography.titleSmall
+                )
                     Text(
                         text = calculationStatusText(processedNotes, totalNotes),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.76f)
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
@@ -228,10 +237,15 @@ private fun StatisticsCalculationStatus(
     }
 }
 
+@Composable
 private fun calculationStatusText(processedNotes: Int, totalNotes: Int): String = when {
-    totalNotes <= 0 -> "Reading notes stored on this device"
-    processedNotes <= 0 -> "$totalNotes notes found · starting local preparation"
-    else -> "$processedNotes of $totalNotes notes processed"
+    totalNotes <= 0 -> stringResource(R.string.statistics_status_reading)
+    processedNotes <= 0 -> pluralStringResource(
+        R.plurals.statistics_status_found,
+        totalNotes,
+        totalNotes
+    )
+    else -> stringResource(R.string.statistics_status_processed, processedNotes, totalNotes)
 }
 
 @Composable
@@ -277,13 +291,13 @@ private fun StatisticsHero(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = if (statistics.totalNotes == 1) {
-                    "note dated ${statistics.selectedYear}"
-                } else {
-                    "notes dated ${statistics.selectedYear}"
-                },
+                text = pluralStringResource(
+                    R.plurals.statistics_notes_dated,
+                    statistics.totalNotes,
+                    statistics.selectedYear
+                ),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -295,15 +309,15 @@ private fun StatisticsHero(
                         "${statistics.longestStreakDays}"
                     },
                     label = if (statistics.selectedYear == statistics.currentYear) {
-                        "current streak"
+                        stringResource(R.string.statistics_current_streak)
                     } else {
-                        "best streak"
+                        stringResource(R.string.statistics_best_streak)
                     }
                 )
                 HeroBadge(
                     icon = Icons.Default.CalendarMonth,
                     value = "${statistics.activeDays}",
-                    label = "active days"
+                    label = stringResource(R.string.statistics_active_days)
                 )
             }
         }
@@ -325,7 +339,7 @@ private fun YearSelector(
         Row(verticalAlignment = Alignment.CenterVertically) {
             NexIconButton(
                 imageVector = Icons.Default.ChevronLeft,
-                contentDescription = "Previous year",
+                contentDescription = stringResource(R.string.statistics_previous_year),
                 enabled = canGoBack,
                 onClick = onPrevious,
                 modifier = Modifier.size(40.dp)
@@ -337,7 +351,7 @@ private fun YearSelector(
             )
             NexIconButton(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Next year",
+                contentDescription = stringResource(R.string.statistics_next_year),
                 enabled = canGoForward,
                 onClick = onNext,
                 modifier = Modifier.size(40.dp)
@@ -377,10 +391,13 @@ private fun ActivityCalendarCard(
     onSelectDay: (java.time.LocalDate) -> Unit
 ) {
     StatisticsCard {
-        Text(text = "Writing activity", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = stringResource(R.string.statistics_writing_activity),
+            style = MaterialTheme.typography.titleLarge
+        )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Daily intensity combines notes, words, and newly created tags.",
+            text = stringResource(R.string.statistics_writing_activity_description),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -416,10 +433,10 @@ private fun SelectedDaySummary(day: DailyWritingActivity) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                DayMetric("Notes", day.noteCount, Modifier.weight(1f))
-                DayMetric("Words", day.wordCount, Modifier.weight(1f))
-                DayMetric("Characters", day.characterCount, Modifier.weight(1f))
-                DayMetric("New tags", day.tagsCreated, Modifier.weight(1f))
+                DayMetric(stringResource(R.string.statistics_metric_notes), day.noteCount, Modifier.weight(1f))
+                DayMetric(stringResource(R.string.statistics_metric_words), day.wordCount, Modifier.weight(1f))
+                DayMetric(stringResource(R.string.statistics_metric_characters), day.characterCount, Modifier.weight(1f))
+                DayMetric(stringResource(R.string.statistics_metric_new_tags), day.tagsCreated, Modifier.weight(1f))
             }
         }
     }
@@ -446,18 +463,18 @@ private fun DayMetric(label: String, value: Number, modifier: Modifier = Modifie
 @Composable
 private fun StatisticsOverview(statistics: NoteStatistics) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        NexSectionLabel("Overview")
+        NexSectionLabel(stringResource(R.string.statistics_overview))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OverviewMetric(
                 icon = Icons.AutoMirrored.Filled.Notes,
                 value = statistics.totalNotes,
-                label = "Notes",
+                label = stringResource(R.string.statistics_metric_notes),
                 modifier = Modifier.weight(1f)
             )
             OverviewMetric(
                 icon = Icons.Default.EditNote,
                 value = statistics.totalWords,
-                label = "Words",
+                label = stringResource(R.string.statistics_metric_words),
                 modifier = Modifier.weight(1f)
             )
         }
@@ -465,13 +482,13 @@ private fun StatisticsOverview(statistics: NoteStatistics) {
             OverviewMetric(
                 icon = Icons.Default.TextFields,
                 value = statistics.totalCharacters,
-                label = "Characters",
+                label = stringResource(R.string.statistics_metric_characters),
                 modifier = Modifier.weight(1f)
             )
             OverviewMetric(
                 icon = Icons.Default.Tag,
                 value = statistics.totalTagsCreated,
-                label = "New tags",
+                label = stringResource(R.string.statistics_metric_new_tags),
                 modifier = Modifier.weight(1f)
             )
         }
@@ -517,39 +534,49 @@ private fun OverviewMetric(
 @Composable
 private fun WritingRhythmCard(statistics: NoteStatistics) {
     StatisticsCard {
-        Text(text = "Writing rhythm", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = stringResource(R.string.statistics_writing_rhythm),
+            style = MaterialTheme.typography.titleLarge
+        )
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             RhythmMetric(
                 value = statistics.longestStreakDays,
-                label = "Best streak",
-                suffix = "days",
+                label = stringResource(R.string.statistics_rhythm_best_streak),
+                suffix = stringResource(R.string.statistics_unit_days),
                 modifier = Modifier.weight(1f)
             )
             RhythmMetric(
                 value = statistics.averageWordsPerNote,
-                label = "Average note",
-                suffix = "words",
+                label = stringResource(R.string.statistics_rhythm_average_note),
+                suffix = stringResource(R.string.statistics_unit_words),
                 modifier = Modifier.weight(1f)
             )
             RhythmMetric(
                 value = statistics.longestNoteWords,
-                label = "Longest note",
-                suffix = "words",
+                label = stringResource(R.string.statistics_rhythm_longest_note),
+                suffix = stringResource(R.string.statistics_unit_words),
                 modifier = Modifier.weight(1f)
             )
         }
         statistics.busiestDay?.let { busiest ->
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "Busiest day · ${busiest.date.format(
-                    DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
-                )}",
+                text = stringResource(
+                    R.string.statistics_busiest_day,
+                    busiest.date.format(
+                        DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
+                    )
+                ),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "${busiest.noteCount} notes and ${formatCount(busiest.wordCount)} words",
+                text = stringResource(
+                    R.string.statistics_busiest_day_detail,
+                    busiest.noteCount,
+                    formatCount(busiest.wordCount)
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -580,7 +607,10 @@ private fun RhythmMetric(
 private fun WeekdayActivityCard(statistics: NoteStatistics) {
     val maxNotes = statistics.notesByWeekday.values.maxOrNull()?.coerceAtLeast(1) ?: 1
     StatisticsCard {
-        Text(text = "Weekly pattern", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = stringResource(R.string.statistics_weekly_pattern),
+            style = MaterialTheme.typography.titleLarge
+        )
         Spacer(Modifier.height(14.dp))
         DayOfWeek.entries.forEach { weekday ->
             WeekdayBar(
@@ -621,16 +651,19 @@ private fun WeekdayBar(weekday: DayOfWeek, noteCount: Int, maxNotes: Int) {
 private fun TopTagsCard(tags: List<TagUsageStatistic>, year: Int) {
     val maxUsage = tags.maxOfOrNull { tag -> tag.noteCount }?.coerceAtLeast(1) ?: 1
     StatisticsCard {
-        Text(text = "Top tags", style = MaterialTheme.typography.titleLarge)
         Text(
-            text = "Tags in notes dated $year",
+            text = stringResource(R.string.statistics_top_tags),
+            style = MaterialTheme.typography.titleLarge
+        )
+        Text(
+            text = stringResource(R.string.statistics_tags_in_year, year),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(14.dp))
         if (tags.isEmpty()) {
             Text(
-                text = "No tags in this year's notes yet.",
+                text = stringResource(R.string.statistics_no_tags_year),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -680,10 +713,7 @@ private fun StatisticsMethodologyNote() {
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                text = "Activity uses each note's assigned date. Word and character totals " +
-                    "reflect its current content because edit history is not stored. " +
-                    "New tags use the day they first appear in statistics. Trash and Vault notes " +
-                    "are excluded.",
+                text = stringResource(R.string.statistics_methodology),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

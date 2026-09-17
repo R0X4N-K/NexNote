@@ -12,7 +12,9 @@ import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import androidx.core.content.FileProvider
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,16 +40,26 @@ internal class ExportManager(
      * The intent is not launched internally because the UI needs an Activity context
      * to call startActivity.
      */
-    suspend fun buildShareIntent(notes: List<Note>, format: ExportFormat): Intent =
+    suspend fun buildShareIntent(notes: List<Note>, format: ExportFormat, includeMedia: Boolean = true): Intent =
         withContext(Dispatchers.IO) {
-            val file = createExportFile(notes, format)
+            val exportNotes = ExportMediaPolicy.apply(notes, includeMedia, format)
+            val document = createExportFile(exportNotes, format)
+            val bundled = includeMedia && AttachmentBundleExporter.needsBundle(notes)
+            val file = if (bundled) {
+                val bundle = prepareFile(buildFileName(notes, format).substringBeforeLast('.') + ".zip")
+                try {
+                    AttachmentBundleExporter.write(bundle, document, buildFileName(notes, format), notes,
+                        imageFileProvider, coroutineContext::ensureActive)
+                    bundle
+                } finally { document.delete() }
+            } else document
             val uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
                 file
             )
             Intent(Intent.ACTION_SEND).apply {
-                type = format.mimeType
+                type = if (bundled) "application/zip" else format.mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 clipData = ClipData.newUri(context.contentResolver, file.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -58,13 +70,15 @@ internal class ExportManager(
      * Generates the PDF on IO and initiates native printing via [PrintManager].
      * Must be called from a coroutine launched in the UI (Main) context.
      */
-    suspend fun print(notes: List<Note>) {
-        val file = withContext(Dispatchers.IO) { createExportFile(notes, ExportFormat.PDF) }
+    suspend fun print(notes: List<Note>, includeMedia: Boolean = true) {
+        val file = withContext(Dispatchers.IO) {
+            createExportFile(ExportMediaPolicy.apply(notes, includeMedia, ExportFormat.PDF), ExportFormat.PDF)
+        }
         val manager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
         try {
             manager.print(
                 buildFileName(notes, ExportFormat.PDF),
-                PdfPrintAdapter(file),
+                PdfPrintAdapter(file, context.getString(R.string.export_error_write_pdf)),
                 null
             )
         } catch (error: Exception) {
@@ -76,6 +90,7 @@ internal class ExportManager(
     // ── Format routing ────────────────────────────────────────────────────────
 
     private fun createExportFile(notes: List<Note>, format: ExportFormat): File {
+        require(notes.none { it.isInVault }) { "Vault notes cannot be exported" }
         val file = prepareFile(buildFileName(notes, format))
         try {
             when (format) {
@@ -96,7 +111,9 @@ internal class ExportManager(
     private fun buildFileName(notes: List<Note>, format: ExportFormat): String {
         val ext = format.extension
         val base = when {
-            notes.size == 1 -> sanitize(notes.first().title.ifBlank { "Note" })
+            notes.size == 1 -> sanitize(
+                notes.first().title.ifBlank { context.getString(R.string.export_default_file_name) }
+            )
             else -> {
                 val ts = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
                 "NexNote_Export_$ts"
@@ -107,7 +124,8 @@ internal class ExportManager(
 
     /** Strips characters that are invalid in file names and truncates to 100 characters. */
     private fun sanitize(name: String): String =
-        name.replace(Regex("""[\\/:*?"<>|]"""), "_").trim().take(100).ifBlank { "Note" }
+        name.replace(Regex("""[\\/:*?"<>|]"""), "_").trim().take(100)
+            .ifBlank { context.getString(R.string.export_default_file_name) }
 
     private fun prepareFile(name: String): File {
         return exportCache.prepareFile(name)
@@ -128,12 +146,15 @@ internal class ExportManager(
     // ── PDF writer (line-by-line pagination) ─────────────────────────────────
 
     private fun writePdf(file: File, notes: List<Note>) {
-        PdfNoteExporter.write(file, notes, imageFileProvider)
+        PdfNoteExporter.write(file, notes, imageFileProvider, context.resources)
     }
 
     // ── PrintDocumentAdapter ──────────────────────────────────────────────────
 
-    private class PdfPrintAdapter(private val pdfFile: File) : PrintDocumentAdapter() {
+    private class PdfPrintAdapter(
+        private val pdfFile: File,
+        private val writeErrorMessage: String
+    ) : PrintDocumentAdapter() {
 
         override fun onLayout(
             oldAttributes: PrintAttributes?,
@@ -171,7 +192,7 @@ internal class ExportManager(
                 }
                 callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
             } catch (e: Exception) {
-                callback.onWriteFailed("Could not write the PDF")
+                callback.onWriteFailed(writeErrorMessage)
             }
         }
 

@@ -2,6 +2,38 @@ package io.github.r0x4nk.nexnote.util
 
 private val markdownTaskListLine = Regex("""^(?:>\s?)?\s*[-*+]\s+\[([ xX])]""")
 
+private val markdownUncheckedTaskListLine = Regex(
+    pattern = """^(?:>\s?)?\s*[-*+]\s+\[ ]""",
+    option = RegexOption.MULTILINE
+)
+
+private val markdownCheckedTaskListLine = Regex(
+    pattern = """^(?:>\s?)?\s*[-*+]\s+\[[xX]]""",
+    option = RegexOption.MULTILINE
+)
+
+/**
+ * Walks [markdown] line by line, invoking [predicate] on every line that is
+ * outside a fenced code block. Iteration stops as soon as [predicate] returns
+ * `true`, so bulk checks stay cheap on large notes.
+ *
+ * Checklist markers inside fenced code blocks are code samples, not real tasks:
+ * they are neither rendered as checkboxes nor rewritten by [setAllMarkdownTaskListItems].
+ */
+private inline fun String.anyLineOutsideFences(predicate: (String) -> Boolean): Boolean {
+    var inFence = false
+    for (line in lineSequence()) {
+        if (line.isFenceDelimiter()) {
+            inFence = !inFence
+            continue
+        }
+        if (!inFence && predicate(line)) return true
+    }
+    return false
+}
+
+private fun String.isFenceDelimiter(): Boolean = trimStart().startsWith("```")
+
 /**
  * Resolves the source offset of a rendered task-list marker.
  *
@@ -68,4 +100,49 @@ internal fun toggleMarkdownTaskListItem(markdown: String, markerOffset: Int): St
         else -> return null
     }
     return markdown.replaceRange(markerOffset, markerOffset + 1, replacement.toString())
+}
+
+/**
+ * Whether the note contains at least one unchecked task-list item outside a
+ * fenced code block. Used to decide whether offering "check all" is meaningful.
+ */
+internal fun hasUncheckedMarkdownTaskListItems(markdown: String): Boolean =
+    markdown.anyLineOutsideFences { markdownUncheckedTaskListLine.containsMatchIn(it) }
+
+/**
+ * Whether the note contains at least one checked task-list item outside a
+ * fenced code block.
+ *
+ * See [hasUncheckedMarkdownTaskListItems] for the fence rationale.
+ */
+internal fun hasCheckedMarkdownTaskListItems(markdown: String): Boolean =
+    markdown.anyLineOutsideFences { markdownCheckedTaskListLine.containsMatchIn(it) }
+
+/**
+ * Sets every task-list marker in [markdown] to checked (`[x]`) or unchecked
+ * (`[ ]`) in one pass.
+ *
+ * Indentation and blockquote prefixes are preserved because only the marker
+ * character captured by the regex is replaced. Non-task lines and fenced code
+ * blocks are left untouched, so this can safely rewrite an entire note.
+ */
+internal fun setAllMarkdownTaskListItems(markdown: String, checked: Boolean): String {
+    if ("[" !in markdown) return markdown
+    val replacement = if (checked) "x" else " "
+
+    var inFence = false
+    return markdown.lineSequence().joinToString("\n") { line ->
+        if (line.isFenceDelimiter()) {
+            inFence = !inFence
+            line
+        } else if (inFence) {
+            line
+        } else {
+            markdownTaskListLine.replace(line) { match ->
+                val markerRange = match.groups[1]!!.range
+                val relativeStart = markerRange.first - match.range.first
+                match.value.replaceRange(relativeStart, relativeStart + 1, replacement)
+            }
+        }
+    }
 }

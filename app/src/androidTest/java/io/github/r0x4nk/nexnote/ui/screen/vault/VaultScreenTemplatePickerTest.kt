@@ -3,20 +3,22 @@ package io.github.r0x4nk.nexnote.ui.screen.vault
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import io.github.r0x4nk.nexnote.di.AppDependencies
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
-import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialAvailability
@@ -66,6 +68,43 @@ class VaultScreenTemplatePickerTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun deviceColorsSelectionKeepsNoteActionsAndLockProtection() {
+        val harness = VaultScreenHarness(
+            initialVaultState = VaultState.UNLOCKED,
+            templates = emptyList(),
+            activeNotes = listOf(Note(id = 11L, title = "Review note", content = "A note used to verify selection actions.", isInVault = true))
+        )
+        composeRule.setVaultScreen(harness = harness, darkTheme = true, dynamicColor = true)
+        composeRule.waitUntilUnlocked(harness)
+        composeRule.waitUntilTextVisible("Review note")
+        saveReviewScreenshot("vault-device-dark")
+        composeRule.onNodeWithText("Review note").performTouchInput { longClick() }
+        composeRule.onNodeWithText("1 selected").assertIsDisplayed()
+        saveReviewScreenshot("vault-selected")
+        composeRule.onNodeWithContentDescription("Selection options").performClick()
+        composeRule.onNodeWithText("Note actions").performClick()
+        composeRule.onNodeWithText("Vault note actions").assertIsDisplayed()
+        composeRule.onNodeWithText("Duplicate").assertIsDisplayed()
+        composeRule.onNodeWithText("Remove from Vault").assertIsDisplayed()
+        saveReviewScreenshot("vault-actions")
+        composeRule.runOnIdle { harness.accessViewModel.lock() }
+        composeRule.waitUntilLocked(harness)
+        composeRule.onNodeWithText("Vault note actions").assertDoesNotExist()
+        composeRule.onNodeWithText("Unlock Vault").assertIsDisplayed()
+        saveReviewScreenshot("vault-locked")
+    }
+
+    private fun saveReviewScreenshot(name: String) {
+        composeRule.waitForIdle()
+        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        val directory = java.io.File(instrumentation.targetContext.getExternalFilesDir(null), "ui-ux-review")
+        directory.mkdirs()
+        java.io.File(directory, "$name.png").outputStream().use {
+            instrumentation.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
 
     @Test
     fun unlockedActiveVaultList_opensDismissesAndSelectsTemplatePicker() {
@@ -250,9 +289,11 @@ class VaultScreenTemplatePickerTest {
 
         composeRule.onNodeWithText("Private sheet title")
             .performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription("Selection options").performClick()
+        composeRule.onNodeWithText("Note actions").performClick()
         composeRule.onNodeWithText("Vault note actions").assertIsDisplayed()
 
-        composeRule.lockVaultFromOverflowMenu()
+        composeRule.runOnIdle { harness.accessViewModel.lock() }
         composeRule.waitUntil(timeoutMillis = 3_000) {
             harness.accessViewModel.uiState.value.vaultState == VaultState.LOCKED &&
                 !harness.notesViewModel.uiState.value.isUnlocked
@@ -361,6 +402,8 @@ class VaultScreenTemplatePickerTest {
 
         composeRule.onNodeWithText("Snackbar private title")
             .performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription("Selection options").performClick()
+        composeRule.onNodeWithText("Note actions").performClick()
         composeRule.onNodeWithText("Move to trash")
             .assertIsDisplayed()
             .performClick()
@@ -384,10 +427,12 @@ class VaultScreenTemplatePickerTest {
         harness: VaultScreenHarness,
         onBack: () -> Unit = {},
         onCreateVaultNote: () -> Unit = {},
-        onCreateVaultNoteFromTemplate: (Long) -> Unit = {}
+        onCreateVaultNoteFromTemplate: (Long) -> Unit = {},
+        darkTheme: Boolean = false,
+        dynamicColor: Boolean = false
     ) {
         setContent {
-            NexNoteTheme {
+            NexNoteTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
                 RadialMenuOverlay {
                     VaultScreen(
                         onBack = onBack,
@@ -506,8 +551,14 @@ private class VaultScreenHarness(
         toggleVaultNotePin = ToggleVaultNotePinUseCase(vaultNoteRepository),
         duplicateVaultNote = DuplicateVaultNoteUseCase(vaultNoteRepository),
         removeNoteFromVault = RemoveNoteFromVaultUseCase(vaultNoteRepository),
+        updateVaultNoteCreationDate =
+            io.github.r0x4nk.nexnote.domain.usecase.UpdateVaultNoteCreationDateUseCase(
+                vaultNoteRepository
+            ),
         observeTemplates = ObserveTemplatesUseCase(templateRepository),
-        observeNoteCardStyle = ObserveNoteCardStyleUseCase(preferencesRepository)
+        observeNoteCardStyle = ObserveNoteCardStyleUseCase(preferencesRepository),
+        strings = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+            as AppDependencies).strings
     )
 }
 
@@ -624,8 +675,12 @@ private class FakeVaultScreenTemplateRepository(
 
 private class FakeVaultScreenPreferencesRepository : IUserPreferencesRepository {
     override val themeMode: Flow<ThemeMode> = MutableStateFlow(ThemeMode.SYSTEM)
+    override val appFont: Flow<io.github.r0x4nk.nexnote.domain.model.AppFont> =
+        MutableStateFlow(io.github.r0x4nk.nexnote.domain.model.AppFont.SYSTEM)
     override val fontScale: Flow<FontScale> = MutableStateFlow(FontScale.NORMAL)
     override val timezoneId: Flow<String> = MutableStateFlow("UTC")
+    override val dynamicColor = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override suspend fun setDynamicColor(enabled: Boolean) { dynamicColor.value = enabled }
     override val accentColor: Flow<AccentColor> = MutableStateFlow(AccentColor.VIOLET)
     override val noteCardStyle: Flow<NoteCardStyle> =
         MutableStateFlow(NoteCardStyle.TITLE_AND_PREVIEW)
@@ -638,6 +693,7 @@ private class FakeVaultScreenPreferencesRepository : IUserPreferencesRepository 
     override val unlockVaultWithAndroidCredential: Flow<Boolean> = MutableStateFlow(false)
 
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
+    override suspend fun setAppFont(font: io.github.r0x4nk.nexnote.domain.model.AppFont) = Unit
     override suspend fun setFontScale(scale: FontScale) = Unit
     override suspend fun setTimezoneId(id: String) = Unit
     override suspend fun setAccentColor(color: AccentColor) = Unit

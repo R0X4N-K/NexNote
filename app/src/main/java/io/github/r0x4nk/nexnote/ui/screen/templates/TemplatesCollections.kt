@@ -20,11 +20,16 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import io.github.r0x4nk.nexnote.ui.common.NoteCollectionSortEffect
+import io.github.r0x4nk.nexnote.ui.common.animateNoteItem
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
@@ -44,6 +49,7 @@ internal fun TemplatesCollection(
 ) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyStaggeredGridState()
+    NoteCollectionSortEffect(uiState.sortOrder, listState, gridState)
     val bottomContentPadding = RadialMenuOverlayDefaults.fabBottomClearance(floatingBottomPadding)
     val scrollToTopBottomPadding = if (selectionState.isActive) {
         floatingBottomPadding + 16.dp
@@ -124,8 +130,8 @@ private fun TemplatesList(
         if (predefined.isNotEmpty()) {
             item {
                 SectionHeader(
-                    title = "Built-in",
-                    description = "Ready-to-use starting points",
+                    title = stringResource(R.string.templates_built_in),
+                    description = stringResource(R.string.templates_built_in_description),
                     count = predefined.size
                 )
             }
@@ -143,7 +149,8 @@ private fun TemplatesList(
                     onDelete = { onDelete(template) },
                     onLongPress = { onToggleSelection(template) },
                     selectionMode = selectionState.isActive,
-                    selected = selectionState.isSelected(template.id)
+                    selected = selectionState.isSelected(template.id),
+                    modifier = animateNoteItem()
                 )
             }
         }
@@ -151,8 +158,8 @@ private fun TemplatesList(
         if (custom.isNotEmpty()) {
             item {
                 SectionHeader(
-                    title = "Your templates",
-                    description = "Structures you can edit and reuse",
+                    title = stringResource(R.string.templates_your),
+                    description = stringResource(R.string.templates_your_description),
                     count = custom.size
                 )
             }
@@ -170,7 +177,8 @@ private fun TemplatesList(
                     onDelete = { onDelete(template) },
                     onLongPress = { onToggleSelection(template) },
                     selectionMode = selectionState.isActive,
-                    selected = selectionState.isSelected(template.id)
+                    selected = selectionState.isSelected(template.id),
+                    modifier = animateNoteItem()
                 )
             }
         }
@@ -206,8 +214,8 @@ private fun TemplatesGrid(
         if (predefined.isNotEmpty()) {
             item(span = StaggeredGridItemSpan.FullLine) {
                 SectionHeader(
-                    title = "Built-in",
-                    description = "Ready-to-use starting points",
+                    title = stringResource(R.string.templates_built_in),
+                    description = stringResource(R.string.templates_built_in_description),
                     count = predefined.size
                 )
             }
@@ -225,7 +233,8 @@ private fun TemplatesGrid(
                     onDelete = { onDelete(template) },
                     onLongPress = { onToggleSelection(template) },
                     selectionMode = selectionState.isActive,
-                    selected = selectionState.isSelected(template.id)
+                    selected = selectionState.isSelected(template.id),
+                    modifier = animateNoteItem()
                 )
             }
         }
@@ -233,8 +242,8 @@ private fun TemplatesGrid(
         if (custom.isNotEmpty()) {
             item(span = StaggeredGridItemSpan.FullLine) {
                 SectionHeader(
-                    title = "Your templates",
-                    description = "Structures you can edit and reuse",
+                    title = stringResource(R.string.templates_your),
+                    description = stringResource(R.string.templates_your_description),
                     count = custom.size
                 )
             }
@@ -252,7 +261,8 @@ private fun TemplatesGrid(
                     onDelete = { onDelete(template) },
                     onLongPress = { onToggleSelection(template) },
                     selectionMode = selectionState.isActive,
-                    selected = selectionState.isSelected(template.id)
+                    selected = selectionState.isSelected(template.id),
+                    modifier = animateNoteItem()
                 )
             }
         }

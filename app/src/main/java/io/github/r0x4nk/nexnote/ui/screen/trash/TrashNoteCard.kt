@@ -16,16 +16,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NoteCollectionCardDefaults
 import io.github.r0x4nk.nexnote.ui.component.buildNoteCardDisplayText
+import io.github.r0x4nk.nexnote.ui.theme.NoteContentTheme
+import io.github.r0x4nk.nexnote.ui.theme.rememberContentMarkdownColors
+import io.github.r0x4nk.nexnote.ui.theme.rememberNoteColors
+import io.github.r0x4nk.nexnote.ui.common.noteRelativeTimeLabel
 import io.github.r0x4nk.nexnote.util.DateUtils
-import io.github.r0x4nk.nexnote.util.MarkdownColors
 
 private const val TRASH_NOTE_EXCERPT_MAX_LENGTH = 120
 
@@ -41,18 +47,22 @@ internal fun TrashNoteCard(
     modifier: Modifier = Modifier,
     onDeletePermanently: (() -> Unit)? = null
 ) {
-    Card(
-        modifier  = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = NoteCollectionCardDefaults.defaultElevation
-        ),
-        colors    = CardDefaults.cardColors(
-            containerColor = NoteCollectionCardDefaults.containerColor()
-        ),
-        shape = NoteCollectionCardDefaults.shape,
-        border = NoteCollectionCardDefaults.border()
-    ) {
-        TrashNoteCardContent(note, onRestore, onDeletePermanently)
+    val colors = rememberNoteColors(note.backgroundColor)
+    NoteContentTheme(colors) {
+        Card(
+            modifier  = modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = NoteCollectionCardDefaults.defaultElevation
+            ),
+            colors    = CardDefaults.cardColors(
+                containerColor = colors.container,
+                contentColor = colors.onContainer
+            ),
+            shape = NoteCollectionCardDefaults.shape,
+            border = NoteCollectionCardDefaults.border()
+        ) {
+            TrashNoteCardContent(note, onRestore, onDeletePermanently)
+        }
     }
 }
 
@@ -66,13 +76,14 @@ private fun TrashNoteCardContent(
 
     Column(
         modifier = Modifier.padding(
-            start = 16.dp, top = 12.dp, bottom = 4.dp, end = 8.dp
+            start = 20.dp, top = 16.dp, bottom = 12.dp, end = 20.dp
         )
     ) {
         TrashNoteTitle(textState.title)
         TrashNoteExcerpt(textState.excerpt)
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(12.dp))
         TrashNoteDate(note)
+        Spacer(Modifier.height(12.dp))
         TrashNoteActions(onRestore, onDeletePermanently)
     }
 }
@@ -80,31 +91,39 @@ private fun TrashNoteCardContent(
 @Composable
 private fun rememberTrashNoteCardTextState(note: Note): TrashNoteCardTextState {
     val primaryColor = MaterialTheme.colorScheme.primary
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
-    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
-    val markdownColors = remember(primaryColor, codeBackground, codeForeground) {
-        MarkdownColors(
-            linkColor            = primaryColor,
-            inlineCodeBackground = codeBackground,
-            inlineCodeForeground = codeForeground
-        )
-    }
-    return remember(note.title, note.content, note.isMarkdown, markdownColors) {
+    val markdownColors = rememberContentMarkdownColors()
+    val untitled = stringResource(R.string.untitled_note)
+    val imagePlaceholder = stringResource(R.string.markdown_image_alt_fallback)
+    // A missing title falls back to a placeholder; the body is never promoted
+    // to the title, so the whole content stays available as the excerpt.
+    val displayTitle = note.title.take(80).ifBlank { untitled }
+    val excerptSource = note.content.take(TRASH_NOTE_EXCERPT_MAX_LENGTH)
+    return remember(
+        note.title,
+        note.content,
+        note.isMarkdown,
+        markdownColors,
+        displayTitle,
+        excerptSource,
+        imagePlaceholder
+    ) {
         TrashNoteCardTextState(
             title = buildNoteCardDisplayText(
-                sourceText = noteDisplayTitle(note),
+                sourceText = displayTitle,
                 ranges = emptyList(),
                 colors = markdownColors,
                 highlightColor = primaryColor,
-                renderMarkdown = note.isMarkdown
+                renderMarkdown = note.isMarkdown,
+                imagePlaceholder = imagePlaceholder
             ),
-            excerpt = if (note.title.isNotBlank() && note.content.isNotBlank()) {
+            excerpt = if (excerptSource.isNotBlank()) {
                 buildNoteCardDisplayText(
-                    sourceText = note.content.take(TRASH_NOTE_EXCERPT_MAX_LENGTH),
+                    sourceText = excerptSource,
                     ranges = emptyList(),
                     colors = markdownColors,
                     highlightColor = primaryColor,
-                    renderMarkdown = note.isMarkdown
+                    renderMarkdown = note.isMarkdown,
+                    imagePlaceholder = imagePlaceholder
                 )
             } else {
                 null
@@ -118,7 +137,7 @@ private fun TrashNoteTitle(title: AnnotatedString) {
     Text(
         text     = title,
         style    = MaterialTheme.typography.titleMedium,
-        maxLines = 1,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis
     )
 }
@@ -130,7 +149,7 @@ private fun TrashNoteExcerpt(excerpt: AnnotatedString?) {
         Text(
             text     = excerpt,
             style    = MaterialTheme.typography.bodyMedium,
-            color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            color    = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -139,10 +158,16 @@ private fun TrashNoteExcerpt(excerpt: AnnotatedString?) {
 
 @Composable
 private fun TrashNoteDate(note: Note) {
+    val deletedDate = note.deletedDate
+    val label = if (deletedDate != null) {
+        stringResource(R.string.trash_deleted_on, DateUtils.formatDate(deletedDate))
+    } else {
+        stringResource(R.string.trash_edited_on, noteRelativeTimeLabel(note.lastModifiedDate))
+    }
     Text(
-        text  = noteDateLabel(note),
+        text  = label,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -152,8 +177,9 @@ private fun TrashNoteActions(
     onDeletePermanently: (() -> Unit)?
 ) {
     Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         RestoreNoteButton(onRestore)
         if (onDeletePermanently != null) {
@@ -166,9 +192,8 @@ private fun TrashNoteActions(
 private fun RestoreNoteButton(onRestore: () -> Unit) {
     NexIconButton(
         imageVector = Icons.Default.RestoreFromTrash,
-        contentDescription = "Restore note",
-        onClick = onRestore,
-        selected = true
+        contentDescription = stringResource(R.string.trash_restore_action_description),
+        onClick = onRestore
     )
 }
 
@@ -176,21 +201,8 @@ private fun RestoreNoteButton(onRestore: () -> Unit) {
 private fun DeleteNoteButton(onDeletePermanently: () -> Unit) {
     NexIconButton(
         imageVector = Icons.Default.DeleteForever,
-        contentDescription = "Delete permanently",
-        onClick = onDeletePermanently,
-        destructive = true
+        contentDescription = stringResource(R.string.trash_delete_action_description),
+        destructive = true,
+        onClick = onDeletePermanently
     )
-}
-
-private fun noteDisplayTitle(note: Note): String {
-    return note.title.ifBlank {
-        note.content.lines().firstOrNull { it.isNotBlank() }?.take(80)
-            ?: "Untitled note"
-    }
-}
-
-private fun noteDateLabel(note: Note): String {
-    return note.deletedDate
-        ?.let { "Deleted ${DateUtils.formatDate(it)}" }
-        ?: "Edited ${DateUtils.formatRelative(note.lastModifiedDate)}"
 }

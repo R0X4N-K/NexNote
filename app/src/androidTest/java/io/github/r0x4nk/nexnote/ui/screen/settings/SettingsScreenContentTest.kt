@@ -1,9 +1,10 @@
 package io.github.r0x4nk.nexnote.ui.screen.settings
 
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
@@ -42,11 +44,28 @@ class SettingsScreenContentTest {
             onTableLayoutModeChange = { submittedMode = it }
         )
 
+        composeRule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasText("Scroll"))
         composeRule.onNodeWithText("Scroll")
             .performScrollTo()
             .performClick()
 
         assertEquals(TableLayoutMode.HORIZONTAL_SCROLL, submittedMode)
+    }
+
+    @Test
+    fun appFontPicker_submitsSelectedFont() {
+        var submittedFont: AppFont? = null
+        composeRule.setSettingsContent(
+            vaultState = VaultState.NOT_CONFIGURED,
+            onAppFontChange = { submittedFont = it }
+        )
+
+        composeRule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasText("Lora"))
+        composeRule.onNodeWithText("Lora")
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(AppFont.LORA, submittedFont)
     }
 
     @Test
@@ -74,21 +93,16 @@ class SettingsScreenContentTest {
             }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_CHANGE_PIN_BUTTON_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_CHANGE_PIN_BUTTON_TAG)
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_VAULT_CURRENT_PIN_FIELD_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_CURRENT_PIN_FIELD_TAG)
             .performTextInput("1234")
-        composeRule.onNodeWithTag(SETTINGS_VAULT_NEW_PIN_FIELD_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_NEW_PIN_FIELD_TAG)
             .performTextInput("5678")
-        composeRule.onNodeWithTag(SETTINGS_VAULT_CONFIRM_PIN_FIELD_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_CONFIRM_PIN_FIELD_TAG)
             .performTextInput("5678")
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_CHANGE_PIN_BUTTON_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_CHANGE_PIN_BUTTON_TAG)
             .performClick()
 
         assertEquals("1234", submittedCurrentPin)
@@ -100,8 +114,7 @@ class SettingsScreenContentTest {
     fun vaultAndroidCredentialSwitch_isDisabledBeforeVaultSetup() {
         composeRule.setSettingsContent(vaultState = VaultState.NOT_CONFIGURED)
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
             .assertIsNotEnabled()
     }
 
@@ -109,8 +122,7 @@ class SettingsScreenContentTest {
     fun vaultAndroidCredentialSwitch_isDisabledWhenVaultIsLockedAndAndroidUnlockIsOff() {
         composeRule.setSettingsContent(vaultState = VaultState.LOCKED)
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
             .assertIsNotEnabled()
     }
 
@@ -123,8 +135,7 @@ class SettingsScreenContentTest {
             onUnlockVaultWithAndroidCredentialChange = { submittedValue = it }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
             .performClick()
 
         assertEquals(true, submittedValue)
@@ -140,8 +151,7 @@ class SettingsScreenContentTest {
             onUnlockVaultWithAndroidCredentialChange = { submittedValue = it }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
             .performClick()
 
         composeRule.onNodeWithText("Disable Android screen lock?").assertIsDisplayed()
@@ -158,8 +168,7 @@ class SettingsScreenContentTest {
             onUnlockVaultWithAndroidCredentialChange = { submittedValue = it }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
             .performClick()
         composeRule.onNodeWithText("Disable").performClick()
 
@@ -177,8 +186,7 @@ class SettingsScreenContentTest {
             onUnlockVaultWithAndroidCredentialChange = { submittedValue = it }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_ANDROID_CREDENTIAL_SWITCH_TAG)
             .performClick()
         composeRule.onNodeWithText("Cancel").performClick()
 
@@ -196,8 +204,7 @@ class SettingsScreenContentTest {
             onVaultAutoLockTimeoutChange = { submittedTimeout = it }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_AUTO_LOCK_TIMEOUT_ROW_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_AUTO_LOCK_TIMEOUT_ROW_TAG)
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithText("After 5 minutes").performClick()
@@ -228,8 +235,7 @@ class SettingsScreenContentTest {
             onRequestVaultReset = { requested = true }
         )
 
-        composeRule.onNodeWithTag(SETTINGS_VAULT_RESET_ROW_TAG)
-            .performScrollTo()
+        composeRule.scrollToSettingsTag(SETTINGS_VAULT_RESET_ROW_TAG)
             .assertIsDisplayed()
             .performClick()
 
@@ -383,6 +389,7 @@ class SettingsScreenContentTest {
         onUnlockVaultWithAndroidCredentialChange: (Boolean) -> Unit = {},
         onVaultAutoLockTimeoutChange: (VaultAutoLockTimeout) -> Unit = {},
         onTableLayoutModeChange: (TableLayoutMode) -> Unit = {},
+        onAppFontChange: (AppFont) -> Unit = {},
         onRequestVaultReset: () -> Unit = {},
         onCancelVaultReset: () -> Unit = {},
         onConfirmVaultReset: () -> Unit = {},
@@ -396,6 +403,7 @@ class SettingsScreenContentTest {
                 SettingsScreenContent(
                     uiState = SettingsUiState(
                         themeMode = ThemeMode.SYSTEM,
+                        appFont = AppFont.SYSTEM,
                         fontScale = FontScale.NORMAL,
                         timezoneId = "",
                         availableTimezones = emptyList(),
@@ -413,6 +421,7 @@ class SettingsScreenContentTest {
                     deleteAllNotesState = deleteAllNotesState,
                     onThemeModeChange = {},
                     onAccentColorChange = {},
+                    onAppFontChange = onAppFontChange,
                     onFontScaleChange = {},
                     onNoteCardStyleChange = {},
                     onTableLayoutModeChange = onTableLayoutModeChange,
@@ -431,6 +440,11 @@ class SettingsScreenContentTest {
                 )
             }
         }
+    }
+
+    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.scrollToSettingsTag(tag: String): androidx.compose.ui.test.SemanticsNodeInteraction {
+        onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasTestTag(tag))
+        return onNodeWithTag(tag).performScrollTo()
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.scrollToSourceCodeRow() {

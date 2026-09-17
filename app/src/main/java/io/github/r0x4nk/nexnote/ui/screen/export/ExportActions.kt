@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import io.github.r0x4nk.nexnote.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -14,6 +15,7 @@ internal data class ExportActions(
     val onScopeSelect: (ExportScope) -> Unit,
     val onDateRangeSelect: (Long, Long) -> Unit,
     val onFormatSelect: (ExportFormat) -> Unit,
+    val onIncludeMediaChange: (Boolean) -> Unit,
     val onExportClick: () -> Unit
 )
 
@@ -31,6 +33,7 @@ internal fun rememberExportActions(
             onScopeSelect = viewModel::selectScope,
             onDateRangeSelect = viewModel::selectDateRange,
             onFormatSelect = viewModel::selectFormat,
+            onIncludeMediaChange = viewModel::selectIncludeMedia,
             onExportClick = {
                 coroutineScope.launch {
                     exportCurrentSelection(
@@ -51,18 +54,22 @@ private suspend fun exportCurrentSelection(
     context: Context,
     exportManager: ExportManager
 ) {
-    viewModel.onExportStart()
+    if (!viewModel.onExportStart()) return
     try {
         if (uiState.format == ExportFormat.PRINT) {
-            exportManager.print(uiState.notes)
+            exportManager.print(uiState.notes, uiState.includeMedia)
         } else {
-            val intent = exportManager.buildShareIntent(uiState.notes, uiState.format)
-            context.startActivity(Intent.createChooser(intent, "Share"))
+            val intent = exportManager.buildShareIntent(uiState.notes, uiState.format, uiState.includeMedia)
+            context.startActivity(
+                Intent.createChooser(intent, context.getString(R.string.common_share))
+            )
         }
         viewModel.onExportComplete()
     } catch (error: CancellationException) {
         throw error
     } catch (_: Exception) {
-        viewModel.onExportError("Export failed. Please try again.")
+        viewModel.onExportError(context.getString(R.string.export_error_failed))
+    } finally {
+        viewModel.onExportComplete()
     }
 }

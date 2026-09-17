@@ -13,14 +13,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -28,8 +29,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
+import io.github.r0x4nk.nexnote.ui.component.OperationLoadingState
 import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +46,8 @@ internal fun TagsScreenLayout(
     actions: TagsActions
 ) {
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground().nestedScroll(scrollBehavior.nestedScrollConnection),
         // Material 3 "lift the FAB" snackbar host — the radial FAB animates
         // up while a snackbar is visible. See [RadialMenuSnackbarHost].
         snackbarHost = {
@@ -145,7 +148,7 @@ private fun TagsLoadingState(modifier: Modifier = Modifier) {
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        OperationLoadingState()
     }
 }
 

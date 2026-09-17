@@ -28,7 +28,8 @@ class NoteCardTextHighlightingTest {
             ranges = emptyList(),
             colors = markdownColors,
             highlightColor = Color.Red,
-            renderMarkdown = true
+            renderMarkdown = true,
+            imagePlaceholder = "Image"
         )
 
         assertEquals("Bold and Docs\n☑ Done", text.text)
@@ -41,7 +42,8 @@ class NoteCardTextHighlightingTest {
             ranges = emptyList(),
             colors = markdownColors,
             highlightColor = Color.Red,
-            renderMarkdown = true
+            renderMarkdown = true,
+            imagePlaceholder = "Image"
         )
 
         assertEquals("Diagram", text.text)
@@ -54,7 +56,8 @@ class NoteCardTextHighlightingTest {
             ranges = emptyList(),
             colors = markdownColors,
             highlightColor = Color.Red,
-            renderMarkdown = true
+            renderMarkdown = true,
+            imagePlaceholder = "Image"
         )
 
         assertEquals("Large heading", text.text)
@@ -68,7 +71,8 @@ class NoteCardTextHighlightingTest {
             ranges = listOf(2..5),
             colors = markdownColors,
             highlightColor = Color.Red,
-            renderMarkdown = true
+            renderMarkdown = true,
+            imagePlaceholder = "Image"
         )
 
         val highlight = text.spanStyles.firstOrNull { range ->

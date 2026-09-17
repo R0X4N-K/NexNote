@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
@@ -19,6 +20,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageAscUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsByUsageDescUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SearchTagsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteMutationActions
 import io.github.r0x4nk.nexnote.ui.common.TrashedNoteEvent
 import kotlinx.coroutines.channels.Channel
@@ -106,7 +108,9 @@ class TagsViewModel(
     private val deleteTag: DeleteTagUseCase,
     private val moveNoteToTrash: MoveNoteToTrashUseCase,
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
-    private val duplicateNoteUseCase: DuplicateNoteUseCase
+    private val duplicateNoteUseCase: DuplicateNoteUseCase,
+    private val updateNoteCreationDate: UpdateNoteCreationDateUseCase,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _searchQuery     = MutableStateFlow("")
@@ -125,9 +129,14 @@ class TagsViewModel(
         moveNoteToTrash = moveNoteToTrash,
         restoreNoteFromTrash = restoreNoteFromTrash,
         duplicateNoteUseCase = duplicateNoteUseCase,
+        updateNoteCreationDate = updateNoteCreationDate,
         trashEvents = _trashEvents,
-        noteActionMessages = _noteActionMessages
+        noteActionMessages = _noteActionMessages,
+        strings = strings
     )
+
+    val operationProgress get() = noteMutations.operationProgress
+
 
     private val tagsFlow = buildTagsFlow(
         searchQuery = _searchQuery,
@@ -246,6 +255,10 @@ class TagsViewModel(
         noteMutations.duplicateNote(note)
     }
 
+    fun updateCreationDate(note: Note, creationDate: Long) {
+        noteMutations.updateCreationDate(note, creationDate)
+    }
+
     // ── Factory ───────────────────────────────────────────────────────────────
 
     companion object {
@@ -263,7 +276,9 @@ class TagsViewModel(
                     deleteTag = useCases.tags.deleteTag,
                     moveNoteToTrash = useCases.notes.moveNoteToTrash,
                     restoreNoteFromTrash = useCases.notes.restoreNoteFromTrash,
-                    duplicateNoteUseCase = useCases.notes.duplicateNote
+                    duplicateNoteUseCase = useCases.notes.duplicateNote,
+                    updateNoteCreationDate = useCases.notes.updateNoteCreationDate,
+                    strings = app.strings
                 )
             }
         }

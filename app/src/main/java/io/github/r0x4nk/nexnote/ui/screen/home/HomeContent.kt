@@ -8,21 +8,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -32,9 +30,12 @@ import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.NoteCollectionLayoutDefaults
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
+import io.github.r0x4nk.nexnote.ui.common.animateNoteItem
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NoteCard
 import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderCollection
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderExpansionState
+import io.github.r0x4nk.nexnote.ui.component.OperationLoadingState
 import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
@@ -48,6 +49,7 @@ internal fun HomeContent(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     vaultPullEnabled: Boolean,
     onNoteClick: (Long) -> Unit,
     onOpenVault: () -> Unit,
@@ -57,7 +59,6 @@ internal fun HomeContent(
     onLoadMoreNotes: () -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     floatingBottomPadding: Dp,
     modifier: Modifier = Modifier
@@ -71,6 +72,7 @@ internal fun HomeContent(
             listState = listState,
             gridState = gridState,
             selectionState = selectionState,
+            tagFolderExpansion = tagFolderExpansion,
             vaultPullEnabled = vaultPullEnabled,
             onNoteClick = onNoteClick,
             onOpenVault = onOpenVault,
@@ -80,7 +82,6 @@ internal fun HomeContent(
             onLoadMoreNotes = onLoadMoreNotes,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
-            onRequestNoteActions = onRequestNoteActions,
             onToggleNoteSelection = onToggleNoteSelection,
             floatingBottomPadding = floatingBottomPadding,
             modifier = modifier
@@ -91,10 +92,10 @@ internal fun HomeContent(
 @Composable
 private fun HomeLoadingState(modifier: Modifier) {
     androidx.compose.foundation.layout.Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().clipToBounds(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        OperationLoadingState()
     }
 }
 
@@ -105,6 +106,7 @@ private fun HomeLoadedContent(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     vaultPullEnabled: Boolean,
     onNoteClick: (Long) -> Unit,
     onOpenVault: () -> Unit,
@@ -114,7 +116,6 @@ private fun HomeLoadedContent(
     onLoadMoreNotes: () -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     floatingBottomPadding: Dp,
     modifier: Modifier
@@ -143,10 +144,10 @@ private fun HomeLoadedContent(
                 listState = listState,
                 gridState = gridState,
                 selectionState = selectionState,
+                tagFolderExpansion = tagFolderExpansion,
                 onNoteClick = onNoteClick,
                 onTogglePin = onTogglePin,
                 onRequestTrash = onRequestTrash,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onLoadMoreNotes = onLoadMoreNotes,
                 bottomContentPadding =
@@ -202,9 +203,6 @@ private fun HomeTopTags(
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
         )
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-        )
     }
 }
 
@@ -215,10 +213,10 @@ private fun HomeNotesBody(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onLoadMoreNotes: () -> Unit,
     bottomContentPadding: Dp
@@ -238,10 +236,10 @@ private fun HomeNotesBody(
             listState = listState,
             gridState = gridState,
             selectionState = selectionState,
+            tagFolderExpansion = tagFolderExpansion,
             onNoteClick = onNoteClick,
             onTogglePin = onTogglePin,
             onRequestTrash = onRequestTrash,
-            onRequestNoteActions = onRequestNoteActions,
             onToggleNoteSelection = onToggleNoteSelection,
             onLoadMoreNotes = onLoadMoreNotes,
             bottomContentPadding = bottomContentPadding
@@ -256,10 +254,10 @@ private fun HomeNoteCollection(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onLoadMoreNotes: () -> Unit,
     bottomContentPadding: Dp
@@ -284,7 +282,6 @@ private fun HomeNoteCollection(
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
-                onRequestNoteActions,
                 onToggleNoteSelection,
                 bottomContentPadding
             )
@@ -295,10 +292,10 @@ private fun HomeNoteCollection(
                 noteCardStyle,
                 listState,
                 selectionState,
+                tagFolderExpansion,
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
-                onRequestNoteActions,
                 onToggleNoteSelection,
                 bottomContentPadding
             )
@@ -312,7 +309,6 @@ private fun HomeNoteCollection(
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
-                onRequestNoteActions,
                 onToggleNoteSelection,
                 bottomContentPadding
             )
@@ -372,14 +368,13 @@ private fun HomeNoteGrid(
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(2),
         state = gridState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().clipToBounds(),
         contentPadding = NoteCollectionLayoutDefaults.gridContentPadding(
             bottomPadding = bottomContentPadding
         ),
@@ -398,9 +393,8 @@ private fun HomeNoteGrid(
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
-                onRequestNoteActions,
                 onToggleNoteSelection,
-                Modifier.animateItem()
+                animateNoteItem()
             )
         }
     }
@@ -415,13 +409,12 @@ private fun HomeNoteList(
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().clipToBounds(),
         contentPadding = NoteCollectionLayoutDefaults.listContentPadding(
             bottomPadding = bottomContentPadding
         ),
@@ -439,9 +432,8 @@ private fun HomeNoteList(
                 onNoteClick,
                 onTogglePin,
                 onRequestTrash,
-                onRequestNoteActions,
                 onToggleNoteSelection,
-                Modifier.animateItem()
+                animateNoteItem()
             )
         }
     }
@@ -453,17 +445,18 @@ private fun HomeNoteTagFolders(
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     bottomContentPadding: Dp
 ) {
     NoteTagFolderCollection(
         displayItems = displayItems,
         listState = listState,
-        bottomContentPadding = bottomContentPadding
+        bottomContentPadding = bottomContentPadding,
+        expansionState = tagFolderExpansion
     ) { scored, modifier ->
         HomeNoteCard(
             scored,
@@ -472,7 +465,6 @@ private fun HomeNoteTagFolders(
             onNoteClick,
             onTogglePin,
             onRequestTrash,
-            onRequestNoteActions,
             onToggleNoteSelection,
             modifier
         )
@@ -487,7 +479,6 @@ private fun HomeNoteCard(
     onNoteClick: (Long) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRequestTrash: (Note) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -509,13 +500,6 @@ private fun HomeNoteCard(
         contentHighlightRanges = scored.contentRanges,
         onPin = remember(note, onTogglePin) { { onTogglePin(note) } },
         onLongPress = remember(note, onToggleNoteSelection) { { onToggleNoteSelection(note) } },
-        onActions = remember(note, selectionState.isActive, onRequestNoteActions) {
-            if (selectionState.isActive) {
-                null
-            } else {
-                { onRequestNoteActions(note) }
-            }
-        },
         selectionMode = selectionState.isActive,
         selected = selectionState.isSelected(noteId),
         modifier = modifier,

@@ -1,37 +1,45 @@
 package io.github.r0x4nk.nexnote.ui.component
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.common.NoteMotion
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
-import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
-import io.github.r0x4nk.nexnote.util.MarkdownColors
+import io.github.r0x4nk.nexnote.ui.theme.NoteContentTheme
+import io.github.r0x4nk.nexnote.ui.theme.rememberContentMarkdownColors
+import io.github.r0x4nk.nexnote.ui.theme.rememberNoteColors
 
 private data class NoteCardVisuals(
     val primaryColor: Color,
-    val containerColor: Color,
-    val cardElevation: Dp
+    val containerColor: Color
 )
 
 private data class NoteCardTextState(
     val title: AnnotatedString,
-    val content: AnnotatedString
+    val preview: AnnotatedString?
 )
+
+private const val NOTE_CARD_TITLE_MAX_LENGTH = 160
+private const val NOTE_CARD_PREVIEW_MAX_LENGTH = 160
 
 /**
  * Renders the visual body of [NoteCard] after swipe and collapse handling.
@@ -46,57 +54,41 @@ internal fun NoteCardContent(
     note: Note,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
-    onActions: (() -> Unit)?,
     selectionMode: Boolean,
     selected: Boolean,
     noteCardStyle: NoteCardStyle,
     titleHighlightRanges: List<IntRange>,
     contentHighlightRanges: List<IntRange>
 ) {
-    val visuals = rememberNoteCardVisuals(note, selected)
-    val textState = rememberNoteCardTextState(
-        note = note,
-        titleHighlightRanges = titleHighlightRanges,
-        contentHighlightRanges = contentHighlightRanges,
-        primaryColor = visuals.primaryColor
-    )
+    val noteColors = rememberNoteColors(note.backgroundColor)
+    NoteContentTheme(noteColors) {
+        val visuals = rememberNoteCardVisuals(noteColors.container)
+        val textState = rememberNoteCardTextState(
+            note = note,
+            titleHighlightRanges = titleHighlightRanges,
+            contentHighlightRanges = contentHighlightRanges,
+            primaryColor = visuals.primaryColor
+        )
 
-    NoteCardSurface(
-        note = note,
-        onClick = onClick,
-        onLongPress = onLongPress,
-        onActions = onActions,
-        selectionMode = selectionMode,
-        selected = selected,
-        noteCardStyle = noteCardStyle,
-        visuals = visuals,
-        textState = textState
-    )
+        NoteCardSurface(
+            note = note,
+            onClick = onClick,
+            onLongPress = onLongPress,
+            selectionMode = selectionMode,
+            selected = selected,
+            noteCardStyle = noteCardStyle,
+            visuals = visuals,
+            textState = textState
+        )
+    }
 }
 
 @Composable
-private fun rememberNoteCardVisuals(note: Note, selected: Boolean): NoteCardVisuals {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
-    val isDark = remember(surfaceColor) { surfaceColor.luminance() < 0.5f }
-    val baseContainerColor = note.backgroundColor?.let { adaptNoteColor(it, isDark) }
-        ?: NoteCollectionCardDefaults.containerColor()
-
-    return NoteCardVisuals(
-        primaryColor = primaryColor,
-        containerColor = if (selected) {
-            lerp(baseContainerColor, selectedContainerColor, 0.46f)
-        } else {
-            baseContainerColor
-        },
-        cardElevation = if (selected || note.isPinned) {
-            NoteCollectionCardDefaults.pinnedElevation
-        } else {
-            NoteCollectionCardDefaults.defaultElevation
-        }
+private fun rememberNoteCardVisuals(container: Color): NoteCardVisuals =
+    NoteCardVisuals(
+        primaryColor = MaterialTheme.colorScheme.primary,
+        containerColor = container
     )
-}
 
 @Composable
 private fun rememberNoteCardTextState(
@@ -105,24 +97,30 @@ private fun rememberNoteCardTextState(
     contentHighlightRanges: List<IntRange>,
     primaryColor: Color
 ): NoteCardTextState {
-    val markdownColors = rememberNoteCardMarkdownColors(primaryColor)
-    val displayTitle = remember(note.title, note.content) {
-        note.title.ifBlank {
-            note.content.lines().firstOrNull { it.isNotBlank() }?.take(80) ?: "Untitled note"
-        }
+    val markdownColors = rememberContentMarkdownColors()
+    val untitledLabel = stringResource(R.string.untitled_note)
+    val imagePlaceholder = stringResource(R.string.markdown_image_alt_fallback)
+    val hasTitle = note.title.isNotBlank()
+    // A note without a title keeps its whole body in the preview: the first
+    // content line must never be promoted to the title (and rendered bold).
+    val displayTitle = remember(note.title, hasTitle, untitledLabel) {
+        if (hasTitle) note.title.take(NOTE_CARD_TITLE_MAX_LENGTH) else untitledLabel
     }
-    val effectiveRanges = if (note.title.isNotBlank()) titleHighlightRanges else emptyList()
-    val titleAnnotated = remember(displayTitle, effectiveRanges, markdownColors, note.isMarkdown) {
+    val effectiveTitleRanges = if (hasTitle) titleHighlightRanges else emptyList()
+    val titleAnnotated = remember(displayTitle, effectiveTitleRanges, markdownColors, note.isMarkdown, imagePlaceholder) {
         buildNoteCardDisplayText(
             sourceText = displayTitle,
-            ranges = effectiveRanges,
+            ranges = effectiveTitleRanges,
             colors = markdownColors,
             highlightColor = primaryColor,
-            renderMarkdown = note.isMarkdown
+            renderMarkdown = note.isMarkdown,
+            imagePlaceholder = imagePlaceholder
         )
     }
 
-    val previewText = remember(note.id, note.content) { note.content.take(160) }
+    val previewText = remember(note.id, note.content) {
+        note.content.take(NOTE_CARD_PREVIEW_MAX_LENGTH)
+    }
     val clampedContentRanges = remember(contentHighlightRanges, previewText.length) {
         contentHighlightRanges.mapNotNull { range ->
             val safeStart = range.first.coerceIn(0, previewText.length)
@@ -130,36 +128,18 @@ private fun rememberNoteCardTextState(
             if (safeStart < safeEnd) safeStart..<safeEnd else null
         }
     }
-    val contentAnnotated = remember(previewText, clampedContentRanges, markdownColors, note.isMarkdown) {
+    val previewAnnotated = remember(previewText, clampedContentRanges, markdownColors, note.isMarkdown, imagePlaceholder) {
         buildNoteCardDisplayText(
             sourceText = previewText,
             ranges = clampedContentRanges,
             colors = markdownColors,
             highlightColor = primaryColor,
-            renderMarkdown = note.isMarkdown
+            renderMarkdown = note.isMarkdown,
+            imagePlaceholder = imagePlaceholder
         )
-    }
+    }.takeIf { previewText.isNotBlank() }
 
-    return NoteCardTextState(title = titleAnnotated, content = contentAnnotated)
-}
-
-/**
- * Bundles the theme-aware colors used by inline Markdown rendering inside
- * note cards. Uses the same `surfaceContainerHigh` / `onSurfaceVariant` pair
- * as the full preview so that a note's compact card and its expanded preview
- * stay visually consistent.
- */
-@Composable
-private fun rememberNoteCardMarkdownColors(linkColor: Color): MarkdownColors {
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
-    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
-    return remember(linkColor, codeBackground, codeForeground) {
-        MarkdownColors(
-            linkColor            = linkColor,
-            inlineCodeBackground = codeBackground,
-            inlineCodeForeground = codeForeground
-        )
-    }
+    return NoteCardTextState(title = titleAnnotated, preview = previewAnnotated)
 }
 
 @Composable
@@ -167,7 +147,6 @@ private fun NoteCardSurface(
     note: Note,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
-    onActions: (() -> Unit)?,
     selectionMode: Boolean,
     selected: Boolean,
     noteCardStyle: NoteCardStyle,
@@ -175,32 +154,49 @@ private fun NoteCardSurface(
     textState: NoteCardTextState
 ) {
     val shape = NoteCollectionCardDefaults.shape
-    Card(
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> visuals.primaryColor
+            note.isPinned -> visuals.primaryColor.copy(alpha = 0.34f)
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+        },
+        animationSpec = tween(
+            durationMillis = NoteMotion.CARD_STATE_MS,
+            easing = NoteMotion.cardStateEasing
+        ),
+        label = "noteCardBorderColor"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 2.dp else NoteCollectionCardDefaults.borderWidth,
+        animationSpec = tween(
+            durationMillis = NoteMotion.CARD_STATE_MS,
+            easing = NoteMotion.cardStateEasing
+        ),
+        label = "noteCardBorderWidth"
+    )
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = tween(
+                    durationMillis = NoteMotion.CARD_STATE_MS,
+                    easing = NoteMotion.cardStateEasing
+                )
+            )
             .roundedCombinedClickableTarget(
                 shape = shape,
                 onClick = onClick,
                 onLongClick = onLongPress
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = visuals.cardElevation),
-        colors = CardDefaults.cardColors(containerColor = visuals.containerColor),
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp,
+        color = visuals.containerColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = shape,
-        border = when {
-            selected -> NoteCollectionCardDefaults.border(
-                color = visuals.primaryColor,
-                alpha = 1f
-            )
-            note.isPinned -> NoteCollectionCardDefaults.border(
-                color = visuals.primaryColor,
-                alpha = 0.34f
-            )
-            else -> NoteCollectionCardDefaults.border(alpha = 0.42f)
-        }
+        border = BorderStroke(borderWidth, borderColor)
     ) {
         NoteCardBody(
             note = note,
-            onActions = onActions,
             selectionMode = selectionMode,
             selected = selected,
             noteCardStyle = noteCardStyle,
@@ -213,26 +209,24 @@ private fun NoteCardSurface(
 @Composable
 private fun NoteCardBody(
     note: Note,
-    onActions: (() -> Unit)?,
     selectionMode: Boolean,
     selected: Boolean,
     noteCardStyle: NoteCardStyle,
     visuals: NoteCardVisuals,
     textState: NoteCardTextState
 ) {
-    val verticalPadding = if (noteCardStyle == NoteCardStyle.TITLE_ONLY) 10.dp else 12.dp
+    val verticalPadding = if (noteCardStyle == NoteCardStyle.TITLE_ONLY) 10.dp else 18.dp
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = 16.dp,
+                horizontal = 20.dp,
                 vertical = verticalPadding
             )
     ) {
         NoteCardMainColumn(
             note = note,
-            onActions = onActions,
             selectionMode = selectionMode,
             selected = selected,
             noteCardStyle = noteCardStyle,
@@ -246,7 +240,6 @@ private fun NoteCardBody(
 @Composable
 private fun NoteCardMainColumn(
     note: Note,
-    onActions: (() -> Unit)?,
     selectionMode: Boolean,
     selected: Boolean,
     noteCardStyle: NoteCardStyle,
@@ -258,15 +251,18 @@ private fun NoteCardMainColumn(
         NoteCardTitleRow(
             title = textState.title,
             isPinned = note.isPinned,
-            onActions = onActions,
             selectionMode = selectionMode,
             selected = selected
         )
-        if (showsContentPreview(note, noteCardStyle)) {
-            Spacer(Modifier.height(4.dp))
-            NoteCardPreview(textState.content)
+        if (noteCardStyle != NoteCardStyle.TITLE_ONLY) {
+            textState.preview?.let { preview ->
+                Spacer(Modifier.height(6.dp))
+                NoteCardPreview(preview)
+            }
         }
-        Spacer(Modifier.height(if (noteCardStyle == NoteCardStyle.TITLE_ONLY) 4.dp else 8.dp))
-        NoteCardFooter(note, noteCardStyle, visuals.primaryColor)
+        if (noteCardStyle == NoteCardStyle.TITLE_INFORMATION) {
+            Spacer(Modifier.height(10.dp))
+            NoteCardFooter(note, visuals.primaryColor)
+        }
     }
 }

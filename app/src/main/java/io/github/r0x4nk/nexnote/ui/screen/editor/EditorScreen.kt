@@ -1,14 +1,20 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.FocusManager
@@ -16,18 +22,22 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
-import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.ui.common.copyAsMarkdown
 import io.github.r0x4nk.nexnote.ui.common.copyAsPlainText
-import io.github.r0x4nk.nexnote.ui.component.copyTextToClipboard
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
 import io.github.r0x4nk.nexnote.ui.component.buildMarkdownBlockSourceRanges
+import io.github.r0x4nk.nexnote.ui.component.copyTextToClipboard
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
-import io.github.r0x4nk.nexnote.ui.theme.adaptNoteColor
+import io.github.r0x4nk.nexnote.ui.theme.NoteContentTheme
+import io.github.r0x4nk.nexnote.ui.theme.rememberNoteColors
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
 import kotlinx.coroutines.launch
 
@@ -42,12 +52,17 @@ fun EditorScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val operationProgress by viewModel.operationProgress.collectAsStateWithLifecycle()
+    OperationProgressDialog(operationProgress)
     val undoRedoState by viewModel.undoRedoState.collectAsStateWithLifecycle()
     val tagsForCurrentNote by viewModel.tagsForCurrentNote.collectAsStateWithLifecycle()
     val selectedTagsInEditor by viewModel.selectedTagsInEditor.collectAsStateWithLifecycle()
     val noteLinkTargets by viewModel.noteLinkTargets.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val state = rememberEditorScreenState(mode)
+    val showTrashConfirmation = remember { mutableStateOf(false) }
+    val showClearContentConfirmation = remember { mutableStateOf(false) }
+    val showRemoveAllTagsConfirmation = remember { mutableStateOf(false) }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val density = LocalDensity.current
@@ -69,15 +84,7 @@ fun EditorScreen(
             null
         }
     }
-    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-    val systemDark = isSystemInDarkTheme()
-    val isDarkTheme = when (themeMode) {
-        ThemeMode.DARK, ThemeMode.TRUE_DARK -> true
-        ThemeMode.LIGHT -> false
-        ThemeMode.SYSTEM -> systemDark
-    }
-    val noteBackground = uiState.backgroundColor?.let { adaptNoteColor(it, isDarkTheme) }
-        ?: androidx.compose.material3.MaterialTheme.colorScheme.surface
+    val noteBackground = rememberNoteColors(uiState.backgroundColor).container
 
     LaunchedEffect(mode) {
         NexNoteDebugLog.editor(
@@ -102,7 +109,8 @@ fun EditorScreen(
         redactEditorContent,
         viewModel
     )
-    val launchImagePickerAtCursor = rememberLaunchImagePickerAtCursor(context, state, viewModel)
+    val launchAttachmentPickerAtCursor = rememberLaunchAttachmentPicker(context, state, viewModel)
+    EditorAttachmentResumeEffect(viewModel)
     val openNoteLinkPicker: () -> Unit = {
         state.openNoteLinkPickerDetachedFromEditor(focusManager)
     }
@@ -134,6 +142,11 @@ fun EditorScreen(
             isMarkdown = true
         )
     }
+    val shareCallbacks = rememberNoteShareCallbacks(state.snackbarHostState)
+    val copiedAsTextMessage = stringResource(R.string.editor_copied_as_text)
+    val copiedAsMarkdownMessage = stringResource(R.string.editor_copied_as_markdown)
+    val clipLabel = stringResource(R.string.note_clip_label)
+    val shareCurrentNote: () -> Unit = { shareCallbacks.onShareNote(currentNoteTextSnapshot()) }
     val copyCurrentNoteAsText: () -> Unit = {
         val text = currentNoteTextSnapshot().copyAsPlainText()
         scope.launch {
@@ -141,7 +154,8 @@ fun EditorScreen(
                 clipboard = clipboard,
                 snackbarHostState = state.snackbarHostState,
                 text = text,
-                snackbarMessage = "Copied as text"
+                snackbarMessage = copiedAsTextMessage,
+                clipLabel = clipLabel
             )
         }
     }
@@ -152,7 +166,8 @@ fun EditorScreen(
                 clipboard = clipboard,
                 snackbarHostState = state.snackbarHostState,
                 text = text,
-                snackbarMessage = "Copied as Markdown"
+                snackbarMessage = copiedAsMarkdownMessage,
+                clipLabel = clipLabel
             )
         }
     }
@@ -178,9 +193,69 @@ fun EditorScreen(
             )
         }
     }
-    val launchImagePickerAfterCommit: () -> Unit = {
+    if (showTrashConfirmation.value) {
+        AlertDialog(
+            tonalElevation = 1.dp,
+            onDismissRequest = { showTrashConfirmation.value = false },
+            title = { Text(stringResource(R.string.editor_trash_dialog_title)) },
+            text = { Text(stringResource(R.string.editor_trash_dialog_message)) },
+            confirmButton = {
+                io.github.r0x4nk.nexnote.ui.component.NexDestructiveButton(onClick = {
+                    showTrashConfirmation.value = false
+                    commitActiveEditContent()
+                    viewModel.trashCurrentNote { navController.popBackStack() }
+                }) { Text(stringResource(R.string.common_move_to_trash)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrashConfirmation.value = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    if (showClearContentConfirmation.value) {
+        AlertDialog(
+            tonalElevation = 1.dp,
+            onDismissRequest = { showClearContentConfirmation.value = false },
+            title = { Text(stringResource(R.string.editor_clear_content_dialog_title)) },
+            text = { Text(stringResource(R.string.editor_clear_content_dialog_message)) },
+            confirmButton = {
+                io.github.r0x4nk.nexnote.ui.component.NexDestructiveButton(onClick = {
+                    showClearContentConfirmation.value = false
+                    commitActiveEditContent()
+                    viewModel.clearContent()
+                }) { Text(stringResource(R.string.common_clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearContentConfirmation.value = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    if (showRemoveAllTagsConfirmation.value) {
+        AlertDialog(
+            tonalElevation = 1.dp,
+            onDismissRequest = { showRemoveAllTagsConfirmation.value = false },
+            title = { Text(stringResource(R.string.editor_remove_all_tags_dialog_title)) },
+            text = { Text(stringResource(R.string.editor_remove_all_tags_dialog_message)) },
+            confirmButton = {
+                io.github.r0x4nk.nexnote.ui.component.NexDestructiveButton(onClick = {
+                    showRemoveAllTagsConfirmation.value = false
+                    commitActiveEditContent()
+                    viewModel.clearAllTags()
+                }) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveAllTagsConfirmation.value = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    val launchAttachmentPickerAfterCommit: () -> Unit = {
         commitActiveEditContent()
-        launchImagePickerAtCursor()
+        launchAttachmentPickerAtCursor()
     }
     val navigateToTagOccurrence: (String) -> Unit = { tagName ->
         commitActiveEditContent()
@@ -239,8 +314,10 @@ fun EditorScreen(
     EditorContentAnimationsReadyEffect(uiState, state)
     EditorContentSyncEffect(uiState, state)
     EditorPendingContentCommitEffect(uiState, state, viewModel)
-    EditorDirectPreviewWarmupEffect(uiState, state)
-    EditorBackgroundPreParseEffect(uiState)
+    NoteContentTheme(rememberNoteColors(uiState.backgroundColor)) {
+        EditorDirectPreviewWarmupEffect(uiState, state)
+        EditorBackgroundPreParseEffect(uiState)
+    }
     EditorPreviewScrollRestorationEffect(uiState, state, density)
     EditorKeyboardTagBarEffect(isKeyboardVisible, state)
     EditorRadialMenuBindings(
@@ -269,16 +346,18 @@ fun EditorScreen(
         density = density
     )
 
+    val alreadyOnNoteMessage = stringResource(R.string.editor_link_self)
+    val linkUnavailableMessage = stringResource(R.string.editor_link_unavailable)
     val insertNoteLinkAtCursor: (NoteLinkTarget) -> Unit = { target ->
         insertAtCursor(noteLinkMarkdownFor(target))
     }
     val openNoteFromPreviewLink: (Long) -> Unit = { targetNoteId ->
         when {
             targetNoteId == uiState.noteId -> {
-                scope.launch { state.snackbarHostState.showSnackbar("Already on this note") }
+                scope.launch { state.snackbarHostState.showSnackbar(alreadyOnNoteMessage) }
             }
             noteLinkTargets.none { it.id == targetNoteId } -> {
-                scope.launch { state.snackbarHostState.showSnackbar("Linked note is not available") }
+                scope.launch { state.snackbarHostState.showSnackbar(linkUnavailableMessage) }
             }
             else -> {
                 scope.launch {
@@ -305,6 +384,7 @@ fun EditorScreen(
             commitActiveEditContent()
             scope.launch {
                 viewModel.flushPendingChanges()
+                viewModel.pruneUnreferencedStoredFiles()
                 viewModel.clearContentHistory()
                 navController.popBackStack()
             }
@@ -328,22 +408,46 @@ fun EditorScreen(
         ),
         actions = EditorScreenActions(
             onBack = handleBack,
-            onExport = onExport?.let { export ->
-                {
-                    commitActiveEditContent()
-                    export()
+            onExport = {
+                commitActiveEditContent()
+                scope.launch {
+                    if (viewModel.flushPendingChanges() && viewModel.uiState.value.noteId != EditorViewModel.NO_ID) {
+                        onExport?.invoke() ?: navController.navigate(Screen.Export.route(viewModel.uiState.value.noteId))
+                    }
+                }
+            },
+            onShare = shareCurrentNote,
+            onClearContent = { showClearContentConfirmation.value = true },
+            onTrash = { showTrashConfirmation.value = true },
+            onMoveToVault = {
+                commitActiveEditContent()
+                scope.launch {
+                    if (viewModel.flushPendingChanges() && viewModel.uiState.value.noteId != EditorViewModel.NO_ID) {
+                        navController.navigate(Screen.Vault.moveNoteRoute(viewModel.uiState.value.noteId)) {
+                            popUpTo(Screen.Editor.route) { inclusive = true }
+                        }
+                    }
                 }
             },
             onCopyNoteAsText = copyCurrentNoteAsText,
             onCopyNoteAsMarkdown = copyCurrentNoteAsMarkdown,
             onTogglePreview = togglePreviewPreservingScroll,
-            onInsertImage = launchImagePickerAfterCommit,
+            onInsertAttachment = launchAttachmentPickerAfterCommit,
             onInsertNoteLink = openNoteLinkPicker,
             insertAtCursor = insertAtCursor,
             applyMarkdownEdit = applyMarkdownEdit,
             onNoteLinkAutocompleteSelected = replaceNoteLinkAutocomplete,
             onPreviewNoteLinkClick = openNoteFromPreviewLink,
             onPreviewTaskListItemClick = viewModel::togglePreviewTaskListItem,
+            onCheckAllTasks = {
+                commitActiveEditContent()
+                viewModel.setAllTaskListItems(checked = true)
+            },
+            onUncheckAllTasks = {
+                commitActiveEditContent()
+                viewModel.setAllTaskListItems(checked = false)
+            },
+            onClearAllTags = { showRemoveAllTagsConfirmation.value = true },
             onToggleColorPicker = toggleColorPicker,
             onBackgroundColorChange = viewModel::onBackgroundColorChange,
             onTitleChange = viewModel::onTitleChange,

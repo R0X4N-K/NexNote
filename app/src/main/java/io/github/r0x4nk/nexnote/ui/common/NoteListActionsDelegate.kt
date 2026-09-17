@@ -1,10 +1,13 @@
 package io.github.r0x4nk.nexnote.ui.common
 
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleNotePinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -25,20 +28,26 @@ internal class NoteListActionsDelegate(
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     private val toggleNotePin: ToggleNotePinUseCase,
     private val duplicateNoteUseCase: DuplicateNoteUseCase,
+    private val updateNoteCreationDate: UpdateNoteCreationDateUseCase,
     private val sortOrder: MutableStateFlow<SortOrder>,
     private val viewMode: MutableStateFlow<NoteListViewMode>,
     private val selectedTagFilters: MutableStateFlow<Set<String>>,
     private val trashEvents: Channel<TrashedNoteEvent>,
-    private val noteActionMessages: Channel<String>
+    private val noteActionMessages: Channel<String>,
+    private val strings: StringProvider
 ) {
     private val noteMutations = NoteMutationActions(
         scope = scope,
         moveNoteToTrash = moveNoteToTrash,
         restoreNoteFromTrash = restoreNoteFromTrash,
         duplicateNoteUseCase = duplicateNoteUseCase,
+        updateNoteCreationDate = updateNoteCreationDate,
         trashEvents = trashEvents,
-        noteActionMessages = noteActionMessages
+        noteActionMessages = noteActionMessages,
+        strings = strings
     )
+
+    val operationProgress get() = noteMutations.operationProgress
 
     fun requestTrash(note: Note) {
         noteMutations.requestTrash(note)
@@ -70,6 +79,10 @@ internal class NoteListActionsDelegate(
 
     fun duplicateNote(note: Note) {
         noteMutations.duplicateNote(note)
+    }
+
+    fun updateCreationDate(note: Note, creationDate: Long) {
+        noteMutations.updateCreationDate(note, creationDate)
     }
 
     fun toggleSortOrder() {
@@ -108,24 +121,38 @@ internal class NoteMutationActions(
     private val moveNoteToTrash: MoveNoteToTrashUseCase,
     private val restoreNoteFromTrash: RestoreNoteFromTrashUseCase,
     private val duplicateNoteUseCase: DuplicateNoteUseCase,
+    private val updateNoteCreationDate: UpdateNoteCreationDateUseCase,
     private val trashEvents: Channel<TrashedNoteEvent>,
-    private val noteActionMessages: Channel<String>
+    private val noteActionMessages: Channel<String>,
+    private val strings: StringProvider
 ) {
+    private val operations = NoteOperationRunner(scope)
+    val operationProgress = operations.progress
+
+    private fun mutate(label: String, action: suspend () -> Unit) {
+        operations.launch(label, onError = {
+            noteActionMessages.trySend(strings.get(R.string.note_op_generic_error))
+        }, action = action)
+    }
+
     fun requestTrash(note: Note) {
         requestTrash(listOf(note))
     }
 
     fun requestTrash(notes: Collection<Note>) {
-        val event = notes.toTrashedNoteEvent() ?: return
-        scope.launch {
+        val event = notes.toTrashedNoteEvent(strings.get(R.string.untitled_note)) ?: return
+        mutate(strings.get(R.string.vault_progress_move_trash)) {
             moveNoteToTrash(event.noteIds)
             trashEvents.trySend(event)
         }
     }
 
     fun requestTrashByIds(noteIds: Collection<Long>) {
-        val event = trashedNoteEventForIds(noteIds) ?: return
-        scope.launch {
+        val event = trashedNoteEventForIds(
+            noteIds,
+            strings.get(R.string.untitled_note)
+        ) ?: return
+        mutate(strings.get(R.string.vault_progress_move_trash)) {
             moveNoteToTrash(event.noteIds)
             trashEvents.trySend(event)
         }
@@ -136,28 +163,46 @@ internal class NoteMutationActions(
     }
 
     fun undoPendingTrash(noteId: Long) {
-        scope.launch { restoreNoteFromTrash(noteId) }
+        mutate(strings.get(R.string.trash_progress_restore_note)) { restoreNoteFromTrash(noteId) }
     }
 
     fun undoPendingTrash(noteIds: Collection<Long>) {
-        scope.launch { restoreNoteFromTrash(noteIds) }
+        mutate(strings.get(R.string.trash_progress_restore_notes)) { restoreNoteFromTrash(noteIds) }
     }
 
     fun duplicateNote(note: Note) {
         if (note.isInVault) {
-            noteActionMessages.trySend("Could not duplicate note")
+            noteActionMessages.trySend(strings.get(R.string.note_op_duplicate_error))
             return
         }
-        val noteLabel = note.displayLabel()
-        scope.launch {
+        val noteLabel = note.displayLabel(untitledLabel = strings.get(R.string.untitled_note))
+        mutate(strings.get(R.string.vault_progress_duplicate)) {
             try {
                 duplicateNoteUseCase(note)
-                noteActionMessages.trySend("Duplicated \"$noteLabel\"")
+                noteActionMessages.trySend(strings.get(R.string.note_op_duplicated, noteLabel))
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                noteActionMessages.trySend("Could not duplicate \"$noteLabel\"")
+                noteActionMessages.trySend(
+                    strings.get(R.string.note_op_duplicate_failed, noteLabel)
+                )
             }
+        }
+    }
+
+    fun updateCreationDate(note: Note, creationDate: Long) {
+        if (note.isInVault || note.isDeleted) return
+        mutate(strings.get(R.string.note_op_update_date_progress)) {
+            val updated = updateNoteCreationDate(note.id, creationDate)
+            noteActionMessages.trySend(
+                strings.get(
+                    if (updated) {
+                        R.string.note_op_date_updated
+                    } else {
+                        R.string.note_op_date_update_failed
+                    }
+                )
+            )
         }
     }
 }

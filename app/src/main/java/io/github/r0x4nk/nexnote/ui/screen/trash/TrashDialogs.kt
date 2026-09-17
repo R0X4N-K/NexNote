@@ -7,6 +7,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.ui.component.NexDestructiveButton
 import androidx.compose.runtime.Composable
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.ui.common.displayLabel
@@ -19,9 +23,12 @@ internal fun DeleteNoteDialog(
 ) {
     note?.let {
         TrashConfirmDialog(
-            title = "Delete permanently",
-            text = deleteNoteDialogText(it),
-            confirmText = "Delete",
+            title = stringResource(R.string.trash_delete_dialog_title),
+            text = stringResource(
+                R.string.trash_delete_dialog_message,
+                it.displayLabel(untitledLabel = stringResource(R.string.untitled_note))
+            ),
+            confirmText = stringResource(R.string.delete),
             onConfirm = onConfirm,
             onDismiss = onDismiss
         )
@@ -36,9 +43,9 @@ internal fun EmptyTrashDialog(
 ) {
     if (visible) {
         TrashConfirmDialog(
-            title = "Empty trash",
-            text = "Permanently delete all notes in the trash? This cannot be undone.",
-            confirmText = "Empty",
+            title = stringResource(R.string.trash_empty_dialog_title),
+            text = stringResource(R.string.trash_empty_dialog_message),
+            confirmText = stringResource(R.string.trash_empty_confirm),
             onConfirm = onConfirm,
             onDismiss = onDismiss
         )
@@ -54,12 +61,15 @@ private fun TrashConfirmDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
         icon = { TrashDeleteIcon() },
         title = { Text(title) },
         text = { Text(text) },
         confirmButton = { TrashErrorTextButton(confirmText, onConfirm) },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
     )
 }
 
@@ -77,12 +87,7 @@ private fun TrashErrorTextButton(
     text: String,
     onClick: () -> Unit
 ) {
-    TextButton(onClick = onClick) {
-        Text(text, color = MaterialTheme.colorScheme.error)
+    NexDestructiveButton(onClick = onClick) {
+        Text(text)
     }
-}
-
-private fun deleteNoteDialogText(note: Note): String {
-    val label = note.displayLabel()
-    return "Permanently delete \"$label\"? This cannot be undone."
 }

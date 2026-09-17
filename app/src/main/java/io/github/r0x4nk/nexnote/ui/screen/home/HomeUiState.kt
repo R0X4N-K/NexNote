@@ -24,6 +24,8 @@ data class HomeUiState(
     val searchScope: HomeSearchScope = HomeSearchScope.TITLE_AND_CONTENT,
     val pinnedFilter: HomePinnedFilter = HomePinnedFilter.ALL,
     val sortOrder: SortOrder = SortOrder.MODIFIED_DESC,
+    val appliedSortOrder: SortOrder = SortOrder.MODIFIED_DESC,
+    val appliedSearchSort: HomeSearchSort = HomeSearchSort.RELEVANCE,
     val viewMode: NoteListViewMode = NoteListViewMode.LIST,
     val showTemplatePicker: Boolean = false,
     val templates: List<Template> = emptyList(),

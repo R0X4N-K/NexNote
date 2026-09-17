@@ -5,18 +5,24 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
+import io.github.r0x4nk.nexnote.domain.model.NoteAttachment
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultState
+import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteAttachmentUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteLinkCandidatesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTagsForNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveThemeModeUseCase
@@ -26,19 +32,25 @@ import io.github.r0x4nk.nexnote.domain.usecase.SaveNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
+import io.github.r0x4nk.nexnote.ui.common.NoteOperationRunner
 import io.github.r0x4nk.nexnote.util.NexNoteDebugLog
+import io.github.r0x4nk.nexnote.util.TagParser
 import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
+import io.github.r0x4nk.nexnote.util.setAllMarkdownTaskListItems
 import io.github.r0x4nk.nexnote.util.toggleMarkdownTaskListItem
+import java.io.File
+import java.io.InputStream
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.InputStream
+import kotlinx.coroutines.withContext
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
@@ -63,7 +75,11 @@ class EditorViewModel internal constructor(
     private val saveCoordinator: EditorSaveCoordinator,
     private val initialMode: EditorMode,
     undoHistoryDebounceMs: Long = DEFAULT_UNDO_HISTORY_DEBOUNCE_MS,
-    undoHistoryMaxSnapshots: Int = DEFAULT_UNDO_HISTORY_MAX_SNAPSHOTS
+    undoHistoryMaxSnapshots: Int = DEFAULT_UNDO_HISTORY_MAX_SNAPSHOTS,
+    copyNoteAttachment: CopyNoteAttachmentUseCase,
+    private val duplicateNote: DuplicateNoteUseCase,
+    private val moveNoteToTrash: MoveNoteToTrashUseCase,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -109,6 +125,7 @@ class EditorViewModel internal constructor(
         uiState = _uiState,
         observeNoteLinkCandidates = observeNoteLinkCandidates,
         observeVaultNoteLinkCandidates = observeVaultNoteLinkCandidates,
+        untitledLabel = strings.get(R.string.untitled_note),
         scope = viewModelScope
     )
 
@@ -121,7 +138,8 @@ class EditorViewModel internal constructor(
         scope = viewModelScope,
         saveCoordinator = saveCoordinator,
         autosaveDelayMs = AUTOSAVE_DELAY_MS,
-        savesEnabled = !initialMode.isReadOnly
+        savesEnabled = !initialMode.isReadOnly,
+        strings = strings
     )
     private val imageActions = EditorImageActions(
         uiState = _uiState,
@@ -129,7 +147,12 @@ class EditorViewModel internal constructor(
         deleteNoteImage = deleteNoteImage,
         saveDelegate = saveDelegate,
         recordContentHistoryChange = ::recordImmediateContentHistoryChange,
-        scope = viewModelScope
+        scope = viewModelScope,
+        strings = strings
+    )
+    private val attachmentActions = EditorAttachmentActions(
+        _uiState, copyNoteAttachment, deleteNoteImage, saveDelegate,
+        ::recordImmediateContentHistoryChange, viewModelScope, strings
     )
     private val loadDelegate = EditorLoadDelegate(
         uiState = _uiState,
@@ -137,7 +160,20 @@ class EditorViewModel internal constructor(
         getVaultNoteById = getVaultNoteById,
         getTemplateById = getTemplateById,
         scheduleAutosave = { scheduleAutosave() },
-        resetContentHistory = ::resetContentHistory
+        resetContentHistory = ::resetContentHistory,
+        strings = strings
+    )
+
+    internal val pendingAttachment = EditorPendingAttachment(
+        currentState = { _uiState.value },
+        persist = { saveDelegate.ensurePersisted() && saveDelegate.flushPendingChanges() },
+        reloadVaultNote = { id, mayApply -> loadDelegate.loadVaultNote(id, mayApply) },
+        onError = {
+            _uiState.update {
+                it.copy(errorMessage = strings.get(R.string.editor_error_resume_attachment))
+            }
+        },
+        readVaultState = { observeVaultState().first() }
     )
 
     init {
@@ -151,6 +187,7 @@ class EditorViewModel internal constructor(
         if (initialMode.isVaultNote) {
             viewModelScope.launch {
                 observeVaultState().collect { state ->
+                    pendingAttachment.onVaultState(state)
                     if (state != VaultState.UNLOCKED) {
                         lockVaultEditor(state)
                     }
@@ -190,7 +227,12 @@ class EditorViewModel internal constructor(
                     NexNoteDebugLog.textSummary("newContent", value, redact = redact)
             )
             _uiState.update {
-                it.copy(errorMessage = "Text too long (max ${MAX_CONTENT_LENGTH / 1_000}k characters)")
+                it.copy(
+                    errorMessage = strings.get(
+                        R.string.editor_error_text_too_long,
+                        MAX_CONTENT_LENGTH / 1_000
+                    )
+                )
             }
             return
         }
@@ -237,6 +279,32 @@ class EditorViewModel internal constructor(
         )
     }
 
+    /**
+     * Marks every task-list item in the note as checked or unchecked in one
+     * undoable step.
+     *
+     * Only task markers change: indentation and blockquote prefixes are kept by
+     * [setAllMarkdownTaskListItems]. The content version advances because the
+     * edit originates outside the text field and must be synchronized before the
+     * user returns to Editing. Unavailable for templates and read-only notes.
+     */
+    fun setAllTaskListItems(checked: Boolean) {
+        if (ignoreReadOnlyChange("setAllTaskListItems")) return
+        val current = _uiState.value
+        if (current.isLoading || current.isTemplateMode) return
+        val updatedContent = setAllMarkdownTaskListItems(current.content, checked)
+        if (updatedContent == current.content) return
+        NexNoteDebugLog.viewModel(
+            event = "setAllTaskListItems",
+            details = "checked=$checked ${current.debugViewModelSummary()}"
+        )
+        applyContentChange(
+            value = updatedContent,
+            selectionOffset = current.contentSelectionOffset?.coerceIn(0, updatedContent.length),
+            synchronizeEditorContent = true
+        )
+    }
+
     private fun applyContentChange(
         value: String,
         selectionOffset: Int?,
@@ -262,6 +330,28 @@ class EditorViewModel internal constructor(
         contentHistory.updateCurrentSelection(safeSelectionOffset)
     }
 
+    /**
+     * Empties the note body in a single undoable step.
+     *
+     * Only the body is cleared: the title, tags, color and metadata stay
+     * untouched. The change comes from outside the text field, so the content
+     * version advances to push the empty value back into the editor. The
+     * snapshot is recorded through [applyContentChange], so undo restores the
+     * removed text. Unavailable for templates and for read-only (locked Vault)
+     * notes.
+     */
+    fun clearContent() {
+        if (ignoreReadOnlyChange("clearContent")) return
+        val current = _uiState.value
+        if (current.isLoading || current.isTemplateMode) return
+        NexNoteDebugLog.viewModel(event = "clearContent", details = current.debugViewModelSummary())
+        applyContentChange(
+            value = "",
+            selectionOffset = 0,
+            synchronizeEditorContent = true
+        )
+    }
+
     fun undoContentChange() {
         if (ignoreReadOnlyChange("undoContentChange")) return
         NexNoteDebugLog.viewModel(event = "undoContentChange", details = uiState.value.debugViewModelSummary())
@@ -279,6 +369,39 @@ class EditorViewModel internal constructor(
         contentHistory.clear()
     }
 
+    /**
+     * Releases stored files the note no longer references once its undo history
+     * is about to be discarded.
+     *
+     * Payloads are retained while the editing session is open so undo/redo can
+     * restore a removed link. Once the history is dropped they can no longer be
+     * recovered, so the manifest and the physical payloads are pruned. The
+     * pruned manifest is persisted *before* the files are deleted: a failed save
+     * never leaves the note pointing at missing payloads.
+     *
+     * Only normal, unlocked, persisted notes participate. Vault manifests are
+     * encrypted and template editing owns no stored files.
+     */
+    suspend fun pruneUnreferencedStoredFiles() {
+        val current = _uiState.value
+        if (!current.canPruneStoredFiles()) return
+        val orphans = unreferencedStoredPaths(current.content, current.imagePaths)
+        if (orphans.isEmpty()) return
+        NexNoteDebugLog.viewModel(
+            event = "pruneUnreferencedStoredFiles",
+            details = "noteId=${current.noteId} orphanCount=${orphans.size}"
+        )
+        _uiState.update {
+            it.copy(imagePaths = it.imagePaths - orphans.toSet(), isDirty = true)
+        }
+        if (!saveDelegate.flushPendingChanges()) return
+        withContext(NonCancellable) {
+            orphans.forEach { path ->
+                runCatchingPreservingCancellation { deleteNoteImage(path) }
+            }
+        }
+    }
+
     fun onCreationDateChange(newTimestamp: Long) {
         if (ignoreReadOnlyChange("onCreationDateChange")) return
         NexNoteDebugLog.viewModel(
@@ -287,6 +410,46 @@ class EditorViewModel internal constructor(
         )
         _uiState.update { it.copy(creationDate = newTimestamp, isDirty = true) }
         scheduleAutosave()
+    }
+
+    private val noteOperations = NoteOperationRunner(viewModelScope)
+    val operationProgress = noteOperations.progress
+
+    fun togglePin() {
+        val current = _uiState.value
+        if (current.isLoading || current.isTemplateMode || current.isReadOnly || current.isVaultLocked) return
+        _uiState.update { it.copy(isPinned = !it.isPinned, isDirty = true) }
+        scheduleAutosave()
+    }
+
+    fun trashCurrentNote(onTrashed: () -> Unit) {
+        val current = _uiState.value
+        if (current.isLoading || current.isTemplateMode || current.isVaultNote || current.isReadOnly || current.isImportingAttachment) return
+        noteOperations.launch(strings.get(R.string.editor_progress_move_to_trash), onError = {
+            _uiState.update {
+                it.copy(errorMessage = strings.get(R.string.editor_error_move_to_trash))
+            }
+        }) {
+            if (!saveDelegate.flushPendingChanges()) return@launch
+            val id = _uiState.value.noteId
+            if (id == NO_ID) return@launch
+            moveNoteToTrash(id)
+            onTrashed()
+        }
+    }
+
+    fun duplicateCurrentNote(onDuplicated: (Long) -> Unit) {
+        val current = _uiState.value
+        if (current.isLoading || current.isTemplateMode || current.isVaultNote || current.isReadOnly) return
+        noteOperations.launch(strings.get(R.string.editor_progress_duplicate), onError = {
+            _uiState.update {
+                it.copy(errorMessage = strings.get(R.string.editor_error_duplicate))
+            }
+        }) {
+            if (!saveDelegate.flushPendingChanges()) return@launch
+            val note = getNoteById(_uiState.value.noteId) ?: return@launch
+            onDuplicated(duplicateNote(note))
+        }
     }
 
     fun onBackgroundColorChange(color: Int?) {
@@ -322,7 +485,7 @@ class EditorViewModel internal constructor(
                 isReadOnly = true,
                 isDirty = false,
                 isSaving = false,
-                errorMessage = "Vault locked",
+                errorMessage = strings.get(R.string.editor_vault_locked_title),
                 showPreview = false,
                 openedDirectlyInPreview = false,
                 openedDirectlyInEdit = false,
@@ -347,6 +510,27 @@ class EditorViewModel internal constructor(
 
     fun clearTagSelectionInEditor() {
         tagNavigator.clearSelection()
+    }
+
+    /**
+     * Removes every tag from the note by stripping the '#' prefix from each
+     * hashtag while preserving the words, matching the global tag-deletion
+     * behaviour. The tag index refreshes on the autosave that follows the
+     * content change. Records one undoable content edit. Unavailable for
+     * templates and read-only notes.
+     */
+    fun clearAllTags() {
+        if (ignoreReadOnlyChange("clearAllTags")) return
+        val current = _uiState.value
+        if (current.isLoading || current.isTemplateMode) return
+        val updatedContent = TagParser.stripAllTagMarkers(current.content)
+        if (updatedContent == current.content) return
+        NexNoteDebugLog.viewModel(event = "clearAllTags", details = current.debugViewModelSummary())
+        applyContentChange(
+            value = updatedContent,
+            selectionOffset = current.contentSelectionOffset?.coerceIn(0, updatedContent.length),
+            synchronizeEditorContent = true
+        )
     }
 
     // ── Images ────────────────────────────────────────────────────────────────
@@ -378,7 +562,15 @@ class EditorViewModel internal constructor(
         imageActions.onRemoveImage(relativePath)
     }
 
+    fun onAttachmentPicked(fileName: () -> String, openInputStream: () -> InputStream?, insertionOffset: Int?) {
+        if (ignoreReadOnlyChange("onAttachmentPicked")) return
+        attachmentActions.onPicked(fileName, openInputStream, insertionOffset)
+    }
+
     fun getImageFile(relativePath: String): File {
+        if (NoteAttachment.isAttachmentPath(relativePath)) {
+            require(relativePath in _uiState.value.imagePaths && !_uiState.value.isVaultLocked)
+        }
         return getNoteImageFile(relativePath)
     }
 
@@ -447,9 +639,9 @@ class EditorViewModel internal constructor(
      * Explicit save triggered on back navigation.
      * Cancels any pending autosave before performing an immediate save.
      */
-    suspend fun flushPendingChanges() {
+    suspend fun flushPendingChanges(): Boolean {
         NexNoteDebugLog.viewModel(event = "flushPendingChanges", details = uiState.value.debugViewModelSummary())
-        saveDelegate.flushPendingChanges()
+        return saveDelegate.flushPendingChanges()
     }
 
     private fun scheduleAutosave() {
@@ -509,6 +701,7 @@ class EditorViewModel internal constructor(
      */
     override fun onCleared() {
         NexNoteDebugLog.viewModel(event = "onCleared", details = uiState.value.debugViewModelSummary())
+        pendingAttachment.cancel()
         saveDelegate.enqueueFinalSave()
         contentHistory.clear()
         super.onCleared()
@@ -536,6 +729,9 @@ class EditorViewModel internal constructor(
                 val useCases = app.useCases
                 EditorViewModel(
                     copyNoteImageToInternal = useCases.images.copyNoteImageToInternal,
+                    copyNoteAttachment = useCases.attachments.copyNoteAttachment,
+                    duplicateNote = useCases.notes.duplicateNote,
+                    moveNoteToTrash = useCases.notes.moveNoteToTrash,
                     deleteNoteImage      = useCases.images.deleteNoteImage,
                     getNoteImageFile     = useCases.images.getNoteImageFile,
                     getNoteById           = useCases.notes.getNoteById,
@@ -554,7 +750,8 @@ class EditorViewModel internal constructor(
                     observeThemeMode      = useCases.preferences.observeThemeMode,
                     decryptVaultImageBytesUseCase = useCases.vault.decryptVaultImageBytes,
                     saveCoordinator        = app.editorSaveCoordinator,
-                    initialMode           = mode
+                    initialMode           = mode,
+                    strings               = app.strings
                 )
             }
         }
@@ -571,3 +768,12 @@ private fun EditorUiState.debugViewModelSummary(): String {
         "${NexNoteDebugLog.textSummary("title", title, redact = redactContentForLogs)} " +
         NexNoteDebugLog.textSummary("content", content, redact = redactContentForLogs)
 }
+
+private fun EditorUiState.canPruneStoredFiles(): Boolean =
+    !isLoading &&
+        !isTemplateMode &&
+        !isReadOnly &&
+        !isVaultNote &&
+        !isVaultLocked &&
+        noteId != EditorViewModel.NO_ID &&
+        imagePaths.isNotEmpty()

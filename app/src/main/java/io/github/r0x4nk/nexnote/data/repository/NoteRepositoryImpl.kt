@@ -3,6 +3,8 @@ package io.github.r0x4nk.nexnote.data.repository
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
 import io.github.r0x4nk.nexnote.data.db.NoteDao
+import io.github.r0x4nk.nexnote.data.db.PendingImageDeletionDao
+import io.github.r0x4nk.nexnote.data.db.entity.PendingImageDeletionEntity
 import io.github.r0x4nk.nexnote.data.db.HomeNoteDao
 import io.github.r0x4nk.nexnote.data.db.NoteStatisticsDao
 import io.github.r0x4nk.nexnote.data.db.entity.NoteEntity
@@ -24,6 +26,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.NoteStatisticsTextAnalyzer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -46,7 +49,8 @@ class NoteRepositoryImpl(
     private val database: RoomDatabase? = null,
     private val statisticsDao: NoteStatisticsDao? = null,
     private val homeNoteDao: HomeNoteDao? = null,
-    private val statisticsComputationDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val statisticsComputationDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val pendingImageDeletionDao: PendingImageDeletionDao? = null
 ) : NoteRepository {
 
     private val creationDateSnapshots: Flow<List<Long>> =
@@ -65,6 +69,8 @@ class NoteRepositoryImpl(
     /**
      * Complete active-note snapshots for explicit full-data operations such as
      * export. Home and Statistics use bounded or derived queries instead.
+     * Keep this flow cold: first() must read current data and release the Room
+     * subscription immediately, without retaining all note bodies in appScope.
      */
     override val allNotes: Flow<List<Note>> =
         dao.getAllNotes()
@@ -75,15 +81,6 @@ class NoteRepositoryImpl(
                 }
             }
             .map { list -> list.map { it.toDomain() } }
-            .let { source ->
-                appScope?.let {
-                    source.shareIn(
-                        scope = it,
-                        started = SharingStarted.WhileSubscribed(FLOW_STOP_TIMEOUT_MS),
-                        replay = 1
-                    )
-                } ?: source
-            }
 
     override val activeNoteCount: Flow<Int> =
         homeNoteDao?.observeActiveNoteCount()
@@ -190,6 +187,8 @@ class NoteRepositoryImpl(
     override val distinctLocalDays: Flow<Set<Long>> =
         creationDateSnapshots
             .map { dates -> dates.map { DateUtils.startOfDay(it) }.toSet() }
+            .distinctUntilChanged()
+            .flowOn(statisticsComputationDispatcher)
 
     /** Text search; advanced ranking is delegated to SearchUtils after the query. */
     override fun searchNotes(query: String): Flow<List<Note>> =
@@ -258,7 +257,7 @@ class NoteRepositoryImpl(
         } else {
             persist()
         }
-        val storedNote = dao.getNoteById(savedId)?.toDomain()
+        val storedNote = if (NexNoteDebugLog.isEnabled) dao.getNoteById(savedId)?.toDomain() else null
         NexNoteDebugLog.repository(event = "saveNoteStored") {
             "savedId=$savedId ${NexNoteDebugLog.noteSummary("stored", storedNote)}"
         }
@@ -319,6 +318,9 @@ class NoteRepositoryImpl(
             database.withTransaction {
                 val paths = dao.getAllNormalNotesForWipeOnce()
                     .flatMap { entity -> entity.imagePaths() }
+                pendingImageDeletionDao?.enqueue(
+                    paths.distinct().map(::PendingImageDeletionEntity)
+                )
                 dao.deleteAllNormalNotes() to paths
             }
         } else {

@@ -1,11 +1,10 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import io.github.r0x4nk.nexnote.ui.component.buildMarkdownBlockSourceRanges
+import io.github.r0x4nk.nexnote.ui.theme.rememberContentMarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownColors
 import io.github.r0x4nk.nexnote.util.MarkdownParser
 import kotlinx.coroutines.Dispatchers
@@ -22,10 +21,10 @@ internal fun EditorDirectPreviewWarmupEffect(
     uiState: EditorUiState,
     state: EditorScreenState
 ) {
-    val colors = rememberMarkdownColorsForWarmup()
+    val colors = rememberContentMarkdownColors()
     val warmupKey = uiState.directPreviewWarmupKey(colors.linkColor)
 
-    LaunchedEffect(warmupKey, uiState.content) {
+    LaunchedEffect(warmupKey, uiState.content, colors) {
         if (warmupKey == null || !state.isDirectPreviewWarmupPending(warmupKey)) {
             return@LaunchedEffect
         }
@@ -36,27 +35,8 @@ internal fun EditorDirectPreviewWarmupEffect(
 
         if (state.isDirectPreviewWarmupPending(warmupKey)) {
             state.completedDirectPreviewWarmupKey = warmupKey
+            state.hasCompletedDirectPreviewReveal = true
         }
-    }
-}
-
-/**
- * Builds the same [MarkdownColors] bundle that `MarkdownPreview` uses on its
- * first composition, so the warmup populates the parser cache with the exact
- * key the preview will look up — otherwise the preview would miss the cache
- * and re-parse synchronously on its first frame.
- */
-@Composable
-private fun rememberMarkdownColorsForWarmup(): MarkdownColors {
-    val linkColor = MaterialTheme.colorScheme.primary
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
-    val codeForeground = MaterialTheme.colorScheme.onSurfaceVariant
-    return remember(linkColor, codeBackground, codeForeground) {
-        MarkdownColors(
-            linkColor            = linkColor,
-            inlineCodeBackground = codeBackground,
-            inlineCodeForeground = codeForeground
-        )
     }
 }
 
@@ -82,9 +62,9 @@ private fun rememberMarkdownColorsForWarmup(): MarkdownColors {
 internal fun EditorBackgroundPreParseEffect(
     uiState: EditorUiState
 ) {
-    val colors = rememberMarkdownColorsForWarmup()
+    val colors = rememberContentMarkdownColors()
 
-    LaunchedEffect(uiState.content, uiState.contentVersion) {
+    LaunchedEffect(uiState.content, uiState.contentVersion, colors) {
         // Only pre-parse while in edit mode with non-trivial content
         if (uiState.isLoading || uiState.showPreview || uiState.content.length < PREPARSE_MIN_CHARS) {
             return@LaunchedEffect
@@ -116,6 +96,25 @@ internal fun EditorUiState.directPreviewWarmupKey(linkColor: Color): DirectPrevi
 internal fun EditorScreenState.isDirectPreviewWarmupPending(
     key: DirectPreviewWarmupKey?
 ): Boolean = key != null && completedDirectPreviewWarmupKey != key
+
+/**
+ * Whether the loading placeholder should still cover a note opened directly in
+ * preview.
+ *
+ * Once the first warmup has revealed the preview, later content or theme changes
+ * re-key the warmup cache but must not bring the skeleton back.
+ */
+internal fun EditorScreenState.shouldShowDirectPreviewLoading(
+    key: DirectPreviewWarmupKey?
+): Boolean = shouldShowDirectPreviewLoading(
+    hasCompletedReveal = hasCompletedDirectPreviewReveal,
+    isWarmupPending = isDirectPreviewWarmupPending(key)
+)
+
+internal fun shouldShowDirectPreviewLoading(
+    hasCompletedReveal: Boolean,
+    isWarmupPending: Boolean
+): Boolean = !hasCompletedReveal && isWarmupPending
 
 private suspend fun waitForDirectPreviewRevealSlot(startedAt: Long) {
     val elapsedMs = System.currentTimeMillis() - startedAt

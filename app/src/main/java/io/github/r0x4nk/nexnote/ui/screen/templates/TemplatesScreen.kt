@@ -1,23 +1,27 @@
 package io.github.r0x4nk.nexnote.ui.screen.templates
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.common.selectedItems
-import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialFabActionEffect
+import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.navigation.Screen
 
 @Composable
@@ -28,6 +32,8 @@ fun TemplatesScreen(
     viewModel: TemplatesViewModel = viewModel(factory = TemplatesViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val operationProgress by viewModel.operationProgress.collectAsStateWithLifecycle()
+    OperationProgressDialog(operationProgress)
     val snackbarHostState = remember { SnackbarHostState() }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
@@ -44,7 +50,7 @@ fun TemplatesScreen(
     }
 
     RadialFabActionEffect(
-        contentDescription = "Create template",
+        contentDescription = stringResource(R.string.templates_create),
         onClick = newTemplateAction
     )
     RadialMenuFabHideEffect(selectionState.isActive)
@@ -92,7 +98,7 @@ fun TemplatesScreen(
     BackHandler(enabled = selectionState.isActive) {
         selectionState = selectionState.exit()
     }
-    TemplatesDeleteDialog(
+    if (operationProgress == null) TemplatesDeleteDialog(
         dialog = uiState.activeDialog,
         onConfirmDelete = {
             viewModel.confirmDelete()

@@ -71,6 +71,7 @@ private fun NavGraphBuilder.homeDestination(
 ) {
     composable(Screen.Home.route) {
         HomeScreen(
+            onExportNote = { id -> navController.navigate(Screen.Export.route(noteId = id)) },
             onNoteClick = { noteId ->
                 navController.navigate(Screen.Editor.existingNoteRoute(noteId))
             },
@@ -115,11 +116,15 @@ private fun NavGraphBuilder.agendaDestination(
 ) {
     composable(Screen.Agenda.route) {
         AgendaScreen(
+            onExportNote = { id -> navController.navigate(Screen.Export.route(noteId = id)) },
             onNoteClick = { noteId ->
                 navController.navigate(Screen.Editor.existingNoteRoute(noteId))
             },
             onNewNote = { creationDate ->
                 navController.navigate(Screen.Editor.newNoteRoute(creationDate))
+            },
+            onMoveNoteToVault = { noteId ->
+                navController.navigate(Screen.Vault.moveNoteRoute(noteId))
             },
             floatingBottomPadding = floatingBottomPadding
         )
@@ -132,8 +137,12 @@ private fun NavGraphBuilder.tagsDestination(
 ) {
     composable(Screen.Tags.route) {
         TagsScreen(
+            onExportNote = { id -> navController.navigate(Screen.Export.route(noteId = id)) },
             onNoteClick = { noteId ->
                 navController.navigate(Screen.Editor.existingNoteRoute(noteId))
+            },
+            onMoveNoteToVault = { noteId ->
+                navController.navigate(Screen.Vault.moveNoteRoute(noteId))
             },
             floatingBottomPadding = floatingBottomPadding
         )

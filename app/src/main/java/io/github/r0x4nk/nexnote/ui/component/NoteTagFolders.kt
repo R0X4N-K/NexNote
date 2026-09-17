@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,18 +28,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.NoteCollectionLayoutDefaults
+import io.github.r0x4nk.nexnote.ui.common.animateNoteItem
 import io.github.r0x4nk.nexnote.util.TagParser
 
 @Immutable
@@ -50,11 +61,91 @@ internal data class NoteTagFolder(
     val noteCount: Int get() = items.size
 }
 
-@Immutable
-internal data class NoteTagFolderExpansionState(
-    val collapsedFolderIds: Set<String>,
-    val onToggleFolder: (String) -> Unit
-)
+/**
+ * Holds the collapsed state for the tag-folder view and the set of folders the
+ * current collection exposes.
+ *
+ * The state is hoisted so a top-bar action can collapse or expand every folder
+ * at once while the collection still owns the folder list. [syncFolderIds]
+ * keeps the two in step and prunes folders that disappeared after a filter or
+ * search change.
+ */
+@Stable
+internal class NoteTagFolderExpansionState(
+    initialCollapsedFolderIds: Set<String> = emptySet()
+) {
+    var collapsedFolderIds by mutableStateOf(initialCollapsedFolderIds)
+        private set
+
+    private var knownFolderIds by mutableStateOf<List<String>>(emptyList())
+
+    val isAllCollapsed: Boolean
+        get() = knownFolderIds.isNotEmpty() && knownFolderIds.all { it in collapsedFolderIds }
+
+    fun syncFolderIds(folderIds: List<String>) {
+        if (knownFolderIds != folderIds) knownFolderIds = folderIds
+        val retained = collapsedFolderIds.intersect(folderIds.toSet())
+        if (retained.size != collapsedFolderIds.size) collapsedFolderIds = retained
+    }
+
+    fun onToggleFolder(folderId: String) {
+        collapsedFolderIds = if (folderId in collapsedFolderIds) {
+            collapsedFolderIds - folderId
+        } else {
+            collapsedFolderIds + folderId
+        }
+    }
+
+    /** Collapses every folder, or expands them all when everything is collapsed. */
+    fun toggleAll() {
+        collapsedFolderIds = if (isAllCollapsed) emptySet() else knownFolderIds.toSet()
+    }
+
+    companion object {
+        val Saver: Saver<NoteTagFolderExpansionState, Any> = listSaver(
+            save = { it.collapsedFolderIds.toList() },
+            restore = { NoteTagFolderExpansionState(it.toSet()) }
+        )
+    }
+}
+
+@Composable
+internal fun rememberNoteTagFolderExpansionState(): NoteTagFolderExpansionState =
+    rememberSaveable(saver = NoteTagFolderExpansionState.Saver) {
+        NoteTagFolderExpansionState()
+    }
+
+/**
+ * Top-bar affordance that collapses every tag folder at once, or expands them
+ * all when the collection is fully collapsed.
+ */
+@Composable
+internal fun TagFolderExpandAllButton(
+    isAllCollapsed: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    NexIconButton(
+        imageVector = if (isAllCollapsed) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+        contentDescription = stringResource(
+            if (isAllCollapsed) R.string.tag_folders_expand_all
+            else R.string.tag_folders_collapse_all
+        ),
+        onClick = onClick,
+        modifier = modifier
+    )
+}
+
+/** Convenience overload for callers that already build the folder list. */
+@Composable
+internal fun rememberNoteTagFolderExpansionState(
+    folders: List<NoteTagFolder>
+): NoteTagFolderExpansionState {
+    val state = rememberNoteTagFolderExpansionState()
+    val folderIds = remember(folders) { folders.map { it.id } }
+    LaunchedEffect(folderIds) { state.syncFolderIds(folderIds) }
+    return state
+}
 
 @Composable
 internal fun NoteTagFolderCollection(
@@ -62,14 +153,16 @@ internal fun NoteTagFolderCollection(
     listState: LazyListState,
     bottomContentPadding: Dp,
     modifier: Modifier = Modifier,
+    expansionState: NoteTagFolderExpansionState = rememberNoteTagFolderExpansionState(),
     noteItemContent: @Composable (ScoredNote, Modifier) -> Unit
 ) {
     val folders = remember(displayItems) { buildNoteTagFolders(displayItems) }
-    val expansionState = rememberNoteTagFolderExpansionState(folders)
+    val folderIds = remember(folders) { folders.map { it.id } }
+    LaunchedEffect(folderIds) { expansionState.syncFolderIds(folderIds) }
 
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().clipToBounds(),
         contentPadding = NoteCollectionLayoutDefaults.listContentPadding(
             bottomPadding = bottomContentPadding
         ),
@@ -81,34 +174,6 @@ internal fun NoteTagFolderCollection(
             noteItemContent = noteItemContent
         )
     }
-}
-
-@Composable
-internal fun rememberNoteTagFolderExpansionState(
-    folders: List<NoteTagFolder>
-): NoteTagFolderExpansionState {
-    var collapsedFolderIdList by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    val folderIds = remember(folders) { folders.map { it.id }.toSet() }
-
-    LaunchedEffect(folderIds) {
-        collapsedFolderIdList = collapsedFolderIdList.filter { it in folderIds }
-    }
-
-    val collapsedFolderIds = remember(collapsedFolderIdList) {
-        collapsedFolderIdList.toSet()
-    }
-    val onToggleFolder: (String) -> Unit = { folderId ->
-        collapsedFolderIdList = if (folderId in collapsedFolderIds) {
-            collapsedFolderIdList.filterNot { it == folderId }
-        } else {
-            collapsedFolderIdList + folderId
-        }
-    }
-
-    return NoteTagFolderExpansionState(
-        collapsedFolderIds = collapsedFolderIds,
-        onToggleFolder = onToggleFolder
-    )
 }
 
 internal fun LazyListScope.noteTagFolderItems(
@@ -129,7 +194,7 @@ internal fun LazyListScope.noteTagFolderItems(
                 onToggle = { expansionState.onToggleFolder(folder.id) },
                 modifier = Modifier
                     .padding(horizontal = horizontalPadding)
-                    .animateItem()
+                    .then(animateNoteItem())
             )
         }
 
@@ -146,7 +211,7 @@ internal fun LazyListScope.noteTagFolderItems(
                             start = horizontalPadding + 8.dp,
                             end = horizontalPadding + 8.dp
                         )
-                        .animateItem()
+                        .then(animateNoteItem())
                 )
             }
         }
@@ -181,7 +246,7 @@ internal fun buildNoteTagFolders(displayItems: List<ScoredNote>): List<NoteTagFo
 
     return tagFolders + NoteTagFolder(
         id = UNTAGGED_FOLDER_ID,
-        title = "Untagged",
+        title = "",
         isUntagged = true,
         items = untaggedItems
     )
@@ -197,7 +262,9 @@ private fun NoteTagFolderHeader(
     val colorScheme = MaterialTheme.colorScheme
     Surface(
         onClick = onToggle,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(noteTagFolderHeaderTag(folder.id)),
         shape = MaterialTheme.shapes.medium,
         color = colorScheme.surfaceContainerHigh,
         contentColor = colorScheme.onSurface,
@@ -215,13 +282,21 @@ private fun NoteTagFolderHeader(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = folder.title,
+                    text = if (folder.isUntagged) {
+                        stringResource(R.string.tag_folder_untagged)
+                    } else {
+                        folder.title
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = folder.noteCount.toNoteCountLabel(),
+                    text = pluralStringResource(
+                        R.plurals.tag_folder_note_count,
+                        folder.noteCount,
+                        folder.noteCount
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = colorScheme.onSurfaceVariant
                 )
@@ -271,7 +346,7 @@ private fun NoteTagFolderIcon(isUntagged: Boolean) {
     }
 }
 
-private fun Int.toNoteCountLabel(): String =
-    if (this == 1) "1 note" else "$this notes"
-
 private const val UNTAGGED_FOLDER_ID = "__untagged__"
+
+/** Stable test hook: note cards now also render tags, so tests scope to the folder header. */
+internal fun noteTagFolderHeaderTag(folderId: String): String = "note_tag_folder_header_$folderId"

@@ -61,7 +61,9 @@ private fun buildHomeNotesDataFlow(flows: HomeUiStateFlows): Flow<HomeNotesData>
             allNotes = noteData.notes,
             allScored = noteData.scoredResults,
             totalNoteCount = totalCount,
-            hasMore = noteData.hasMore
+            hasMore = noteData.hasMore,
+            appliedSortOrder = noteData.appliedSortOrder,
+            appliedSearchSort = noteData.appliedSearchSort
         )
     }
 }

@@ -14,14 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -57,10 +53,9 @@ internal fun MarkdownTextBlock(
     activeHighlightRange: IntRange?,
     highlightColor: Color,
     onNoteLinkClick: (Long) -> Unit,
-    onTaskListItemClick: (lineIndex: Int) -> Unit
+    onTaskListItemClick: ((lineIndex: Int) -> Unit)?
 ) {
     val uriHandler = LocalUriHandler.current
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val displayText = rememberHighlightedPreviewText(
         annotatedText,
         markdown,
@@ -70,19 +65,13 @@ internal fun MarkdownTextBlock(
         highlightColor
     )
 
-    BasicText(
+    MarkdownTaskText(
         text = displayText,
-        modifier = Modifier
-            .fillMaxWidth()
-            .markdownAnnotationTapHandler(
-                displayText = displayText,
-                getLayoutResult = { layoutResult },
-                openUri = uriHandler::openUri,
-                onNoteLinkClick = onNoteLinkClick,
-                onTaskListItemClick = onTaskListItemClick
-            ),
-        style        = markdownTextStyle(style),
-        onTextLayout = { layoutResult = it }
+        style = markdownTextStyle(style),
+        openUri = uriHandler::openUri,
+        onNoteLinkClick = onNoteLinkClick,
+        onTaskListItemClick = onTaskListItemClick,
+        modifier = Modifier.fillMaxWidth()
     )
 }
 
@@ -102,7 +91,7 @@ internal fun MarkdownBlockquote(
     activeHighlightRange: IntRange?,
     highlightColor: Color,
     onNoteLinkClick: (Long) -> Unit,
-    onTaskListItemClick: (lineIndex: Int) -> Unit
+    onTaskListItemClick: ((lineIndex: Int) -> Unit)?
 ) {
     val uriHandler = LocalUriHandler.current
     val barColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
@@ -164,7 +153,7 @@ internal fun Modifier.markdownAnnotationTapHandler(
     getLayoutResult: () -> TextLayoutResult?,
     openUri: (String) -> Unit,
     onNoteLinkClick: (Long) -> Unit,
-    onTaskListItemClick: (lineIndex: Int) -> Unit = {}
+    onTaskListItemClick: ((lineIndex: Int) -> Unit)? = null
 ): Modifier =
     pointerInput(displayText, openUri, onNoteLinkClick, onTaskListItemClick) {
         detectTapGestures { offset ->
@@ -203,7 +192,7 @@ internal fun Modifier.markdownAnnotationTapHandler(
                 .firstOrNull()
                 ?.item
                 ?.toIntOrNull()
-                ?.let(onTaskListItemClick)
+                ?.let { onTaskListItemClick?.invoke(it) }
         }
     }
 
@@ -227,30 +216,23 @@ private fun RowScope.BlockquoteText(
     style: TextStyle,
     openUri: (String) -> Unit,
     onNoteLinkClick: (Long) -> Unit,
-    onTaskListItemClick: (lineIndex: Int) -> Unit
+    onTaskListItemClick: ((lineIndex: Int) -> Unit)?
 ) {
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
 
-    BasicText(
+    MarkdownTaskText(
         text = displayText,
         style = blockquoteTextStyle(style),
-        onTextLayout = { layoutResult = it },
-        modifier = Modifier
-            .weight(1f)
-            .markdownAnnotationTapHandler(
-                displayText = displayText,
-                getLayoutResult = { layoutResult },
-                openUri = openUri,
-                onNoteLinkClick = onNoteLinkClick,
-                onTaskListItemClick = onTaskListItemClick
-            )
+        openUri = openUri,
+        onNoteLinkClick = onNoteLinkClick,
+        onTaskListItemClick = onTaskListItemClick,
+        modifier = Modifier.weight(1f)
     )
 }
 
 @Composable
 private fun blockquoteTextStyle(style: TextStyle): TextStyle =
     style.copy(
-        color     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+        color     = MaterialTheme.colorScheme.onSurfaceVariant,
         fontStyle = FontStyle.Italic
     )
 

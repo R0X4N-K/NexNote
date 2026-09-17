@@ -29,7 +29,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.util.ImageFileManager
 import io.github.r0x4nk.nexnote.util.runCatchingPreservingCancellation
 import kotlinx.coroutines.Dispatchers
@@ -167,10 +169,11 @@ private fun VaultMarkdownImageBlock(
 
 @Composable
 private fun MarkdownImagePlaceholder(altText: String) {
+    val fallback = stringResource(R.string.markdown_image_alt_fallback)
     Text(
-        text     = "📷 ${altText.ifEmpty { "Immagine" }}",
+        text     = "📷 ${altText.ifEmpty { fallback }}",
         style    = MaterialTheme.typography.bodyMedium,
-        color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+        color    = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 4.dp)
     )
 }
@@ -197,7 +200,7 @@ private fun LoadedMarkdownImage(
 ) {
     Image(
         bitmap             = imageBitmap,
-        contentDescription = altText.ifEmpty { "Image in note" },
+        contentDescription = altText.ifEmpty { stringResource(R.string.markdown_image_description) },
         modifier           = Modifier
             .markdownImageFrame(imageSize ?: imageBitmap.intrinsicMarkdownSize())
             .clip(RoundedCornerShape(8.dp)),
@@ -219,9 +222,9 @@ private fun MissingMarkdownImage() {
             modifier           = Modifier.size(20.dp)
         )
         Text(
-            text  = "Immagine non trovata",
+            text  = stringResource(R.string.markdown_image_missing),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

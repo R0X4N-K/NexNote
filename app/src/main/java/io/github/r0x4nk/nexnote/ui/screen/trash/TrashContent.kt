@@ -11,13 +11,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.ui.common.animateNoteItem
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
+import io.github.r0x4nk.nexnote.ui.component.OperationLoadingState
 import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
 
 /**
@@ -40,7 +44,7 @@ internal fun TrashContent(
     Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                OperationLoadingState(modifier = Modifier.align(Alignment.Center))
             }
 
             uiState.notes.isEmpty() -> TrashEmptyState()
@@ -56,7 +60,7 @@ internal fun TrashContent(
                 listState = listState,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp)
+                    .padding(end = 16.dp, bottom = 16.dp)
             )
         }
     }
@@ -66,8 +70,8 @@ internal fun TrashContent(
 private fun TrashEmptyState() {
     NexEmptyState(
         icon = Icons.Default.Delete,
-        title = "Trash is empty",
-        message = "Deleted notes will appear here",
+        title = stringResource(R.string.trash_empty_state_title),
+        message = stringResource(R.string.trash_empty_state_message),
         modifier = Modifier.fillMaxSize()
     )
 }
@@ -81,6 +85,7 @@ private fun TrashNotesList(
 ) {
     LazyColumn(
         state = listState,
+        modifier = Modifier.fillMaxSize().clipToBounds(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -92,7 +97,8 @@ private fun TrashNotesList(
             TrashNoteCard(
                 note = note,
                 onRestore = { onRestore(note) },
-                onDeletePermanently = { onDeletePermanently(note) }
+                onDeletePermanently = { onDeletePermanently(note) },
+                modifier = animateNoteItem()
             )
         }
     }

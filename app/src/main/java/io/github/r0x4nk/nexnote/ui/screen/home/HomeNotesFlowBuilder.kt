@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.transformLatest
 internal data class HomeNotesQueryResult(
     val notes: List<Note>,
     val scoredResults: List<ScoredNote>,
-    val hasMore: Boolean
+    val hasMore: Boolean,
+    val appliedSortOrder: SortOrder = SortOrder.MODIFIED_DESC,
+    val appliedSearchSort: HomeSearchSort = HomeSearchSort.RELEVANCE
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -90,7 +92,9 @@ internal fun buildHomeNotesQueryFlow(
                     scored.map(ScoredNote::note)
                 },
                 scoredResults = scored,
-                hasMore = candidates.size > query.limit
+                hasMore = candidates.size > query.limit,
+                appliedSortOrder = if (query.sortAscending) SortOrder.MODIFIED_ASC else SortOrder.MODIFIED_DESC,
+                appliedSearchSort = query.searchSort
             )
         }
     }

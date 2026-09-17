@@ -15,6 +15,19 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NexNoteDatabaseMigrationTest {
 
+    @Test
+    fun migration9To10AddsDurableCleanupQueueAndPreservesNotes() {
+        val name = "migration-9-10"
+        createSeededDatabase(name, 9)
+        helper.runMigrationsAndValidate(name, 10, true, NexNoteDatabase.MIGRATION_9_10).use {
+            assertRepresentativeData(it, expectVaultColumn = true)
+            it.execSQL("INSERT INTO pending_image_deletions(relativePath) VALUES ('images/a.jpg')")
+            it.query("SELECT relativePath FROM pending_image_deletions").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("images/a.jpg", cursor.getString(0))
+            }
+        }
+    }
     @get:Rule
     val helper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),

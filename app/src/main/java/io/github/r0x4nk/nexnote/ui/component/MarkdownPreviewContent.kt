@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.util.referencedAttachments
 import io.github.r0x4nk.nexnote.util.MarkdownBlock
 import io.github.r0x4nk.nexnote.util.findMarkdownTaskListMarkerOffset
 
@@ -75,6 +76,11 @@ private fun RenderedMarkdownBlock(
     when (block) {
         is MarkdownBlock.TextBlock -> RenderMarkdownTextBlock(block, sourceRange, state, config)
         is MarkdownBlock.ImageBlock -> RenderMarkdownImageBlock(block, config)
+        is MarkdownBlock.AttachmentBlock -> MarkdownAttachmentCard(
+            attachment = block.attachment,
+            fileProvider = config.imageFileProvider,
+            isVault = config.vaultImageByteProvider != null
+        )
         MarkdownBlock.HorizontalRuleBlock -> MarkdownHorizontalRule()
         is MarkdownBlock.BlockquoteBlock -> RenderMarkdownBlockquote(block, sourceRange, state, config)
         is MarkdownBlock.CodeBlock -> MarkdownCodeBlock(code = block.code)
@@ -84,6 +90,11 @@ private fun RenderedMarkdownBlock(
             layoutMode      = config.tableLayoutMode,
             onNoteLinkClick = config.onNoteLinkClick
         )
+    }
+    if (block !is MarkdownBlock.AttachmentBlock) {
+        block.referencedAttachments().forEach { attachment ->
+            MarkdownAttachmentCard(attachment, config.imageFileProvider, config.vaultImageByteProvider != null)
+        }
     }
 }
 
@@ -103,9 +114,11 @@ private fun RenderMarkdownTextBlock(
         activeHighlightRange = config.activeHighlightRange,
         highlightColor       = state.highlightColor,
         onNoteLinkClick      = config.onNoteLinkClick,
-        onTaskListItemClick  = { lineIndex ->
-            config.resolveTaskListMarkerOffset(sourceRange, lineIndex)
-                ?.let(config.onTaskListItemClick)
+        onTaskListItemClick  = config.onTaskListItemClick?.let { onClick ->
+            { lineIndex ->
+                config.resolveTaskListMarkerOffset(sourceRange, lineIndex)?.let(onClick)
+                Unit
+            }
         }
     )
 }
@@ -148,9 +161,11 @@ private fun RenderMarkdownBlockquote(
         activeHighlightRange = config.activeHighlightRange,
         highlightColor       = state.highlightColor,
         onNoteLinkClick      = config.onNoteLinkClick,
-        onTaskListItemClick  = { lineIndex ->
-            config.resolveTaskListMarkerOffset(sourceRange, lineIndex)
-                ?.let(config.onTaskListItemClick)
+        onTaskListItemClick  = config.onTaskListItemClick?.let { onClick ->
+            { lineIndex ->
+                config.resolveTaskListMarkerOffset(sourceRange, lineIndex)?.let(onClick)
+                Unit
+            }
         }
     )
 }

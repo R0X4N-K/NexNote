@@ -6,6 +6,7 @@ import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveTemplatesUseCase
+import io.github.r0x4nk.nexnote.testing.TestStringProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,10 +38,11 @@ class TemplatesViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeDao = FakeTemplateDao()
-        val repository = TemplateRepositoryImpl(fakeDao)
+        val repository = TemplateRepositoryImpl(fakeDao, TestStringProvider)
         viewModel = TemplatesViewModel(
             observeTemplates = ObserveTemplatesUseCase(repository),
-            deleteTemplate = DeleteTemplateUseCase(repository)
+            deleteTemplate = DeleteTemplateUseCase(repository),
+            strings = TestStringProvider
         )
     }
 

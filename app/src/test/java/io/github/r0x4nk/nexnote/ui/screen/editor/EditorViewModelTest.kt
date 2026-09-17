@@ -38,6 +38,76 @@ import org.junit.Test
 class EditorViewModelTest : EditorViewModelTestBase() {
 
     @Test
+    fun `pin change persists through subsequent content edits`() = runTest {
+        val vm = viewModel()
+        runCurrent()
+        vm.onContentChange("Original")
+        vm.togglePin()
+        vm.flushPendingChanges()
+        vm.onContentChange("Updated")
+        vm.flushPendingChanges()
+        val reloaded = viewModel(noteId = vm.uiState.value.noteId)
+        advanceUntilIdle()
+        assertTrue(reloaded.uiState.value.isPinned)
+        assertEquals("Updated", reloaded.uiState.value.content)
+    }
+
+    @Test
+    fun `duplicate flushes the latest editor content before copying`() = runTest {
+        val vm = viewModel()
+        runCurrent()
+        vm.onContentChange("Just typed")
+        var duplicatedId = 0L
+        vm.duplicateCurrentNote { duplicatedId = it }
+        advanceUntilIdle()
+        assertTrue(duplicatedId > 0L)
+        assertTrue(duplicatedId != vm.uiState.value.noteId)
+        val duplicate = viewModel(noteId = duplicatedId)
+        advanceUntilIdle()
+        assertEquals("Just typed", duplicate.uiState.value.content)
+    }
+
+    @Test
+    fun `pruning deletes stored files the note no longer references`() = runTest {
+        val storage = FakeEditorNoteImageStorage()
+        fakeNoteDao.addNote(
+            NoteEntity(
+                id = 1L,
+                title = "Report",
+                content = "[kept](images/keep.pdf)",
+                imagePathsRaw = "images/keep.pdf\nimages/orphan.pdf"
+            )
+        )
+        val vm = viewModel(noteId = 1L, imageStorage = storage)
+        advanceUntilIdle()
+
+        vm.pruneUnreferencedStoredFiles()
+        advanceUntilIdle()
+
+        assertEquals(listOf("images/orphan.pdf"), storage.deletedPaths)
+        assertEquals("images/keep.pdf", fakeNoteDao.getNoteById(1L)?.imagePathsRaw)
+    }
+
+    @Test
+    fun `pruning keeps stored files that are still referenced`() = runTest {
+        val storage = FakeEditorNoteImageStorage()
+        fakeNoteDao.addNote(
+            NoteEntity(
+                id = 1L,
+                content = "![a](images/one.jpg) and [b](images/two.pdf)",
+                imagePathsRaw = "images/one.jpg\nimages/two.pdf"
+            )
+        )
+        val vm = viewModel(noteId = 1L, imageStorage = storage)
+        advanceUntilIdle()
+
+        vm.pruneUnreferencedStoredFiles()
+        advanceUntilIdle()
+
+        assertTrue(storage.deletedPaths.isEmpty())
+    }
+
+    @Test
     fun `new note has empty state and is not dirty`() = runTest {
         val vm = viewModel()
         runCurrent()
@@ -576,6 +646,76 @@ class EditorViewModelTest : EditorViewModelTestBase() {
 
         assertEquals("", vm.uiState.value.content)
         assertTrue(vm.undoRedoState.value.canRedo)
+    }
+
+    @Test
+    fun `clearContent empties the body only and stays undoable`() = runTest {
+        val vm = viewModel()
+        vm.onTitleChange("Keep me")
+        vm.onContentChange("Body text")
+        advanceUndoHistoryDebounce()
+        val versionBefore = vm.uiState.value.contentVersion
+
+        vm.clearContent()
+
+        assertEquals("", vm.uiState.value.content)
+        assertEquals("Keep me", vm.uiState.value.title)
+        assertTrue(vm.uiState.value.isDirty)
+        assertEquals(versionBefore + 1, vm.uiState.value.contentVersion)
+        assertTrue(vm.undoRedoState.value.canUndo)
+
+        vm.undoContentChange()
+        assertEquals("Body text", vm.uiState.value.content)
+        assertEquals("Keep me", vm.uiState.value.title)
+    }
+
+    @Test
+    fun `setAllTaskListItems checks every item and stays undoable`() = runTest {
+        val vm = viewModel()
+        vm.onContentChange("- [ ] one\n  - [ ] two")
+        advanceUndoHistoryDebounce()
+        val versionBefore = vm.uiState.value.contentVersion
+
+        vm.setAllTaskListItems(checked = true)
+
+        assertEquals("- [x] one\n  - [x] two", vm.uiState.value.content)
+        assertTrue(vm.uiState.value.isDirty)
+        assertEquals(versionBefore + 1, vm.uiState.value.contentVersion)
+        assertTrue(vm.undoRedoState.value.canUndo)
+
+        vm.undoContentChange()
+        assertEquals("- [ ] one\n  - [ ] two", vm.uiState.value.content)
+    }
+
+    @Test
+    fun `setAllTaskListItems is a no-op when no marker changes`() = runTest {
+        val vm = viewModel()
+        vm.onContentChange("plain text")
+        advanceUndoHistoryDebounce()
+        val versionBefore = vm.uiState.value.contentVersion
+
+        vm.setAllTaskListItems(checked = true)
+
+        assertEquals("plain text", vm.uiState.value.content)
+        assertEquals(versionBefore, vm.uiState.value.contentVersion)
+    }
+
+    @Test
+    fun `clearAllTags strips hashes preserving words and stays undoable`() = runTest {
+        val vm = viewModel()
+        vm.onContentChange("Meeting notes for #work with #team")
+        advanceUndoHistoryDebounce()
+        val versionBefore = vm.uiState.value.contentVersion
+
+        vm.clearAllTags()
+
+        assertEquals("Meeting notes for work with team", vm.uiState.value.content)
+        assertTrue(vm.uiState.value.isDirty)
+        assertEquals(versionBefore + 1, vm.uiState.value.contentVersion)
+        assertTrue(vm.undoRedoState.value.canUndo)
+
+        vm.undoContentChange()
+        assertEquals("Meeting notes for #work with #team", vm.uiState.value.content)
     }
 
     @Test

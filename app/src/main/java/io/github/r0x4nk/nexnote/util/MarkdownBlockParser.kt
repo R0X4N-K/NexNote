@@ -52,6 +52,10 @@ private class MarkdownBlockParsingSession(
             isBlockquoteLine -> appendBlockquoteLine(line)
             MarkdownPatterns.HORIZONTAL_RULE.matches(line.trim()) -> appendHorizontalRule()
             MarkdownPatterns.STANDALONE_IMAGE_LINE.matchEntire(line) != null -> appendImageBlock(line)
+            AttachmentMarkdown.parse(line) != null -> {
+                flushText()
+                blocks += MarkdownBlock.AttachmentBlock(requireNotNull(AttachmentMarkdown.parse(line)))
+            }
             isTableLine -> appendTableLine(line)
             else -> textLines += line
         }

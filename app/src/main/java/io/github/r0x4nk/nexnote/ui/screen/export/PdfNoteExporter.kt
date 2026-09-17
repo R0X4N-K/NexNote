@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.isSpecified
 import androidx.core.graphics.withTranslation
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.util.ColumnAlignment
 import io.github.r0x4nk.nexnote.util.DateUtils
@@ -45,16 +46,18 @@ internal object PdfNoteExporter {
     fun write(
         file: File,
         notes: List<Note>,
-        imageFileProvider: (String) -> File
+        imageFileProvider: (String) -> File,
+        resources: android.content.res.Resources
     ) {
-        PdfNoteDocumentWriter(file, notes, imageFileProvider).write()
+        PdfNoteDocumentWriter(file, notes, imageFileProvider, resources).write()
     }
 }
 
 private class PdfNoteDocumentWriter(
     private val file: File,
     private val notes: List<Note>,
-    private val imageFileProvider: (String) -> File
+    private val imageFileProvider: (String) -> File,
+    private val resources: android.content.res.Resources
 ) {
     private val contentWidth = (PAGE_WIDTH - 2 * MARGIN_X).toInt()
     private val maxY = PAGE_HEIGHT - MARGIN_Y
@@ -128,7 +131,7 @@ private class PdfNoteDocumentWriter(
     private fun drawNote(index: Int, note: Note) {
         if (index > 0) drawDivider()
 
-        val titleText = note.title.ifBlank { "(untitled)" }
+        val titleText = note.title.ifBlank { resources.getString(R.string.export_untitled) }
         drawLayout(makeLayout(titleText, titlePaint))
         addVerticalSpace(4f)
 
@@ -153,6 +156,9 @@ private class PdfNoteDocumentWriter(
             is MarkdownBlock.BlockquoteBlock -> drawBlockquote(block.content)
             is MarkdownBlock.CodeBlock -> drawCodeBlock(block.code)
             is MarkdownBlock.ImageBlock -> drawImageBlock(block)
+            is MarkdownBlock.AttachmentBlock -> drawTextBlock(AnnotatedString(
+                "${block.attachment.extension.uppercase(java.util.Locale.ROOT)} · ${block.attachment.displayName}"
+            ))
             is MarkdownBlock.TableBlock -> drawTable(block)
             MarkdownBlock.HorizontalRuleBlock -> drawHorizontalRule()
         }
@@ -261,7 +267,7 @@ private class PdfNoteDocumentWriter(
 
     private fun drawMissingImage(block: MarkdownBlock.ImageBlock) {
         val label = block.altText.ifBlank { block.path }
-        val text = "[Image not found: $label]"
+            val text = resources.getString(R.string.export_pdf_image_not_found, label)
         drawLayout(makeLayout(text, metaPaint))
         addVerticalSpace(BLOCK_SPACING)
     }

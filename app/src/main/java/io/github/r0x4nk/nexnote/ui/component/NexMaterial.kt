@@ -50,8 +50,8 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun nexTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
-    containerColor = MaterialTheme.colorScheme.surface,
-    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    containerColor = Color.Transparent,
+    scrolledContainerColor = Color.Transparent,
     navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     titleContentColor = MaterialTheme.colorScheme.onSurface,
     actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -189,7 +189,7 @@ fun NexSearchField(
                             Text(
                                 text = placeholder,
                                 style = textStyle.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                         }
@@ -221,8 +221,8 @@ fun NexEmptyState(
     ) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.70f),
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
             Box(
                 modifier = Modifier

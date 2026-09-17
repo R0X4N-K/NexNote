@@ -24,22 +24,6 @@ object DateUtils {
             .format(Date(timestamp))
 
     /**
-     * Formats a timestamp as a human-readable relative string.
-     * Examples: "Now", "5m ago", "3h ago", "2d ago", "dd/MM/yyyy" (beyond 7 days).
-     */
-    fun formatRelative(timestamp: Long): String {
-        val now = System.currentTimeMillis()
-        val diff = now - timestamp
-        return when {
-            diff < 60_000L           -> "Now"
-            diff < 3_600_000L        -> "${diff / 60_000L}m ago"
-            diff < 86_400_000L       -> "${diff / 3_600_000L}h ago"
-            diff < 7 * 86_400_000L   -> "${diff / 86_400_000L}d ago"
-            else                     -> formatDate(timestamp)
-        }
-    }
-
-    /**
      * Returns the UTC timestamp of midnight (00:00:00.000) of the day containing
      * [timestamp], in the local system timezone.
      */

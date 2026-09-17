@@ -6,34 +6,42 @@ import org.junit.Test
 
 class NoteDisplayTextTest {
 
+    private val untitled = "Untitled note"
+
+    @Test
+    fun `large note label retains only the first meaningful line prefix`() {
+        val content = "\n\r\n  First   line " + "x".repeat(2_000_000) + "\nOther"
+        assertEquals(
+            "First line " + "x".repeat(69),
+            Note(content = content).displayLabel(untitledLabel = untitled)
+        )
+        assertEquals("", Note(content = content).displayLabel(0, untitledLabel = untitled))
+        assertEquals(untitled, Note(content = "\n\t").displayLabel(untitledLabel = untitled))
+        assertEquals("One two", Note(title = " One\ntwo ").displayLabel(untitledLabel = untitled))
+    }
+
     @Test
     fun `displayLabel prefers the note title`() {
         val note = Note(title = "  Sprint   notes  ", content = "Fallback")
 
-        assertEquals("Sprint notes", note.displayLabel())
+        assertEquals("Sprint notes", note.displayLabel(untitledLabel = untitled))
     }
 
     @Test
     fun `displayLabel falls back to the first content line`() {
         val note = Note(content = "\n\n  First   useful line  \nSecond line")
 
-        assertEquals("First useful line", note.displayLabel())
+        assertEquals("First useful line", note.displayLabel(untitledLabel = untitled))
     }
 
     @Test
-    fun `snackbarMessage includes the note label`() {
-        val event = TrashedNoteEvent(noteId = 7L, noteLabel = "Release checklist")
-
-        assertEquals("Moved \"Release checklist\" to trash", event.snackbarMessage())
-    }
-
-    @Test
-    fun `snackbarMessage summarizes multiple trashed notes without labels`() {
+    fun `toTrashedNoteEvent keeps the first label and all note ids`() {
         val event = listOf(
             Note(id = 7L, title = "Private 1"),
             Note(id = 8L, title = "Private 2")
-        ).toTrashedNoteEvent()
+        ).toTrashedNoteEvent(untitledLabel = untitled)
 
-        assertEquals("Moved 2 notes to trash", event?.snackbarMessage())
+        assertEquals("Private 1", event?.noteLabel)
+        assertEquals(listOf(7L, 8L), event?.noteIds)
     }
 }

@@ -2,6 +2,7 @@ package io.github.r0x4nk.nexnote.ui.screen.agenda
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -18,26 +21,39 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
-import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderExpansionState
 import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
+import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
 import io.github.r0x4nk.nexnote.ui.component.buildNoteTagFolders
 import io.github.r0x4nk.nexnote.ui.component.rememberNoteTagFolderExpansionState
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
+import kotlinx.coroutines.launch
 
 internal data class AgendaLayoutState(
     val uiState: AgendaUiState,
     val snackbarHostState: SnackbarHostState,
     val listState: LazyListState,
+    val timelineListState: LazyListState,
+    val pagerState: PagerState,
+    val selectedTab: AgendaTab,
+    val activeNotes: List<Note>,
+    val sectionExpansionState: NoteTagFolderExpansionState,
     val noteCardStyle: NoteCardStyle,
     val isCalendarVisible: Boolean,
     val isToolbarSticky: Boolean,
@@ -47,13 +63,26 @@ internal data class AgendaLayoutState(
     val selectableNoteIds: List<Long>
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun AgendaScreenLayout(
     layoutState: AgendaLayoutState,
     actions: AgendaActions
 ) {
+    val scope = rememberCoroutineScope()
+    val pagerState = layoutState.pagerState
+    val onTabSelected: (AgendaTab) -> Unit = remember(scope, pagerState) {
+        { tab -> scope.launch { pagerState.animateScrollToPage(tab.pageIndex) } }
+    }
+    val onTimelineToday: () -> Unit = {
+        // Sections are emitted most-recent first, so the top of the list is
+        // always the closest bucket to today.
+        scope.launch { layoutState.timelineListState.animateScrollToItem(0) }
+    }
+
     Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground(),
         snackbarHost = {
             AgendaSnackbarHost(
                 snackbarHostState = layoutState.snackbarHostState,
@@ -68,20 +97,59 @@ internal fun AgendaScreenLayout(
                     onClose = actions.onExitNoteSelection,
                     onSelectAll = actions.onSelectAllVisibleNotes,
                     onDeselectAll = actions.onDeselectAllNotes,
+                    onNoteActions = layoutState.activeNotes
+                        .singleOrNull { layoutState.selectionState.isSelected(it.id) }
+                        ?.let { note -> { actions.onRequestNoteActions(note) } },
                     onShareSelected = actions.onShareSelectedNotes,
                     onCopySelectedAsText = actions.onCopySelectedNotesAsText,
                     onCopySelectedAsMarkdown = actions.onCopySelectedNotesAsMarkdown,
                     onDeleteSelected = actions.onDeleteSelectedNotes
                 )
             } else {
-                AgendaTopBar(actions = actions)
+                Column {
+                    val isAgendaTab = layoutState.selectedTab == AgendaTab.AGENDA
+                    AgendaTopBar(
+                        title = stringResource(layoutState.selectedTab.labelRes),
+                        onToday = if (!isAgendaTab) {
+                            actions.onGoToToday
+                        } else {
+                            onTimelineToday
+                        }
+                    )
+                    AgendaTabs(
+                        selectedTab = layoutState.selectedTab,
+                        onTabSelected = onTabSelected
+                    )
+                }
             }
         }
     ) { padding ->
-        AgendaBody(
-            params = layoutState.toBodyParams(actions),
-            modifier = Modifier.padding(padding)
-        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            userScrollEnabled = !layoutState.selectionState.isActive
+        ) { page ->
+            when (AgendaTab.fromPage(page)) {
+                AgendaTab.CALENDAR -> AgendaCalendarPage(layoutState, actions)
+                AgendaTab.AGENDA -> AgendaTimelinePage(
+                    sections = layoutState.uiState.timelineGroups,
+                    listState = layoutState.timelineListState,
+                    expansionState = layoutState.sectionExpansionState,
+                    isSearchActive = layoutState.uiState.isSearchActive,
+                    searchQuery = layoutState.uiState.searchQuery,
+                    searchSort = layoutState.uiState.searchSort,
+                    hasActiveSearchFilters = layoutState.uiState.hasActiveSearchFilters,
+                    noteCount = layoutState.uiState.timelineNoteCount,
+                    searchFocusRequester = layoutState.searchFocusRequester,
+                    noteCardStyle = layoutState.noteCardStyle,
+                    selectionState = layoutState.selectionState,
+                    floatingBottomPadding = layoutState.floatingBottomPadding,
+                    actions = actions
+                )
+            }
+        }
     }
 }
 
@@ -135,17 +203,18 @@ private fun AgendaLayoutState.toBodyParams(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AgendaBody(
-    params: AgendaBodyParams,
-    modifier: Modifier = Modifier
+private fun AgendaCalendarPage(
+    layoutState: AgendaLayoutState,
+    actions: AgendaActions
 ) {
+    val params = layoutState.toBodyParams(actions)
     val scrollToTopBottomPadding = if (params.selectionState.isActive) {
         params.floatingBottomPadding + 16.dp
     } else {
         RadialMenuOverlayDefaults.fabBottomClearance(params.floatingBottomPadding)
     }
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize()
     ) {
         AgendaLazyColumn(params)
         ScrollToTopButton(
@@ -175,7 +244,7 @@ private fun AgendaLazyColumn(params: AgendaBodyParams) {
 
     LazyColumn(
         state = params.listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().clipToBounds(),
         contentPadding = PaddingValues(
             bottom = 16.dp
         )
@@ -239,6 +308,10 @@ private fun LazyListScope.agendaTagFilterItem(params: AgendaBodyParams) {
 
 @Composable
 private fun AgendaStickyControlsRow(params: AgendaBodyParams) {
+    // While a note selection is active the contextual top bar owns every
+    // action, so the in-body search/sort/view controls must not compete with
+    // it. The empty sticky slot keeps the LazyColumn item indices stable.
+    if (params.selectionState.isActive) return
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,

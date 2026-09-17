@@ -14,7 +14,9 @@ internal data class HomeNotesData(
     val allNotes: List<Note>,
     val allScored: List<ScoredNote>,
     val totalNoteCount: Int,
-    val hasMore: Boolean
+    val hasMore: Boolean,
+    val appliedSortOrder: SortOrder,
+    val appliedSearchSort: HomeSearchSort
 )
 
 internal data class HomeSearchData(
@@ -55,6 +57,8 @@ internal fun buildHomeUiState(
         searchScope = searchData.scope,
         pinnedFilter = searchData.pinnedFilter,
         sortOrder = sortViewData.sortOrder,
+        appliedSortOrder = notesData.appliedSortOrder,
+        appliedSearchSort = notesData.appliedSearchSort,
         viewMode = sortViewData.viewMode,
         showTemplatePicker = templatePickerData.showPicker,
         templates = templatePickerData.templates,

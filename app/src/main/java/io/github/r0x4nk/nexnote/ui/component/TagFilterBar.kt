@@ -13,7 +13,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
+
+/** Stable test hook: note cards now also render tags, so tests must scope to this bar. */
+internal const val TAG_FILTER_BAR_TAG = "tag_filter_bar"
 
 /**
  * A horizontally scrollable bar showing the currently active tag filters.
@@ -43,9 +49,12 @@ fun TagFilterBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .testTag(TAG_FILTER_BAR_TAG)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
@@ -56,7 +65,7 @@ fun TagFilterBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Filter",
+                text = stringResource(R.string.common_filter),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -74,7 +83,7 @@ fun TagFilterBar(
 
             TextButton(onClick = onClearAll) {
                 Text(
-                    text = "Clear all",
+                    text = stringResource(R.string.common_clear_all),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )

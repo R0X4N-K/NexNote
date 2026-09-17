@@ -11,6 +11,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
 
 @Composable
@@ -20,6 +22,8 @@ internal fun VaultAndroidCredentialPromptCoordinator(
     onPromptResult: (VaultAndroidCredentialPromptResult) -> Unit
 ) {
     val context = LocalContext.current
+    val promptTitle = stringResource(R.string.vault_credential_prompt_title)
+    val promptMessage = stringResource(R.string.vault_credential_prompt_message)
     val latestOnPromptResult by rememberUpdatedState(onPromptResult)
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -41,8 +45,8 @@ internal fun VaultAndroidCredentialPromptCoordinator(
         }
 
         val promptIntent = keyguardManager.createConfirmDeviceCredentialIntent(
-            "Unlock Vault",
-            "Confirm your Android screen lock to continue."
+            promptTitle,
+            promptMessage
         )
         if (promptIntent == null) {
             latestOnPromptResult(VaultAndroidCredentialPromptResult.UNAVAILABLE)

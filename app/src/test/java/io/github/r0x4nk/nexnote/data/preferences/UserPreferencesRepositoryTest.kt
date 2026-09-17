@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
@@ -68,11 +69,34 @@ class UserPreferencesRepositoryTest {
         assertEquals(ThemeMode.TRUE_DARK, ds.themeMode.first())
     }
 
+    // ── AppFont ───────────────────────────────────────────────────────────────
+
+    @Test
+    fun `appFont defaults to SYSTEM`() = testScope.runTest {
+        val ds = createTestDataStore()
+        assertEquals(AppFont.SYSTEM, ds.appFont.first())
+    }
+
+    @Test
+    fun `setAppFont persists all values`() = testScope.runTest {
+        val ds = createTestDataStore()
+        AppFont.entries.forEach { font ->
+            ds.edit { it[APP_FONT_KEY] = font.name }
+            assertEquals(font, ds.appFont.first())
+        }
+    }
+
+    @Test
+    fun `unknown appFont falls back to SYSTEM`() = testScope.runTest {
+        val ds = createTestDataStore()
+        ds.edit { it[APP_FONT_KEY] = "COMIC_SANS" }
+        assertEquals(AppFont.SYSTEM, ds.appFont.first())
+    }
+
     // ── FontScale ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `fontScale defaults to NORMAL`() = testScope.runTest {
-        val ds = createTestDataStore()
+    fun `fontScale defaults to NORMAL`() = testScope.runTest {        val ds = createTestDataStore()
         assertEquals(FontScale.NORMAL, ds.fontScale.first())
     }
 
@@ -262,6 +286,7 @@ class UserPreferencesRepositoryTest {
 // ── Helper extensions (mirror UserPreferencesRepository logic) ────────────────
 
 private val THEME_MODE_KEY   = stringPreferencesKey("theme_mode")
+private val APP_FONT_KEY     = stringPreferencesKey("app_font")
 private val FONT_SCALE_KEY   = stringPreferencesKey("font_scale")
 private val TABLE_LAYOUT_MODE_KEY = stringPreferencesKey("table_layout_mode")
 private val TIMEZONE_KEY     = stringPreferencesKey("timezone_id")
@@ -279,6 +304,12 @@ private val DataStore<Preferences>.themeMode
     get() = data.map { prefs ->
         val name = prefs[THEME_MODE_KEY] ?: ThemeMode.SYSTEM.name
         ThemeMode.entries.firstOrNull { it.name == name } ?: ThemeMode.SYSTEM
+    }
+
+private val DataStore<Preferences>.appFont
+    get() = data.map { prefs ->
+        val name = prefs[APP_FONT_KEY] ?: AppFont.SYSTEM.name
+        AppFont.entries.firstOrNull { it.name == name } ?: AppFont.SYSTEM
     }
 
 private val DataStore<Preferences>.fontScale

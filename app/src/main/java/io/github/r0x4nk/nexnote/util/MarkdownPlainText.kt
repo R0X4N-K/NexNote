@@ -23,6 +23,7 @@ object MarkdownPlainText {
             is MarkdownBlock.BlockquoteBlock -> content.text
             is MarkdownBlock.CodeBlock -> code
             is MarkdownBlock.ImageBlock -> altText
+            is MarkdownBlock.AttachmentBlock -> attachment.displayName
             is MarkdownBlock.TableBlock -> tableToPlainText()
             MarkdownBlock.HorizontalRuleBlock -> ""
         }

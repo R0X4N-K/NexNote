@@ -66,7 +66,10 @@ class TagsViewModelTest {
                 noteRepository = noteRepository,
                 tagRepository = tagRepository,
                 imageStorage = NoOpNoteImageStorage()
-            )
+            ),
+            updateNoteCreationDate =
+                io.github.r0x4nk.nexnote.domain.usecase.UpdateNoteCreationDateUseCase(noteRepository),
+            strings = io.github.r0x4nk.nexnote.testing.TestStringProvider
         )
     }
 

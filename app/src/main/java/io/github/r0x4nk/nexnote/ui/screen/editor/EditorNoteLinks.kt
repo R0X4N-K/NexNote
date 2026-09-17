@@ -37,10 +37,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.util.NoteLinkMarkdown
 
 @Immutable
@@ -67,8 +69,10 @@ internal fun NoteLinkPickerDialog(
     }
 
     AlertDialog(
+
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
-        title = { Text("Link note") },
+        title = { Text(stringResource(R.string.editor_link_picker_title)) },
         text = {
             Column {
                 OutlinedTextField(
@@ -79,15 +83,18 @@ internal fun NoteLinkPickerDialog(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Search notes"
+                            contentDescription = stringResource(R.string.editor_search_notes)
                         )
                     },
-                    placeholder = { Text("Search notes") }
+                    placeholder = { Text(stringResource(R.string.editor_search_notes)) }
                 )
                 Spacer(Modifier.height(10.dp))
                 NoteLinkTargetList(
                     targets = filteredTargets,
-                    emptyText = if (targets.isEmpty()) "No notes available" else "No matches",
+                    emptyText = stringResource(
+                        if (targets.isEmpty()) R.string.editor_no_notes_available
+                        else R.string.editor_no_matches
+                    ),
                     onTargetSelected = onTargetSelected,
                     modifier = Modifier.heightIn(max = 360.dp)
                 )
@@ -96,7 +103,7 @@ internal fun NoteLinkPickerDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

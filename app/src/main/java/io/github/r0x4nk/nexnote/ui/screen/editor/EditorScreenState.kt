@@ -45,7 +45,7 @@ internal class EditorScreenState(
     val contentTextFieldState: TextFieldState,
     initialContentAnimationsEnabled: Boolean,
     val contentFieldValueState: MutableState<TextFieldValue>,
-    val pendingImageInsertionOffsetState: MutableState<Int?>,
+    val pendingAttachmentInsertionOffsetState: MutableState<Int?>,
     val pendingContentScrollAnchorState: MutableState<ContentScrollAnchor?>
 ) {
     var showDatePicker by mutableStateOf(false)
@@ -86,6 +86,17 @@ internal class EditorScreenState(
     var keyboardToolbarHeightPx by mutableIntStateOf(0)
     var bottomFadeHeightPx by mutableIntStateOf(0)
     var completedDirectPreviewWarmupKey by mutableStateOf<DirectPreviewWarmupKey?>(null)
+
+    /**
+     * Whether a note opened directly in preview has already been revealed once.
+     *
+     * The warmup cache is re-keyed on content and theme so it can keep the
+     * parser warm, but the loading skeleton must remain a one-shot gate for the
+     * initial reveal. Without this flag, any content edit made from the preview
+     * (for example toggling a checkbox) invalidates the warmup key and resurrects
+     * the skeleton on every interaction.
+     */
+    var hasCompletedDirectPreviewReveal by mutableStateOf(false)
     var syncedContentVersion by mutableIntStateOf(-1)
     var contentEditRevision by mutableIntStateOf(0)
     var hasPendingContentCommit by mutableStateOf(false)
@@ -142,7 +153,7 @@ internal fun rememberEditorScreenState(mode: EditorMode): EditorScreenState = ke
     val searchFocusRequester = remember { FocusRequester() }
     val contentTextFieldState = rememberTextFieldState()
     val contentFieldValueState = remember { mutableStateOf(TextFieldValue("")) }
-    val pendingImageInsertionOffsetState = remember { mutableStateOf<Int?>(null) }
+    val pendingAttachmentInsertionOffsetState = remember { mutableStateOf<Int?>(null) }
     val pendingContentScrollAnchorState = remember { mutableStateOf<ContentScrollAnchor?>(null) }
 
     remember {
@@ -156,7 +167,7 @@ internal fun rememberEditorScreenState(mode: EditorMode): EditorScreenState = ke
             contentTextFieldState = contentTextFieldState,
             initialContentAnimationsEnabled = mode.initialContentAnimationsEnabled,
             contentFieldValueState = contentFieldValueState,
-            pendingImageInsertionOffsetState = pendingImageInsertionOffsetState,
+            pendingAttachmentInsertionOffsetState = pendingAttachmentInsertionOffsetState,
             pendingContentScrollAnchorState = pendingContentScrollAnchorState
         )
     }

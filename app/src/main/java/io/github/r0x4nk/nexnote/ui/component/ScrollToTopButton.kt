@@ -18,7 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import kotlinx.coroutines.launch
 
 /** Shows a compact action after a list has moved far enough from its first item. */
@@ -78,7 +80,7 @@ private fun ScrollToTopButton(
         SmallFloatingActionButton(onClick = onClick) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowUp,
-                contentDescription = "Scroll to top"
+                contentDescription = stringResource(R.string.scroll_to_top)
             )
         }
     }

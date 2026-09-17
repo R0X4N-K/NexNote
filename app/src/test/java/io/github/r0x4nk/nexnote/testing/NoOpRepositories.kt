@@ -1,9 +1,10 @@
 package io.github.r0x4nk.nexnote.testing
 
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
-import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.domain.model.Template
@@ -38,8 +39,11 @@ internal object NoOpTemplateRepository : TemplateRepository {
 
 internal object NoOpPreferencesRepository : IUserPreferencesRepository {
     override val themeMode = flowOf(ThemeMode.SYSTEM)
+    override val appFont = flowOf(AppFont.SYSTEM)
     override val fontScale = flowOf(FontScale.NORMAL)
     override val timezoneId = flowOf("UTC")
+    override val dynamicColor = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override suspend fun setDynamicColor(enabled: Boolean) { dynamicColor.value = enabled }
     override val accentColor = flowOf(AccentColor.VIOLET)
     override val noteCardStyle = flowOf(NoteCardStyle.TITLE_AND_PREVIEW)
     override val tableLayoutMode = flowOf(TableLayoutMode.FIT_SCREEN)
@@ -49,6 +53,7 @@ internal object NoOpPreferencesRepository : IUserPreferencesRepository {
     override val unlockVaultWithAndroidCredential = flowOf(false)
 
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
+    override suspend fun setAppFont(font: AppFont) = Unit
     override suspend fun setFontScale(scale: FontScale) = Unit
     override suspend fun setTimezoneId(id: String) = Unit
     override suspend fun setAccentColor(color: AccentColor) = Unit

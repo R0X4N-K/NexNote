@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.util
 
+import io.github.r0x4nk.nexnote.domain.model.NoteAttachment
 import androidx.compose.ui.text.AnnotatedString
 
 /** Horizontal alignment of a table column, as specified by its separator row. */
@@ -14,6 +15,8 @@ sealed class MarkdownBlock {
     data class TextBlock(val annotatedString: AnnotatedString) : MarkdownBlock()
 
     /** An embedded image referenced by a markdown `![altText](path)` tag. */
+    data class AttachmentBlock(val attachment: NoteAttachment) : MarkdownBlock()
+
     data class ImageBlock(val path: String, val altText: String) : MarkdownBlock()
 
     /** A horizontal rule (`---`, `***`, `___`, etc.). */

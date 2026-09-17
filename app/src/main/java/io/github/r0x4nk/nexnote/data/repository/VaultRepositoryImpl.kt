@@ -1,6 +1,8 @@
 package io.github.r0x4nk.nexnote.data.repository
 
 import android.content.Context
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -15,6 +17,7 @@ import io.github.r0x4nk.nexnote.data.security.VaultKeyDerivationParams
 import io.github.r0x4nk.nexnote.data.security.VaultKeyDeriver
 import io.github.r0x4nk.nexnote.data.security.VaultPinHash
 import io.github.r0x4nk.nexnote.data.security.VaultPinHasher
+import io.github.r0x4nk.nexnote.data.security.VaultPinAttemptLimiter
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
 import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
@@ -61,17 +64,22 @@ class VaultRepositoryImpl internal constructor(
     private val pinHasher: VaultPinHasher = VaultPinHasher(),
     private val keyDeriver: VaultKeyDeriver = VaultKeyDeriver(),
     private val protectUnlockMaterial: ((ByteArray) -> ProtectVaultUnlockMaterialResult)? = null,
-    private val unprotectUnlockMaterial: ((String) -> UnprotectVaultUnlockMaterialResult)? = null
+    private val unprotectUnlockMaterial: ((String) -> UnprotectVaultUnlockMaterialResult)? = null,
+    nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
+    bootCount: () -> Int = { 0 }
 ) : VaultRepository, VaultUnlockedKeyProvider {
 
     constructor(context: Context) : this(
         dataStore = context.vaultDataStore,
         protectUnlockMaterial = AndroidVaultUnlockMaterialProtector(context)::protect,
-        unprotectUnlockMaterial = AndroidVaultUnlockMaterialProtector(context)::unprotect
+        unprotectUnlockMaterial = AndroidVaultUnlockMaterialProtector(context)::unprotect,
+        nowMillis = SystemClock::elapsedRealtime,
+        bootCount = { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1) }
     )
 
     private val unlockedKey = MutableStateFlow<SecretKey?>(null)
     private val keyAccessMutex = Mutex()
+    private val pinAttemptLimiter = VaultPinAttemptLimiter(dataStore, nowMillis, bootCount)
     private lateinit var noteRewrapper: VaultNoteRewrapper
     private lateinit var noteWiper: VaultNoteWiper
     override val unlockedVaultKey: StateFlow<SecretKey?> = unlockedKey.asStateFlow()
@@ -130,6 +138,7 @@ class VaultRepositoryImpl internal constructor(
             prefs[KEY_DERIVATION_KEY_LENGTH_BITS_KEY] = keyParams.keyLengthBits
             prefs.remove(ANDROID_CREDENTIAL_PROTECTED_UNLOCK_MATERIAL_KEY)
         }
+        pinAttemptLimiter.reset()
         unlockedKey.value = null
     }
 
@@ -143,7 +152,7 @@ class VaultRepositoryImpl internal constructor(
                 return false
             }
 
-        if (!pinHasher.verify(pin, config.pinHash)) {
+        if (!pinAttemptLimiter.verify { pinHasher.verify(pin, config.pinHash) }) {
             unlockedKey.value = null
             return false
         }
@@ -265,7 +274,7 @@ class VaultRepositoryImpl internal constructor(
         // caller knows the previous PIN.
         val currentKey = unlockedKey.value ?: return ChangeVaultPinResult.VaultLocked
 
-        if (!pinHasher.verify(currentPin, config.pinHash)) {
+        if (!pinAttemptLimiter.verify { pinHasher.verify(currentPin, config.pinHash) }) {
             return ChangeVaultPinResult.WrongCurrentPin
         }
 

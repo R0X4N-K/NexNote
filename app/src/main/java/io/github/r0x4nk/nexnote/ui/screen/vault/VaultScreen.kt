@@ -1,5 +1,9 @@
 package io.github.r0x4nk.nexnote.ui.screen.vault
 
+import io.github.r0x4nk.nexnote.R
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -7,16 +11,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -26,13 +33,14 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Note
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -46,10 +54,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Sell
-import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.EditCalendar
 import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -62,6 +72,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -71,19 +82,26 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberModalBottomSheetState
+import io.github.r0x4nk.nexnote.ui.common.NoteCollectionSortEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -100,45 +118,52 @@ import io.github.r0x4nk.nexnote.ui.common.NoteCollectionLayoutDefaults
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
+import io.github.r0x4nk.nexnote.ui.common.animateNoteItem
 import io.github.r0x4nk.nexnote.ui.common.selectedItems
 import io.github.r0x4nk.nexnote.ui.component.AutoScrollingTagRow
 import io.github.r0x4nk.nexnote.ui.component.NexEmptyState
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
-import io.github.r0x4nk.nexnote.ui.component.NoteClipboardCallbacks
-import io.github.r0x4nk.nexnote.ui.component.NoteCard
-import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheetHeader
+import io.github.r0x4nk.nexnote.ui.component.NexSheetHeader
 import io.github.r0x4nk.nexnote.ui.component.NoteActionsSheetRow
+import io.github.r0x4nk.nexnote.ui.component.NoteCreationDatePickerDialog
+import io.github.r0x4nk.nexnote.ui.component.NoteCard
+import io.github.r0x4nk.nexnote.ui.component.NoteClipboardCallbacks
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
 import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
 import io.github.r0x4nk.nexnote.ui.component.NoteSearchFiltersSheet
 import io.github.r0x4nk.nexnote.ui.component.NoteSearchSortMenu
 import io.github.r0x4nk.nexnote.ui.component.NoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderCollection
-import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderExpansionState
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteTagFolderExpansionState
 import io.github.r0x4nk.nexnote.ui.component.ScrollToTopButton
+import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
 import io.github.r0x4nk.nexnote.ui.component.TagFilterBar
+import io.github.r0x4nk.nexnote.ui.component.TagFolderExpandAllButton
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
-import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
-import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuFabHideEffect
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuItem
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuOverlayDefaults
 import io.github.r0x4nk.nexnote.ui.component.radial.RadialMenuSnackbarHost
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteClipboardCallbacks
+import io.github.r0x4nk.nexnote.ui.component.rememberNoteShareCallbacks
 import io.github.r0x4nk.nexnote.ui.screen.home.TemplatePickerDialog
 import io.github.r0x4nk.nexnote.ui.screen.trash.TrashNoteCard
 
 internal const val VAULT_NOTE_ACTION_COPY_TAG = "vault_note_action_copy"
 internal const val VAULT_NOTE_ACTION_COPY_TEXT_TAG = "vault_note_action_copy_text"
 internal const val VAULT_NOTE_ACTION_COPY_MARKDOWN_TAG = "vault_note_action_copy_markdown"
-internal const val VAULT_NOTE_ACTION_SELECT_TAG = "vault_note_action_select"
 internal const val VAULT_NOTE_ACTION_MOVE_TO_TRASH_TAG = "vault_note_action_move_to_trash"
 internal const val VAULT_NOTE_ACTION_DUPLICATE_TAG = "vault_note_action_duplicate"
+internal const val VAULT_NOTE_ACTION_EDIT_DATE_TAG = "vault_note_action_edit_date"
 internal const val VAULT_NOTE_ACTION_REMOVE_FROM_VAULT_TAG =
     "vault_note_action_remove_from_vault"
 internal const val VAULT_NOTE_ROW_TAG = "vault_note_row"
 internal const val VAULT_NOTES_LOADING_TAG = "vault_notes_loading"
+internal const val VAULT_TOP_TAGS_TAG = "vault_top_tags"
 
 private enum class VaultNoteActionsPage { Actions, Copy }
 
@@ -156,15 +181,20 @@ fun VaultScreen(
 ) {
     val accessState by accessViewModel.uiState.collectAsStateWithLifecycle()
     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
+    val operationProgress by notesViewModel.operationProgress.collectAsStateWithLifecycle()
+    OperationProgressDialog(operationProgress)
     val noteCardStyle by notesViewModel.noteCardStyle.collectAsStateWithLifecycle()
     val searchFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val gridState = rememberLazyStaggeredGridState()
+    val tagFolderExpansion = rememberNoteTagFolderExpansionState()
+    NoteCollectionSortEffect(notesState.sortOrder to notesState.searchSort, listState, gridState)
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val clipboardCallbacks = rememberNoteClipboardCallbacks(snackbarHostState)
     val shareCallbacks = rememberNoteShareCallbacks(snackbarHostState)
     var activeActionsNote by remember { mutableStateOf<Note?>(null) }
+    var dateEditNote by remember { mutableStateOf<Note?>(null) }
     var showSearchFilters by rememberSaveable { mutableStateOf(false) }
     var selectionState by rememberSaveable(stateSaver = SelectionUiState.Saver) {
         mutableStateOf(SelectionUiState())
@@ -215,6 +245,7 @@ fun VaultScreen(
     LaunchedEffect(accessState.isUnlocked) {
         if (!accessState.isUnlocked) {
             activeActionsNote = null
+            dateEditNote = null
             selectionState = selectionState.exit()
             showSearchFilters = false
         }
@@ -262,7 +293,8 @@ fun VaultScreen(
     )
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground().nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { VaultSnackbarHost(snackbarHostState, floatingBottomPadding) },
         topBar = {
             if (selectionState.isActive) {
@@ -279,6 +311,9 @@ fun VaultScreen(
                     },
                     onDeselectAll = {
                         selectionState = selectionState.deselectAll()
+                    },
+                    onNoteActions = selectedVaultNotes.singleOrNull()?.let { note ->
+                        { activeActionsNote = note }
                     },
                     onShareSelected = {
                         shareCallbacks.onShareNotes(selectedVaultNotes)
@@ -312,6 +347,8 @@ fun VaultScreen(
                     hasActiveSearchFilters = notesState.hasActiveSearchFilters,
                     viewMode = notesState.viewMode,
                     isTrashVisible = notesState.isTrashVisible,
+                    hasNotes = notesState.notes.isNotEmpty(),
+                    tagFolderExpansion = tagFolderExpansion,
                     searchFocusRequester = searchFocusRequester,
                     onBack = handleBack,
                     onLock = accessViewModel::lock,
@@ -337,24 +374,16 @@ fun VaultScreen(
             listState = listState,
             gridState = gridState,
             selectionState = selectionState,
+            tagFolderExpansion = tagFolderExpansion,
             onConfigurePin = accessViewModel::configurePin,
             onUnlockWithPin = accessViewModel::unlockWithPin,
             onRequestAndroidCredentialPrompt =
                 accessViewModel::requestAndroidCredentialPrompt,
             onClearError = accessViewModel::clearError,
             onNoteClick = onNoteClick,
-            onRequestNoteActions = { note ->
-                if (!selectionState.isActive) {
-                    activeActionsNote = note
-                }
-            },
             onToggleNoteSelection = { note ->
-                if (selectionState.isActive) {
-                    selectionState = selectionState.toggle(note.id)
-                    activeActionsNote = null
-                } else {
-                    activeActionsNote = note
-                }
+                selectionState = selectionState.toggle(note.id)
+                activeActionsNote = null
             },
             onMoveToTrash = notesViewModel::moveToTrash,
             onTogglePin = notesViewModel::togglePin,
@@ -403,10 +432,18 @@ fun VaultScreen(
         onMoveToTrash = notesViewModel::moveToTrash,
         onDuplicate = notesViewModel::duplicate,
         onRemoveFromVault = notesViewModel::removeFromVault,
-        onSelect = { note ->
-            selectionState = selectionState.select(note.id)
+        onEditCreationDate = { note -> dateEditNote = note },
+        onDismiss = {
+            activeActionsNote = null
+            selectionState = selectionState.exit()
+        }
+    )
+    NoteCreationDatePickerDialog(
+        note = if (accessState.isUnlocked) dateEditNote else null,
+        onConfirm = { creationDate ->
+            dateEditNote?.let { note -> notesViewModel.updateCreationDate(note, creationDate) }
         },
-        onDismiss = { activeActionsNote = null }
+        onDismiss = { dateEditNote = null }
     )
     if (accessState.isUnlocked && notesState.showTemplatePicker) {
         TemplatePickerDialog(
@@ -433,12 +470,18 @@ private fun VaultRadialMenu(
     onCreateVaultNoteFromTemplate: () -> Unit,
     onSearchClick: () -> Unit
 ) {
+    val newNoteDescription = stringResource(R.string.vault_new_note)
+    val newNoteFromTemplateDescription = stringResource(R.string.vault_new_note_from_template)
+    val searchDescription = stringResource(R.string.vault_search)
     RadialMenuEffect(
         items = remember(
             isAvailable,
             onCreateVaultNote,
             onCreateVaultNoteFromTemplate,
-            onSearchClick
+            onSearchClick,
+            newNoteDescription,
+            newNoteFromTemplateDescription,
+            searchDescription
         ) {
             if (!isAvailable) {
                 emptyList()
@@ -447,25 +490,25 @@ private fun VaultRadialMenu(
                     RadialMenuItem(
                         icon = Icons.Default.Add,
                         label = "",
-                        contentDescription = "New Vault note",
+                        contentDescription = newNoteDescription,
                         action = onCreateVaultNote
                     ),
                     RadialMenuItem(
                         icon = Icons.Default.Description,
                         label = "",
-                        contentDescription = "New Vault note from template",
+                        contentDescription = newNoteFromTemplateDescription,
                         action = onCreateVaultNoteFromTemplate
                     ),
                     RadialMenuItem(
                         icon = Icons.Default.Search,
                         label = "",
-                        contentDescription = "Search Vault",
+                        contentDescription = searchDescription,
                         action = onSearchClick
                     )
                 )
             }
         },
-        fabContentDescription = "Open Vault creation menu"
+        fabContentDescription = stringResource(R.string.vault_open_menu)
     )
 }
 
@@ -502,6 +545,8 @@ private fun VaultTopBar(
     hasActiveSearchFilters: Boolean,
     viewMode: NoteListViewMode,
     isTrashVisible: Boolean,
+    hasNotes: Boolean,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     searchFocusRequester: FocusRequester,
     onBack: () -> Unit,
     onLock: () -> Unit,
@@ -527,7 +572,7 @@ private fun VaultTopBar(
         navigationIcon = {
             NexIconButton(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Go back",
+                contentDescription = stringResource(R.string.common_back),
                 onClick = onBack
             )
         },
@@ -540,33 +585,37 @@ private fun VaultTopBar(
                     )
                     NexIconButton(
                         imageVector = Icons.Default.FilterAlt,
-                        contentDescription = "Filter search results",
+                        contentDescription = stringResource(R.string.common_filter_search_results),
                         selected = hasActiveSearchFilters,
                         onClick = onOpenSearchFilters
                     )
                     NexIconButton(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close search",
+                        contentDescription = stringResource(R.string.common_close_search),
                         onClick = { onSearchToggle(false) }
                     )
                 } else {
                     NexIconButton(
                         imageVector = Icons.Default.Search,
-                        contentDescription = if (isTrashVisible) {
-                            "Search Vault trash"
-                        } else {
-                            "Search Vault"
-                        },
+                        contentDescription = stringResource(
+                            if (isTrashVisible) R.string.vault_search_trash
+                            else R.string.vault_search
+                        ),
                         onClick = { onSearchToggle(true) }
                     )
                     NoteListSortButton(
                         sortOrder = sortOrder,
                         onToggleSortOrder = onToggleSortOrder
                     )
-                    VaultTrashButton(
-                        isTrashVisible = isTrashVisible,
-                        onToggleTrashVisibility = onToggleTrashVisibility
-                    )
+                    if (!isTrashVisible && viewMode == NoteListViewMode.TAGS && hasNotes) {
+                        TagFolderExpandAllButton(
+                            isAllCollapsed = tagFolderExpansion.isAllCollapsed,
+                            onClick = tagFolderExpansion::toggleAll
+                        )
+                    }
+                    if (!isTrashVisible) {
+                        VaultTrashButton(onToggleTrashVisibility = onToggleTrashVisibility)
+                    }
                 }
                 VaultOverflowMenu(
                     viewMode = viewMode,
@@ -593,11 +642,13 @@ private fun VaultOverflowMenu(
     NoteListOverflowMenu(
         viewMode = viewMode,
         onToggleViewMode = onToggleViewMode,
-        contentDescription = "Vault options"
+        contentDescription = stringResource(R.string.vault_options),
+        availableViewModes = if (isTrashVisible) listOf(NoteListViewMode.LIST)
+            else NoteListViewMode.noteModes
     ) { dismiss ->
         if (!isTrashVisible) {
             DropdownMenuItem(
-                text = { Text("Select Vault notes") },
+                text = { Text(stringResource(R.string.vault_select_notes)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.SelectAll,
@@ -611,7 +662,7 @@ private fun VaultOverflowMenu(
             )
         }
         DropdownMenuItem(
-            text = { Text("Lock Vault") },
+            text = { Text(stringResource(R.string.vault_lock)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Security,
@@ -628,18 +679,12 @@ private fun VaultOverflowMenu(
 
 @Composable
 private fun VaultTrashButton(
-    isTrashVisible: Boolean,
     onToggleTrashVisibility: () -> Unit
 ) {
     NexIconButton(
         imageVector = Icons.Default.Delete,
-        contentDescription = if (isTrashVisible) {
-            "Show Vault notes"
-        } else {
-            "Show Vault trash"
-        },
-        onClick = onToggleTrashVisibility,
-        selected = isTrashVisible
+        contentDescription = stringResource(R.string.vault_show_trash),
+        onClick = onToggleTrashVisibility
     )
 }
 
@@ -651,7 +696,7 @@ private fun VaultTopBarTitle(
     searchFocusRequester: FocusRequester,
     onSearchQueryChange: (String) -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         AnimatedVisibility(
             visible = isSearchActive,
             enter = fadeIn(tween(120)),
@@ -660,11 +705,10 @@ private fun VaultTopBarTitle(
             NexSearchField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = if (isTrashVisible) {
-                    "Search Vault trash"
-                } else {
-                    "Search Vault"
-                },
+                placeholder = stringResource(
+                    if (isTrashVisible) R.string.vault_search_trash
+                    else R.string.vault_search
+                ),
                 modifier = Modifier.fillMaxWidth(),
                 focusRequester = searchFocusRequester,
                 textStyle = MaterialTheme.typography.titleMedium
@@ -676,8 +720,12 @@ private fun VaultTopBarTitle(
             exit = fadeOut(tween(100))
         ) {
             Text(
-                text = if (isTrashVisible) "Vault Trash" else "Vault",
-                style = MaterialTheme.typography.headlineSmall
+                text = stringResource(
+                    if (isTrashVisible) R.string.vault_trash_title else R.string.vault_title
+                ),
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }
     }
@@ -733,12 +781,12 @@ private fun VaultContent(
     listState: LazyListState,
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onConfigurePin: (CharArray, CharArray) -> Unit,
     onUnlockWithPin: (CharArray) -> Unit,
     onRequestAndroidCredentialPrompt: () -> Unit,
     onClearError: () -> Unit,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
@@ -785,6 +833,7 @@ private fun VaultContent(
                 listState = listState,
                 gridState = gridState,
                 selectionState = selectionState,
+                tagFolderExpansion = tagFolderExpansion,
                 isLoading = isVaultNotesLoading,
                 isTrashVisible = notesState.isTrashVisible,
                 isSearchActive = notesState.isSearchActive,
@@ -795,7 +844,6 @@ private fun VaultContent(
                     emptySet()
                 },
                 onNoteClick = onNoteClick,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onMoveToTrash = onMoveToTrash,
                 onTogglePin = onTogglePin,
@@ -828,11 +876,18 @@ private fun CenteredFormBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Box(
-        modifier = modifier.padding(horizontal = 20.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        content()
+    BoxWithConstraints(modifier = modifier.imePadding()) {
+        val viewportHeight = maxHeight
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight)
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(Modifier.widthIn(max = 480.dp)) { content() }
+        }
     }
 }
 
@@ -851,11 +906,11 @@ private fun VaultSetupForm(
     }
 
     VaultAccessForm(
-        title = "Set up Vault",
+        title = stringResource(R.string.vault_setup_title),
         pin = pin,
         confirmation = confirmation,
         showConfirmation = true,
-        buttonText = "Create PIN",
+        buttonText = stringResource(R.string.vault_create_pin),
         isBusy = uiState.isBusy,
         errorText = uiState.error?.message(),
         failedPinAttemptsText = null,
@@ -878,7 +933,7 @@ private fun VaultSetupForm(
 }
 
 @Composable
-private fun VaultUnlockForm(
+internal fun VaultUnlockForm(
     uiState: VaultAccessUiState,
     onUnlockWithPin: (CharArray) -> Unit,
     onRequestAndroidCredentialPrompt: () -> Unit,
@@ -891,11 +946,11 @@ private fun VaultUnlockForm(
     }
 
     VaultAccessForm(
-        title = "Unlock Vault",
+        title = stringResource(R.string.vault_unlock_title),
         pin = pin,
         confirmation = "",
         showConfirmation = false,
-        buttonText = "Unlock",
+        buttonText = stringResource(R.string.vault_unlock_action),
         isBusy = uiState.isBusy,
         errorText = uiState.error?.message(),
         failedPinAttemptsText = uiState.failedPinAttempts.toFailedPinAttemptsText(),
@@ -945,12 +1000,14 @@ private fun VaultAccessForm(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.semantics { heading() },
             color = MaterialTheme.colorScheme.onSurface
         )
         VaultPinField(
             value = pin,
-            label = "PIN",
+            label = stringResource(R.string.vault_pin_label),
             enabled = !isBusy,
             imeAction = if (showConfirmation) ImeAction.Next else ImeAction.Done,
             onValueChange = onPinChange,
@@ -961,7 +1018,7 @@ private fun VaultAccessForm(
         if (showConfirmation) {
             VaultPinField(
                 value = confirmation,
-                label = "Confirm PIN",
+                label = stringResource(R.string.vault_confirm_pin_label),
                 enabled = !isBusy,
                 imeAction = ImeAction.Done,
                 onValueChange = onConfirmationChange,
@@ -971,6 +1028,7 @@ private fun VaultAccessForm(
         if (errorText != null) {
             Text(
                 text = errorText,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
@@ -978,12 +1036,13 @@ private fun VaultAccessForm(
         if (failedPinAttemptsText != null) {
             Text(
                 text = failedPinAttemptsText,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
         }
         Button(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             enabled = !isBusy,
             onClick = onSubmit,
             shape = MaterialTheme.shapes.extraLarge
@@ -1008,7 +1067,7 @@ private fun VaultAndroidCredentialUnlockButton(
     onClick: () -> Unit
 ) {
     OutlinedButton(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         enabled = enabled,
         onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge
@@ -1018,7 +1077,7 @@ private fun VaultAndroidCredentialUnlockButton(
             contentDescription = null
         )
         Spacer(Modifier.size(8.dp))
-        Text("Use Android screen lock")
+        Text(stringResource(R.string.vault_use_android_lock))
     }
 }
 
@@ -1054,7 +1113,6 @@ internal fun VaultNotesCollection(
     noteCardStyle: NoteCardStyle,
     isTrashVisible: Boolean,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
     onRestoreFromTrash: (Note) -> Unit,
@@ -1064,6 +1122,7 @@ internal fun VaultNotesCollection(
     listState: LazyListState = rememberLazyListState(),
     gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     selectionState: SelectionUiState = SelectionUiState(),
+    tagFolderExpansion: NoteTagFolderExpansionState = rememberNoteTagFolderExpansionState(),
     isLoading: Boolean = false,
     isSearchActive: Boolean = false,
     topTags: List<Tag> = emptyList(),
@@ -1075,9 +1134,10 @@ internal fun VaultNotesCollection(
     bottomContentPadding: Dp = NoteCollectionLayoutDefaults.defaultBottomPadding,
     scrollToTopBottomPadding: Dp = 16.dp
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    val collectionViewMode = if (isTrashVisible) NoteListViewMode.LIST else viewMode
+    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            VaultProtectionBanner(isTrashVisible = isTrashVisible)
+            VaultProtectionBanner(isTrashVisible = isTrashVisible, viewMode = collectionViewMode)
             // Tag filter bars are hidden while loading: their state derives from
             // the encrypted Vault tags flow, which has not yet emitted.
             if (!isLoading) {
@@ -1094,7 +1154,7 @@ internal fun VaultNotesCollection(
             VaultNotesBody(
                 notes = notes,
                 scoredResults = scoredResults,
-                viewMode = viewMode,
+                viewMode = collectionViewMode,
                 noteCardStyle = noteCardStyle,
                 listState = listState,
                 gridState = gridState,
@@ -1103,8 +1163,8 @@ internal fun VaultNotesCollection(
                 isSearchActive = isSearchActive,
                 hasTagFilter = selectedTagFilters.isNotEmpty(),
                 selectionState = selectionState,
+                tagFolderExpansion = tagFolderExpansion,
                 onNoteClick = onNoteClick,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onMoveToTrash = onMoveToTrash,
                 onTogglePin = onTogglePin,
@@ -1115,7 +1175,7 @@ internal fun VaultNotesCollection(
             )
         }
         if (!isLoading && notes.isNotEmpty()) {
-            when (viewMode) {
+            when (collectionViewMode) {
                 NoteListViewMode.GRID -> ScrollToTopButton(
                     gridState = gridState,
                     modifier = Modifier
@@ -1137,16 +1197,17 @@ internal fun VaultNotesCollection(
 @Composable
 private fun VaultProtectionBanner(
     isTrashVisible: Boolean,
+    viewMode: NoteListViewMode,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = NoteCollectionLayoutDefaults.horizontalPadding(viewMode), vertical = 8.dp),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        tonalElevation = 1.dp
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -1163,13 +1224,19 @@ private fun VaultProtectionBanner(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = if (isTrashVisible) "Protected trash" else "Protected mode",
+                    text = stringResource(
+                        if (isTrashVisible) R.string.vault_protected_trash_title
+                        else R.string.vault_protected_mode_title
+                    ),
                     style = MaterialTheme.typography.labelLarge
                 )
                 Text(
-                    text = "Vault session active",
+                    text = stringResource(
+                        if (isTrashVisible) R.string.vault_protected_trash_message
+                        else R.string.vault_protected_mode_message
+                    ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -1196,6 +1263,7 @@ private fun VaultTagFilterBars(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
+                .testTag(VAULT_TOP_TAGS_TAG)
         )
         HorizontalDivider(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
@@ -1221,8 +1289,8 @@ private fun VaultNotesBody(
     isSearchActive: Boolean,
     hasTagFilter: Boolean,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
@@ -1254,7 +1322,6 @@ private fun VaultNotesBody(
                 gridState = gridState,
                 selectionState = selectionState,
                 onNoteClick = onNoteClick,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onMoveToTrash = onMoveToTrash,
                 onTogglePin = onTogglePin,
@@ -1272,8 +1339,8 @@ private fun VaultNotesBody(
                 noteCardStyle = noteCardStyle,
                 listState = listState,
                 selectionState = selectionState,
+                tagFolderExpansion = tagFolderExpansion,
                 onNoteClick = onNoteClick,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onMoveToTrash = onMoveToTrash,
                 onTogglePin = onTogglePin,
@@ -1292,7 +1359,6 @@ private fun VaultNotesBody(
                 listState = listState,
                 selectionState = selectionState,
                 onNoteClick = onNoteClick,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onMoveToTrash = onMoveToTrash,
                 onTogglePin = onTogglePin,
@@ -1314,7 +1380,6 @@ private fun VaultNotesList(
     listState: LazyListState,
     selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
@@ -1326,7 +1391,7 @@ private fun VaultNotesList(
     val displayItems = rememberVaultDisplayItems(notes, scoredResults)
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().clipToBounds(),
         contentPadding = NoteCollectionLayoutDefaults.listContentPadding(
             bottomPadding = bottomContentPadding
         ),
@@ -1343,13 +1408,13 @@ private fun VaultNotesList(
                     note = note,
                     onRestoreFromTrash = onRestoreFromTrash,
                     onRequestDeletePermanentlyFromTrash =
-                        onRequestDeletePermanentlyFromTrash
+                        onRequestDeletePermanentlyFromTrash,
+                    modifier = animateNoteItem()
                 )
             } else {
                 VaultActiveNoteCard(
                     scored = scored,
                     onNoteClick = onNoteClick,
-                    onRequestNoteActions = onRequestNoteActions,
                     onToggleNoteSelection = onToggleNoteSelection,
                     onMoveToTrash = onMoveToTrash,
                     onTogglePin = onTogglePin,
@@ -1357,7 +1422,7 @@ private fun VaultNotesList(
                     selectionState = selectionState,
                     modifier = Modifier
                         .testTag(VAULT_NOTE_ROW_TAG)
-                        .animateItem()
+                        .then(animateNoteItem())
                 )
             }
         }
@@ -1373,7 +1438,6 @@ private fun VaultNotesGrid(
     gridState: LazyStaggeredGridState,
     selectionState: SelectionUiState,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
@@ -1386,7 +1450,7 @@ private fun VaultNotesGrid(
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(2),
         state = gridState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().clipToBounds(),
         contentPadding = NoteCollectionLayoutDefaults.gridContentPadding(
             bottomPadding = bottomContentPadding
         ),
@@ -1404,13 +1468,13 @@ private fun VaultNotesGrid(
                     note = note,
                     onRestoreFromTrash = onRestoreFromTrash,
                     onRequestDeletePermanentlyFromTrash =
-                        onRequestDeletePermanentlyFromTrash
+                        onRequestDeletePermanentlyFromTrash,
+                    modifier = animateNoteItem()
                 )
             } else {
                 VaultActiveNoteCard(
                     scored = scored,
                     onNoteClick = onNoteClick,
-                    onRequestNoteActions = onRequestNoteActions,
                     onToggleNoteSelection = onToggleNoteSelection,
                     onMoveToTrash = onMoveToTrash,
                     onTogglePin = onTogglePin,
@@ -1418,7 +1482,7 @@ private fun VaultNotesGrid(
                     selectionState = selectionState,
                     modifier = Modifier
                         .testTag(VAULT_NOTE_ROW_TAG)
-                        .animateItem()
+                        .then(animateNoteItem())
                 )
             }
         }
@@ -1433,8 +1497,8 @@ private fun VaultNotesTagFolders(
     noteCardStyle: NoteCardStyle,
     listState: LazyListState,
     selectionState: SelectionUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
@@ -1448,7 +1512,8 @@ private fun VaultNotesTagFolders(
         displayItems = displayItems,
         listState = listState,
         bottomContentPadding = bottomContentPadding,
-        modifier = modifier
+        modifier = modifier,
+        expansionState = tagFolderExpansion
     ) { scored, itemModifier ->
         val note = scored.note
         if (isReadOnly) {
@@ -1462,7 +1527,6 @@ private fun VaultNotesTagFolders(
             VaultActiveNoteCard(
                 scored = scored,
                 onNoteClick = onNoteClick,
-                onRequestNoteActions = onRequestNoteActions,
                 onToggleNoteSelection = onToggleNoteSelection,
                 onMoveToTrash = onMoveToTrash,
                 onTogglePin = onTogglePin,
@@ -1511,6 +1575,7 @@ private fun VaultDeletePermanentlyDialog(
     if (!visible) return
 
     AlertDialog(
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
         icon = {
             Icon(
@@ -1519,18 +1584,18 @@ private fun VaultDeletePermanentlyDialog(
                 tint = MaterialTheme.colorScheme.error
             )
         },
-        title = { Text("Delete Vault note?") },
+        title = { Text(stringResource(R.string.vault_delete_dialog_title)) },
         text = {
-            Text("Permanently delete this Vault note? This cannot be undone.")
+            Text(stringResource(R.string.vault_delete_dialog_message))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Delete", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1591,35 +1656,40 @@ private fun vaultEmptyStateIcon(
         else -> Icons.AutoMirrored.Filled.Note
     }
 
+@Composable
 private fun vaultEmptyStateTitle(
     isTrashVisible: Boolean,
     isSearchActive: Boolean,
     hasTagFilter: Boolean
 ): String =
-    when {
-        isSearchActive -> "No results"
-        hasTagFilter -> "No notes with these tags"
-        isTrashVisible -> "Vault trash empty"
-        else -> "No Vault notes"
-    }
+    stringResource(
+        when {
+            isSearchActive -> R.string.vault_empty_no_results_title
+            hasTagFilter -> R.string.vault_empty_tag_filter_title
+            isTrashVisible -> R.string.vault_empty_trash_title
+            else -> R.string.vault_empty_notes_title
+        }
+    )
 
+@Composable
 private fun vaultEmptyStateMessage(
     isTrashVisible: Boolean,
     isSearchActive: Boolean,
     hasTagFilter: Boolean
 ): String =
-    when {
-        isSearchActive -> "Try different words"
-        hasTagFilter -> "Try removing some tag filters"
-        isTrashVisible -> "No deleted Vault notes."
-        else -> "Use the + button below to create your first Vault note"
-    }
+    stringResource(
+        when {
+            isSearchActive -> R.string.vault_empty_no_results_message
+            hasTagFilter -> R.string.vault_empty_tag_filter_message
+            isTrashVisible -> R.string.vault_empty_trash_message
+            else -> R.string.vault_empty_notes_message
+        }
+    )
 
 @Composable
 private fun VaultActiveNoteCard(
     scored: ScoredNote,
     onNoteClick: (Long) -> Unit,
-    onRequestNoteActions: (Note) -> Unit,
     onToggleNoteSelection: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
@@ -1644,11 +1714,6 @@ private fun VaultActiveNoteCard(
         contentHighlightRanges = scored.contentRanges,
         onPin = { onTogglePin(note) },
         onLongPress = { onToggleNoteSelection(note) },
-        onActions = if (selectionState.isActive) {
-            null
-        } else {
-            { onRequestNoteActions(note) }
-        },
         selectionMode = selectionState.isActive,
         selected = selectionState.isSelected(note.id)
     )
@@ -1663,7 +1728,7 @@ internal fun VaultNoteActionsSheet(
     onMoveToTrash: (Note) -> Unit,
     onDuplicate: (Note) -> Unit,
     onRemoveFromVault: (Note) -> Unit,
-    onSelect: (Note) -> Unit,
+    onEditCreationDate: ((Note) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     if (note == null) return
@@ -1671,30 +1736,37 @@ internal fun VaultNoteActionsSheet(
     var page by remember(note.id) { mutableStateOf(VaultNoteActionsPage.Actions) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
+        dragHandle = { io.github.r0x4nk.nexnote.ui.component.NexSheetDragHandle() },
+        tonalElevation = 1.dp,
         onDismissRequest = onDismiss,
         sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(bottom = 12.dp)
         ) {
-            NoteActionsSheetHeader(
-                title = if (page == VaultNoteActionsPage.Actions) {
-                    "Vault note actions"
-                } else {
-                    "Copy Vault note"
-                },
-                noteLabel = "Selected Vault note"
+            val onHeaderBack: () -> Unit = if (page == VaultNoteActionsPage.Actions) {
+                onDismiss
+            } else {
+                { page = VaultNoteActionsPage.Actions }
+            }
+            NexSheetHeader(
+                title = stringResource(
+                    if (page == VaultNoteActionsPage.Actions) {
+                        R.string.vault_actions_title
+                    } else {
+                        R.string.vault_copy_actions_title
+                    }
+                ),
+                subtitle = stringResource(R.string.vault_selected_note),
+                onBack = onHeaderBack
             )
-            HorizontalDivider()
+            Spacer(Modifier.size(8.dp))
             when (page) {
                 VaultNoteActionsPage.Actions -> VaultNoteActionsMainPage(
                     showShare = shareCallbacks != null,
-                    onSelect = {
-                        onSelect(note)
-                        onDismiss()
-                    },
                     onShare = {
                         shareCallbacks?.onShareNote(note)
                         onDismiss()
@@ -1708,6 +1780,12 @@ internal fun VaultNoteActionsSheet(
                         onDuplicate(note)
                         onDismiss()
                     },
+                    onEditCreationDate = onEditCreationDate?.let { edit ->
+                        {
+                            edit(note)
+                            onDismiss()
+                        }
+                    },
                     onRemoveFromVault = {
                         onRemoveFromVault(note)
                         onDismiss()
@@ -1715,7 +1793,6 @@ internal fun VaultNoteActionsSheet(
                 )
 
                 VaultNoteActionsPage.Copy -> VaultNoteActionsCopyPage(
-                    onBack = { page = VaultNoteActionsPage.Actions },
                     onCopyPlainText = {
                         clipboardCallbacks.onCopyPlainText(note)
                         onDismiss()
@@ -1733,46 +1810,48 @@ internal fun VaultNoteActionsSheet(
 @Composable
 private fun VaultNoteActionsMainPage(
     showShare: Boolean,
-    onSelect: () -> Unit,
     onShare: () -> Unit,
     onCopy: () -> Unit,
     onMoveToTrash: () -> Unit,
     onDuplicate: () -> Unit,
+    onEditCreationDate: (() -> Unit)?,
     onRemoveFromVault: () -> Unit
 ) {
-    NoteActionsSheetRow(
-        text = "Select",
-        icon = Icons.Outlined.CheckCircle,
-        modifier = Modifier.testTag(VAULT_NOTE_ACTION_SELECT_TAG),
-        onClick = onSelect
-    )
     if (showShare) {
         NoteActionsSheetRow(
-            text = "Share",
+            text = stringResource(R.string.common_share),
             icon = Icons.Default.IosShare,
             onClick = onShare
         )
     }
     NoteActionsSheetRow(
-        text = "Copy",
+        text = stringResource(R.string.common_copy),
         icon = Icons.Outlined.ContentCopy,
         modifier = Modifier.testTag(VAULT_NOTE_ACTION_COPY_TAG),
         onClick = onCopy
     )
     NoteActionsSheetRow(
-        text = "Duplicate",
+        text = stringResource(R.string.common_duplicate),
         icon = Icons.Outlined.FileCopy,
         modifier = Modifier.testTag(VAULT_NOTE_ACTION_DUPLICATE_TAG),
         onClick = onDuplicate
     )
+    if (onEditCreationDate != null) {
+        NoteActionsSheetRow(
+            text = stringResource(R.string.edit_creation_date),
+            icon = Icons.Outlined.EditCalendar,
+            modifier = Modifier.testTag(VAULT_NOTE_ACTION_EDIT_DATE_TAG),
+            onClick = onEditCreationDate
+        )
+    }
     NoteActionsSheetRow(
-        text = "Remove from Vault",
+        text = stringResource(R.string.common_remove_from_vault),
         icon = Icons.Default.LockOpen,
         modifier = Modifier.testTag(VAULT_NOTE_ACTION_REMOVE_FROM_VAULT_TAG),
         onClick = onRemoveFromVault
     )
     NoteActionsSheetRow(
-        text = "Move to trash",
+        text = stringResource(R.string.common_move_to_trash),
         icon = Icons.Outlined.Delete,
         destructive = true,
         modifier = Modifier.testTag(VAULT_NOTE_ACTION_MOVE_TO_TRASH_TAG),
@@ -1782,45 +1861,41 @@ private fun VaultNoteActionsMainPage(
 
 @Composable
 private fun VaultNoteActionsCopyPage(
-    onBack: () -> Unit,
     onCopyPlainText: () -> Unit,
     onCopyMarkdown: () -> Unit
 ) {
     NoteActionsSheetRow(
-        text = "Back",
-        icon = Icons.AutoMirrored.Outlined.ArrowBack,
-        onClick = onBack
-    )
-    NoteActionsSheetRow(
-        text = "Copy as text",
+        text = stringResource(R.string.common_copy_as_text),
         icon = Icons.AutoMirrored.Outlined.TextSnippet,
         modifier = Modifier.testTag(VAULT_NOTE_ACTION_COPY_TEXT_TAG),
         onClick = onCopyPlainText
     )
     NoteActionsSheetRow(
-        text = "Copy as Markdown",
+        text = stringResource(R.string.common_copy_as_markdown),
         icon = Icons.Outlined.Code,
         modifier = Modifier.testTag(VAULT_NOTE_ACTION_COPY_MARKDOWN_TAG),
         onClick = onCopyMarkdown
     )
 }
 
-private fun VaultAccessError.message(): String = when (this) {
-    VaultAccessError.EMPTY_PIN -> "Enter a PIN."
-    VaultAccessError.PIN_MISMATCH -> "PINs do not match."
-    VaultAccessError.WRONG_PIN -> "Wrong PIN."
-    VaultAccessError.VAULT_NOT_CONFIGURED -> "Vault is not configured."
-    VaultAccessError.ANDROID_CREDENTIAL_UNAVAILABLE ->
-        "Android screen lock unlock is not available."
-    VaultAccessError.ANDROID_CREDENTIAL_CANCELED ->
-        "Android screen lock was canceled."
-    VaultAccessError.ANDROID_CREDENTIAL_RESET_REQUIRED ->
-        "Android screen lock unlock is no longer available. " +
-            "Unlock with your PIN to re-enable it."
-    VaultAccessError.OPERATION_FAILED -> "Vault access failed."
-}
-
-private fun Int.toFailedPinAttemptsText(): String? =
-    takeIf { it > 0 }?.let { attempts ->
-        "Failed PIN attempts: $attempts"
+@Composable
+private fun VaultAccessError.message(): String = stringResource(
+    when (this) {
+        VaultAccessError.EMPTY_PIN -> R.string.vault_error_empty_pin
+        VaultAccessError.PIN_MISMATCH -> R.string.vault_error_pin_mismatch
+        VaultAccessError.WRONG_PIN -> R.string.vault_error_wrong_pin
+        VaultAccessError.PIN_RATE_LIMITED -> R.string.vault_error_rate_limited
+        VaultAccessError.VAULT_NOT_CONFIGURED -> R.string.vault_error_not_configured
+        VaultAccessError.ANDROID_CREDENTIAL_UNAVAILABLE ->
+            R.string.vault_error_credential_unavailable
+        VaultAccessError.ANDROID_CREDENTIAL_CANCELED ->
+            R.string.vault_error_credential_canceled
+        VaultAccessError.ANDROID_CREDENTIAL_RESET_REQUIRED ->
+            R.string.vault_error_credential_reset_required
+        VaultAccessError.OPERATION_FAILED -> R.string.vault_error_operation_failed
     }
+)
+
+@Composable
+private fun Int.toFailedPinAttemptsText(): String? =
+    if (this > 0) stringResource(R.string.vault_failed_pin_attempts, this) else null

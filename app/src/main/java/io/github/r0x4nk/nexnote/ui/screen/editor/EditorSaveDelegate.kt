@@ -1,5 +1,7 @@
 package io.github.r0x4nk.nexnote.ui.screen.editor
 
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.usecase.IndexNoteTagsUseCase
@@ -28,7 +30,8 @@ internal class EditorSaveDelegate(
     private val saveCoordinator: EditorSaveCoordinator,
     private val autosaveDelayMs: Long,
     private val savesEnabled: Boolean = true,
-    private val tagIndexDedup: TagIndexDedupPolicy = TagIndexDedupPolicy()
+    private val tagIndexDedup: TagIndexDedupPolicy = TagIndexDedupPolicy(),
+    private val strings: StringProvider
 ) {
     private val saveMutex = Mutex()
     private var autosaveJob: Job? = null
@@ -117,7 +120,12 @@ internal class EditorSaveDelegate(
                 event = "ensurePersistedFailed",
                 details = "${NexNoteDebugLog.throwableSummary(e)} ${snapshot.debugSaveSummary()}"
             )
-            uiState.update { it.copy(isSaving = false, errorMessage = "Save failed") }
+            uiState.update {
+            it.copy(
+                isSaving = false,
+                errorMessage = strings.get(R.string.editor_error_save_failed)
+            )
+        }
             false
         }
     }
@@ -172,7 +180,12 @@ internal class EditorSaveDelegate(
                 event = "performSaveFailed",
                 details = "${NexNoteDebugLog.throwableSummary(e)} ${snapshot.debugSaveSummary()}"
             )
-            uiState.update { it.copy(isSaving = false, errorMessage = "Save failed") }
+            uiState.update {
+            it.copy(
+                isSaving = false,
+                errorMessage = strings.get(R.string.editor_error_save_failed)
+            )
+        }
             false
         }
     }
@@ -250,7 +263,9 @@ internal class EditorSaveDelegate(
     private suspend fun saveAsTemplate(snapshot: EditorUiState) {
         val template = Template(
             id = snapshot.templateId,
-            name = snapshot.title.trim().ifBlank { "Template" },
+            name = snapshot.title.trim().ifBlank {
+            strings.get(R.string.editor_default_template_name)
+        },
             content = snapshot.content,
             isMarkdown = EDITOR_MARKDOWN_ENABLED,
             isPredefined = false

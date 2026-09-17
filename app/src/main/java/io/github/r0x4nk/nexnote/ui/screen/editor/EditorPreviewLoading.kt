@@ -15,10 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 
 @Composable
 internal fun EditorPreviewLoadingPlaceholder(
@@ -27,13 +29,14 @@ internal fun EditorPreviewLoadingPlaceholder(
     val colorScheme = MaterialTheme.colorScheme
     val placeholderColor = colorScheme.surfaceContainerHighest.copy(alpha = 0.48f)
     val accentColor = colorScheme.primary.copy(alpha = 0.26f)
+    val loadingDescription = stringResource(R.string.editor_loading_preview)
 
     Column(
         verticalArrangement = Arrangement.spacedBy(18.dp),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .semantics { contentDescription = "Loading preview" }
+            .semantics { contentDescription = loadingDescription }
     ) {
         PreviewLoadingHeader(placeholderColor = placeholderColor, accentColor = accentColor)
         repeat(4) { index ->

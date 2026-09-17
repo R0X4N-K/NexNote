@@ -27,16 +27,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.dismiss
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.r0x4nk.nexnote.R
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
@@ -117,7 +127,16 @@ fun RadialMenu(
     val surface   = MaterialTheme.colorScheme.surface
     val onSurface = MaterialTheme.colorScheme.onSurface
 
-    Box(modifier.fillMaxSize()) {
+    val menuTitle = stringResource(R.string.radial_menu)
+    val dismissLabel = stringResource(R.string.close_menu)
+    val scrimColor = MaterialTheme.colorScheme.scrim
+    Box(modifier.fillMaxSize().semantics {
+        paneTitle = menuTitle
+        dismiss(dismissLabel) {
+            onDismiss()
+            true
+        }
+    }) {
 
         // ── Scrim ─────────────────────────────────────────────────────────────
         // A semi-transparent overlay dims the content behind the menu.
@@ -126,7 +145,7 @@ fun RadialMenu(
         // The menu is now corner-anchored and the scrim alone provides
         // sufficient visual context.
         Canvas(Modifier.fillMaxSize()) {
-            drawRect(Color.Black.copy(alpha = 0.30f * animScale))
+            drawRect(scrimColor.copy(alpha = 0.30f * animScale))
         }
 
         // ── Single gesture handler covering the full screen ───────────────────
@@ -193,18 +212,26 @@ fun RadialMenu(
                             pivotFractionY = iconSizePx / 2 / (iconSizePx + 28f)
                         )
                     }
+                    .clearAndSetSemantics {
+                        contentDescription = item.contentDescription.ifBlank { item.label }
+                        role = Role.Button
+                        if (!item.enabled) disabled()
+                        onClick {
+                            if (item.enabled) onItemClick(index)
+                            item.enabled
+                        }
+                    }
             ) {
-                // Icon circle
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(iconSizeDp)
                         .clip(CircleShape)
-                        .background(surface.copy(alpha = 0.92f))
+                        .background(surface)
                 ) {
                     Icon(
                         imageVector        = item.icon,
-                        contentDescription = item.contentDescription.takeIf { it.isNotBlank() },
+                        contentDescription = null,
                         tint               = onSurface,
                         modifier           = Modifier.size(24.dp)
                     )
@@ -219,7 +246,7 @@ fun RadialMenu(
                         modifier = Modifier
                             .padding(top = 5.dp)
                             .background(
-                                surface.copy(alpha = 0.85f),
+                                surface,
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .padding(horizontal = 6.dp, vertical = 3.dp)

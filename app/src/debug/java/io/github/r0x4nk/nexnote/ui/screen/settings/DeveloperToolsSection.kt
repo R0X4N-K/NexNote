@@ -13,15 +13,20 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.activity.ComponentActivity
+import android.content.ContextWrapper
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.usecase.GenerateDebugNotesUseCase
 
 internal const val SETTINGS_DEVELOPER_NOTE_COUNT_FIELD_TAG =
@@ -32,7 +37,13 @@ internal const val SETTINGS_DEVELOPER_GENERATE_BUTTON_TAG =
 /** Adds debug-only data generation controls to the settings list. */
 internal fun LazyListScope.developerToolsSection() {
     item {
-        val viewModel: DeveloperToolsViewModel = viewModel(factory = DeveloperToolsViewModel.Factory)
+        // Generation belongs to the activity so switching destinations does not cancel it.
+        val owner = generateSequence(LocalContext.current) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<ComponentActivity>().first()
+        val viewModel: DeveloperToolsViewModel = viewModel(
+            viewModelStoreOwner = owner,
+            factory = DeveloperToolsViewModel.Factory
+        )
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
         DeveloperToolsContent(
@@ -50,10 +61,10 @@ internal fun DeveloperToolsContent(
     onGenerate: () -> Unit
 ) {
     SettingsSectionSurface {
-        SettingsSectionHeader("Developer tools")
+        SettingsSectionHeader(stringResource(R.string.debug_developer_tools))
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "Create realistic test notes for list, search, agenda, tag, and Markdown performance checks. Generated data is added to your existing notes.",
+            text = stringResource(R.string.debug_generate_notes_description),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -67,11 +78,14 @@ internal fun DeveloperToolsContent(
             enabled = !uiState.isGenerating,
             singleLine = true,
             isError = uiState.error == DeveloperToolsError.INVALID_NOTE_COUNT,
-            label = { Text("Number of notes") },
+            label = { Text(stringResource(R.string.debug_number_of_notes)) },
             supportingText = {
                 Text(
-                    "Allowed range: ${GenerateDebugNotesUseCase.MIN_NOTE_COUNT}–" +
-                        "${GenerateDebugNotesUseCase.MAX_NOTE_COUNT}"
+                    stringResource(
+                        R.string.debug_allowed_range,
+                        GenerateDebugNotesUseCase.MIN_NOTE_COUNT,
+                        GenerateDebugNotesUseCase.MAX_NOTE_COUNT
+                    )
                 )
             },
             keyboardOptions = KeyboardOptions(
@@ -99,7 +113,7 @@ internal fun DeveloperToolsContent(
                     text = "  ${uiState.generatedCount}/${uiState.requestedCount}"
                 )
             } else {
-                Text("Generate test notes")
+                Text(stringResource(R.string.debug_generate_test_notes))
             }
         }
         DeveloperToolsFeedback(uiState)
@@ -110,11 +124,11 @@ internal fun DeveloperToolsContent(
 private fun DeveloperToolsFeedback(uiState: DeveloperToolsUiState) {
     val message = when {
         uiState.error == DeveloperToolsError.INVALID_NOTE_COUNT ->
-            "Enter a number in the allowed range."
+            stringResource(R.string.debug_error_invalid_count)
         uiState.error == DeveloperToolsError.GENERATION_FAILED ->
-            "Generation stopped after ${uiState.generatedCount} notes."
+            stringResource(R.string.debug_error_generation_stopped, uiState.generatedCount)
         uiState.lastGeneratedCount != null ->
-            "Generated ${uiState.lastGeneratedCount} test notes."
+            stringResource(R.string.debug_generated_count, uiState.lastGeneratedCount)
         else -> null
     }
     val color = if (uiState.error == null) {

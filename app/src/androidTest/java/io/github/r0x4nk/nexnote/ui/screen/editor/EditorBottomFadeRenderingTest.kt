@@ -108,7 +108,7 @@ class EditorBottomFadeRenderingTest {
     }
 
     @Test
-    fun editModePlacesContentAndFadeImmediatelyAboveKeyboardToolbar() {
+    fun editModeHidesFadeAboveVisibleKeyboardToolbar() {
         lateinit var editorState: EditorScreenState
 
         composeEditorContentMode(
@@ -117,10 +117,9 @@ class EditorBottomFadeRenderingTest {
             onStateReady = { editorState = it }
         )
 
-        composeRule.onNodeWithTag(EDITOR_BOTTOM_FADE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(EDITOR_BOTTOM_FADE_TAG).assertDoesNotExist()
         assertContentFieldBottomOffset(EditorKeyboardToolbarMinHeight.value)
-        assertFadeBottomOffset(EditorKeyboardToolbarMinHeight.value)
-        assertTrue(editorState.bottomFadeHeightPx > 0)
+        assertEquals(0, editorState.bottomFadeHeightPx)
     }
 
     @Test
@@ -261,15 +260,6 @@ class EditorBottomFadeRenderingTest {
             .getUnclippedBoundsInRoot().bottom.value
 
         assertEquals(expectedOffsetDp, hostBottom - fieldBottom, 1f)
-    }
-
-    private fun assertFadeBottomOffset(expectedOffsetDp: Float) {
-        val hostBottom = composeRule.onNodeWithTag(EDITOR_FADE_TEST_HOST_TAG)
-            .getUnclippedBoundsInRoot().bottom.value
-        val fadeBottom = composeRule.onNodeWithTag(EDITOR_BOTTOM_FADE_TAG)
-            .getUnclippedBoundsInRoot().bottom.value
-
-        assertEquals(expectedOffsetDp, hostBottom - fadeBottom, 1f)
     }
 
     private fun assertContinuousFade(noteBackground: Color) {

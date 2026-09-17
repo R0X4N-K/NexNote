@@ -14,17 +14,17 @@ import io.github.r0x4nk.nexnote.util.MarkdownParser
 
 private const val NOTE_CARD_BLOCK_SEPARATOR = "\n"
 private const val NOTE_CARD_TABLE_SEPARATOR = " | "
-private const val NOTE_CARD_IMAGE_PLACEHOLDER = "Image"
 
 internal fun buildNoteCardDisplayText(
     sourceText: String,
     ranges: List<IntRange>,
     colors: MarkdownColors,
     highlightColor: Color,
-    renderMarkdown: Boolean
+    renderMarkdown: Boolean,
+    imagePlaceholder: String
 ): AnnotatedString {
     val renderedText = if (renderMarkdown) {
-        renderCompactMarkdown(sourceText, colors)
+        renderCompactMarkdown(sourceText, colors, imagePlaceholder)
     } else {
         AnnotatedString(sourceText)
     }
@@ -38,11 +38,12 @@ internal fun buildNoteCardDisplayText(
 
 private fun renderCompactMarkdown(
     sourceText: String,
-    colors: MarkdownColors
+    colors: MarkdownColors,
+    imagePlaceholder: String
 ): AnnotatedString {
     val renderedText = buildAnnotatedString {
         MarkdownParser.parseBlocks(sourceText, colors).forEach { block ->
-            appendCompactMarkdownBlock(block)
+            appendCompactMarkdownBlock(block, imagePlaceholder)
         }
     }
 
@@ -53,12 +54,16 @@ private fun renderCompactMarkdown(
     }
 }
 
-private fun AnnotatedString.Builder.appendCompactMarkdownBlock(block: MarkdownBlock) {
+private fun AnnotatedString.Builder.appendCompactMarkdownBlock(
+    block: MarkdownBlock,
+    imagePlaceholder: String
+) {
     when (block) {
         is MarkdownBlock.TextBlock -> appendCompactText(block.annotatedString)
         is MarkdownBlock.BlockquoteBlock -> appendCompactBlockquote(block.content)
         is MarkdownBlock.CodeBlock -> appendCompactCode(block.code)
-        is MarkdownBlock.ImageBlock -> appendCompactImage(block.altText)
+        is MarkdownBlock.ImageBlock -> appendCompactImage(block.altText, imagePlaceholder)
+        is MarkdownBlock.AttachmentBlock -> appendCompactText(AnnotatedString("📎 ${block.attachment.displayName}"))
         is MarkdownBlock.TableBlock -> appendCompactTable(block)
         MarkdownBlock.HorizontalRuleBlock -> Unit
     }
@@ -85,10 +90,10 @@ private fun AnnotatedString.Builder.appendCompactCode(code: String) {
     }
 }
 
-private fun AnnotatedString.Builder.appendCompactImage(altText: String) {
+private fun AnnotatedString.Builder.appendCompactImage(altText: String, imagePlaceholder: String) {
     appendBlockSeparatorIfNeeded()
     withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-        append(altText.ifBlank { NOTE_CARD_IMAGE_PLACEHOLDER })
+        append(altText.ifBlank { imagePlaceholder })
     }
 }
 

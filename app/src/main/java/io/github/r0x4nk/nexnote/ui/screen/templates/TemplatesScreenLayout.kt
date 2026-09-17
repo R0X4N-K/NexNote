@@ -2,16 +2,20 @@ package io.github.r0x4nk.nexnote.ui.screen.templates
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ExperimentalMaterial3Api
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.ui.common.SelectionUiState
 import io.github.r0x4nk.nexnote.ui.component.SelectionTopAppBar
@@ -72,7 +76,8 @@ private fun TemplatesScreenScaffold(
     actions: TemplatesLayoutActions
 ) {
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             if (selectionState.isActive) {
                 SelectionTopAppBar(
@@ -83,7 +88,9 @@ private fun TemplatesScreenScaffold(
                     onSelectAll = actions.onSelectAll,
                     onDeselectAll = actions.onDeselectAll,
                     onDeleteSelected = actions.onDeleteSelected,
-                    deleteContentDescription = "Delete selected templates"
+                    deleteContentDescription = stringResource(
+                        R.string.templates_delete_selected_description
+                    )
                 )
             } else {
                 TemplatesTopBarSlot(uiState, searchFocusRequester, scrollBehavior, actions)

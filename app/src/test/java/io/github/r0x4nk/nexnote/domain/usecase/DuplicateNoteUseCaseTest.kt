@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -26,6 +27,18 @@ class DuplicateNoteUseCaseTest {
 
     @get:Rule
     val tempFolder = TemporaryFolder()
+
+    @Test
+    fun `large text duplicate preserves all content with one save`() = runTest {
+        val repository = FakeDuplicateNoteRepository(nextId = 500L)
+        val tags = FakeDuplicateTagRepository()
+        val useCase = DuplicateNoteUseCase(repository, tags, FakeDuplicateImageStorage(tempFolder.root))
+        val source = Note(id = 9L, content = "Long note #tag\n".repeat(40_000))
+        val id = useCase(source)
+        assertEquals(source.content, repository.savedNotes.getValue(id).content)
+        assertEquals(1, repository.saveCount)
+        assertEquals(listOf(id to source.content), tags.indexedNotes)
+    }
 
     @Test
     fun `duplicate creates a new active note and indexes its tags`() = runTest {
@@ -92,6 +105,36 @@ class DuplicateNoteUseCaseTest {
     }
 
     @Test
+    fun `attachment duplication preserves binary data and rewrites independent ownership`() = runTest {
+        val repository = FakeDuplicateNoteRepository(200)
+        val storage = io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage(tempFolder.root,
+            processImage = { _, _ -> error("PDF must not be decoded") })
+        val path = storage.copyAttachmentToInternal(1, "report.pdf") { "%PDF-test".byteInputStream() }
+        val source = Note(id = 1, content = "[Report]($path)", imagePaths = listOf(path))
+        val id = DuplicateNoteUseCase(repository, FakeDuplicateTagRepository(), storage)(source)
+        val duplicate = repository.savedNotes.getValue(id)
+        val copiedPath = duplicate.imagePaths.single()
+        assertNotEquals(path, copiedPath)
+        assertEquals("[Report]($copiedPath)", duplicate.content)
+        storage.deleteImage(path)
+        assertEquals("%PDF-test", storage.getImageFile(copiedPath).readText())
+    }
+
+    @Test
+    fun `failed second attachment copy rolls back draft and new files without changing original`() = runTest {
+        val repository = FakeDuplicateNoteRepository(200)
+        val storage = io.github.r0x4nk.nexnote.data.local.InternalNoteImageStorage(tempFolder.root)
+        val path = storage.copyAttachmentToInternal(1, "report.pdf") { "%PDF-test".byteInputStream() }
+        val missing = "images/attachments/note_1_abcd.pdf"
+        val source = Note(id = 1, content = "[Report]($path)\n[Missing]($missing)", imagePaths = listOf(path, missing))
+        val result = runCatching { DuplicateNoteUseCase(repository, FakeDuplicateTagRepository(), storage)(source) }
+        assertTrue(result.isFailure)
+        assertTrue(repository.savedNotes.isEmpty())
+        assertEquals(listOf(storage.getImageFile(path)), java.io.File(tempFolder.root, "images").walkTopDown().filter { it.isFile }.toList())
+        assertEquals("%PDF-test", storage.getImageFile(path).readText())
+    }
+
+    @Test
     fun `duplicate rejects Vault notes before saving or indexing`() = runTest {
         val noteRepository = FakeDuplicateNoteRepository(nextId = 300L)
         val tagRepository = FakeDuplicateTagRepository()
@@ -143,7 +186,7 @@ private class FakeDuplicateNoteRepository(
 
     override suspend fun moveToTrash(id: Long) = Unit
     override suspend fun restoreFromTrash(id: Long) = Unit
-    override suspend fun deleteNotePermanently(id: Long) = Unit
+    override suspend fun deleteNotePermanently(id: Long) { savedNotes.remove(id) }
     override suspend fun emptyTrash() = Unit
     override suspend fun setPinned(id: Long, isPinned: Boolean) = Unit
     override suspend fun setPreviewMode(id: Long, isPreviewMode: Boolean) = Unit

@@ -8,11 +8,12 @@ import io.github.r0x4nk.nexnote.data.db.model.NoteLinkCandidateProjection
 import io.github.r0x4nk.nexnote.data.repository.NoteRepositoryImpl
 import io.github.r0x4nk.nexnote.data.repository.TemplateRepositoryImpl
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
-import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
+import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
@@ -30,6 +31,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.CopyNoteImageToInternalUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DecryptVaultImageBytesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteNoteImageUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteByIdUseCase
+import io.github.r0x4nk.nexnote.testing.TestStringProvider
 import io.github.r0x4nk.nexnote.domain.usecase.GetNoteImageFileUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetTemplateByIdUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.GetVaultNoteByIdUseCase
@@ -44,11 +46,13 @@ import io.github.r0x4nk.nexnote.domain.usecase.SaveTemplateUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SaveVaultNoteUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNotePreviewModeUseCase
 import io.github.r0x4nk.nexnote.testing.NoOpTagRepository
-import kotlinx.coroutines.Dispatchers
+import java.io.File
+import java.io.InputStream
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -57,8 +61,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
-import java.io.File
-import java.io.InputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 abstract class EditorViewModelTestBase {
@@ -99,11 +101,20 @@ abstract class EditorViewModelTestBase {
         decryptVaultImageBytes: DecryptVaultImageBytesUseCase? = null
     ): EditorViewModel {
         val noteRepository = NoteRepositoryImpl(fakeNoteDao, imageStorage)
-        val templateRepository = TemplateRepositoryImpl(fakeTemplateDao)
+        val templateRepository = TemplateRepositoryImpl(fakeTemplateDao, TestStringProvider)
         val fallbackVaultNotes = FakeEditorVaultNoteRepository()
         val fallbackVaultState = FakeEditorVaultStateRepository()
         return EditorViewModel(
+            moveNoteToTrash = io.github.r0x4nk.nexnote.domain.usecase.MoveNoteToTrashUseCase(noteRepository),
+            duplicateNote = io.github.r0x4nk.nexnote.domain.usecase.DuplicateNoteUseCase(noteRepository, NoOpTagRepository, imageStorage, testDispatcher),
             copyNoteImageToInternal = CopyNoteImageToInternalUseCase(imageStorage),
+            copyNoteAttachment = io.github.r0x4nk.nexnote.domain.usecase.CopyNoteAttachmentUseCase(
+                imageStorage as? io.github.r0x4nk.nexnote.domain.repository.NoteAttachmentStorage
+                    ?: object : io.github.r0x4nk.nexnote.domain.repository.NoteAttachmentStorage {
+                        override suspend fun copyAttachmentToInternal(noteId: Long, fileName: String, openInputStream: () -> InputStream?): String =
+                            error("This test has no attachment storage")
+                    }
+            ),
             deleteNoteImage = DeleteNoteImageUseCase(imageStorage),
             getNoteImageFile = GetNoteImageFileUseCase(imageStorage),
             getNoteById = GetNoteByIdUseCase(noteRepository),
@@ -126,7 +137,8 @@ abstract class EditorViewModelTestBase {
             decryptVaultImageBytesUseCase = decryptVaultImageBytes
                 ?: DecryptVaultImageBytesUseCase(fallbackVaultNotes),
             saveCoordinator = editorSaveCoordinator,
-            initialMode = mode
+            initialMode = mode,
+            strings = TestStringProvider
         )
     }
 }
@@ -264,6 +276,7 @@ class FakeEditorNoteImageStorage : NoteImageStorage {
 class FakeEditorPreferencesRepository : IUserPreferencesRepository {
 
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+    private val _appFont = MutableStateFlow(AppFont.SYSTEM)
     private val _fontScale = MutableStateFlow(FontScale.NORMAL)
     private val _timezoneId = MutableStateFlow("")
     private val _accentColor = MutableStateFlow(AccentColor.VIOLET)
@@ -278,8 +291,11 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
     var lastThemeMode: ThemeMode? = null
 
     override val themeMode: Flow<ThemeMode> = _themeMode
+    override val appFont: Flow<AppFont> = _appFont
     override val fontScale: Flow<FontScale> = _fontScale
     override val timezoneId: Flow<String> = _timezoneId
+    override val dynamicColor = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override suspend fun setDynamicColor(enabled: Boolean) { dynamicColor.value = enabled }
     override val accentColor: Flow<AccentColor> = _accentColor
     override val noteCardStyle: Flow<NoteCardStyle> = _noteCardStyle
     override val tableLayoutMode: Flow<TableLayoutMode> = _tableLayoutMode
@@ -296,6 +312,10 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
 
     override suspend fun setFontScale(scale: FontScale) {
         _fontScale.value = scale
+    }
+
+    override suspend fun setAppFont(font: AppFont) {
+        _appFont.value = font
     }
 
     override suspend fun setTimezoneId(id: String) {
@@ -332,6 +352,8 @@ class FakeEditorPreferencesRepository : IUserPreferencesRepository {
 }
 
 class FakeEditorNoteDao : NoteDao {
+    override suspend fun getNoteForAttachmentRecovery(id: Long): NoteEntity? = getNoteById(id)
+
 
     private val notes = mutableMapOf<Long, NoteEntity>()
     private var nextId = 1L

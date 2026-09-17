@@ -1,14 +1,15 @@
 package io.github.r0x4nk.nexnote.ui.screen.vault
 
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.NotePinnedFilter
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchScope
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
-import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.Template
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
@@ -16,12 +17,12 @@ import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
 import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
+import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
-import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
-import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.TagRepository
 import io.github.r0x4nk.nexnote.domain.repository.TemplateRepository
+import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import io.github.r0x4nk.nexnote.domain.usecase.DeleteVaultNotePermanentlyUseCase
@@ -36,6 +37,7 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTrashedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RemoveNoteFromVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleVaultNotePinUseCase
+import io.github.r0x4nk.nexnote.testing.TestStringProvider
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import kotlinx.coroutines.Dispatchers
@@ -86,8 +88,13 @@ class VaultNotesViewModelTest {
             toggleVaultNotePin = ToggleVaultNotePinUseCase(fakeNotesRepo),
             duplicateVaultNote = DuplicateVaultNoteUseCase(fakeNotesRepo),
             removeNoteFromVault = RemoveNoteFromVaultUseCase(fakeNotesRepo),
+            updateVaultNoteCreationDate =
+                io.github.r0x4nk.nexnote.domain.usecase.UpdateVaultNoteCreationDateUseCase(
+                    fakeNotesRepo
+                ),
             observeTemplates = ObserveTemplatesUseCase(fakeTemplateRepo),
-            observeNoteCardStyle = ObserveNoteCardStyleUseCase(fakePreferencesRepo)
+            observeNoteCardStyle = ObserveNoteCardStyleUseCase(fakePreferencesRepo),
+            strings = TestStringProvider
         )
     }
 
@@ -1001,6 +1008,37 @@ class VaultNotesViewModelTest {
     }
 
     @Test
+    fun `update creation date resaves unlocked vault note through vault path`() =
+        runViewModelTest {
+            val secret = noteFixture(id = 1L, title = "Secret")
+            val messages = mutableListOf<String>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.vaultActionMessages.collect { messages += it }
+            }
+            fakeNotesRepo.emit(listOf(secret))
+            fakeVaultRepo.setState(VaultState.UNLOCKED)
+            advanceUntilIdle()
+
+            viewModel.updateCreationDate(secret, 4_200L)
+            advanceUntilIdle()
+
+            assertEquals(4_200L, fakeNotesRepo.savedNotes.single().creationDate)
+            assertEquals(listOf("Creation date updated"), messages)
+        }
+
+    @Test
+    fun `update creation date is ignored while vault is locked`() = runViewModelTest {
+        val secret = noteFixture(id = 1L, title = "Secret")
+        fakeNotesRepo.emit(listOf(secret))
+        advanceUntilIdle()
+
+        viewModel.updateCreationDate(secret, 4_200L)
+        advanceUntilIdle()
+
+        assertTrue(fakeNotesRepo.savedNotes.isEmpty())
+    }
+
+    @Test
     fun `restore from trash moves deleted vault note back through use case`() =
         runViewModelTest {
             val deleted = noteFixture(id = 2L, title = "Deleted", isDeleted = true)
@@ -1420,8 +1458,11 @@ private class FakeTemplateRepository : TemplateRepository {
 
 private class FakeUserPreferencesRepository : IUserPreferencesRepository {
     override val themeMode: Flow<ThemeMode> = MutableStateFlow(ThemeMode.SYSTEM)
+    override val appFont: Flow<AppFont> = MutableStateFlow(AppFont.SYSTEM)
     override val fontScale: Flow<FontScale> = MutableStateFlow(FontScale.NORMAL)
     override val timezoneId: Flow<String> = MutableStateFlow("UTC")
+    override val dynamicColor = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override suspend fun setDynamicColor(enabled: Boolean) { dynamicColor.value = enabled }
     override val accentColor: Flow<AccentColor> = MutableStateFlow(AccentColor.VIOLET)
     private val noteCardStyleFlow = MutableStateFlow(NoteCardStyle.TITLE_AND_PREVIEW)
     override val noteCardStyle: Flow<NoteCardStyle> = noteCardStyleFlow
@@ -1434,6 +1475,7 @@ private class FakeUserPreferencesRepository : IUserPreferencesRepository {
     override val unlockVaultWithAndroidCredential: Flow<Boolean> = MutableStateFlow(false)
 
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
+    override suspend fun setAppFont(font: AppFont) = Unit
     override suspend fun setFontScale(scale: FontScale) = Unit
     override suspend fun setTimezoneId(id: String) = Unit
     override suspend fun setAccentColor(color: AccentColor) = Unit

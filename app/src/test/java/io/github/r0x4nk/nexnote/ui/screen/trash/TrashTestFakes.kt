@@ -38,6 +38,8 @@ internal class FakeNoteImageStorage(
 internal class FakeNoteDao(
     private val events: MutableList<String>
 ) : NoteDao {
+    override suspend fun getNoteForAttachmentRecovery(id: Long): NoteEntity? = getNoteById(id)
+
 
     private val _allNotes = MutableStateFlow<List<NoteEntity>>(emptyList())
     private val _deletedNotes = MutableStateFlow<List<NoteEntity>>(emptyList())

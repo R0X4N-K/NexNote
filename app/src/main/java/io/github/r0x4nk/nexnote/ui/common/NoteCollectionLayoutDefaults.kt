@@ -9,6 +9,9 @@ internal object NoteCollectionLayoutDefaults {
     private val listHorizontalPadding = 16.dp
     private val gridHorizontalPadding = 12.dp
 
+    fun horizontalPadding(viewMode: NoteListViewMode): Dp =
+        if (viewMode == NoteListViewMode.GRID) gridHorizontalPadding else listHorizontalPadding
+
     val itemSpacing: Dp = 8.dp
     val defaultBottomPadding: Dp = 8.dp
 

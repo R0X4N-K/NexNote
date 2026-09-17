@@ -10,6 +10,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
@@ -25,15 +28,17 @@ internal fun TagsTopBar(
     TopAppBar(
         title = {
             Text(
-                text = "Tags",
-                style = MaterialTheme.typography.headlineSmall
+                text = stringResource(R.string.tags_title),
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         },
         actions = {
             if (!isSearchActive) {
                 NexIconButton(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Search tags",
+                    contentDescription = stringResource(R.string.search_tags),
                     onClick = actions.onSearchOpen
                 )
             }
@@ -64,7 +69,7 @@ private fun TagsOverflowButton(
 ) {
     NexIconButton(
         imageVector = Icons.Default.MoreVert,
-        contentDescription = "More options",
+        contentDescription = stringResource(R.string.more_options),
         onClick = onClick,
         selected = expanded
     )

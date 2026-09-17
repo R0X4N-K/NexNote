@@ -1,32 +1,38 @@
 package io.github.r0x4nk.nexnote.ui.screen.settings
 
 import io.github.r0x4nk.nexnote.domain.model.AccentColor
+import io.github.r0x4nk.nexnote.domain.model.AppFont
 import io.github.r0x4nk.nexnote.domain.model.FontScale
-import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
-import io.github.r0x4nk.nexnote.domain.model.Note
-import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
-import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.model.IndexedNoteStatistics
+import io.github.r0x4nk.nexnote.domain.model.Note
+import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
+import io.github.r0x4nk.nexnote.domain.model.NoteLinkCandidate
 import io.github.r0x4nk.nexnote.domain.model.NoteStatisticsIndexState
+import io.github.r0x4nk.nexnote.domain.model.ScoredNote
 import io.github.r0x4nk.nexnote.domain.model.TableLayoutMode
 import io.github.r0x4nk.nexnote.domain.model.ThemeMode
 import io.github.r0x4nk.nexnote.domain.model.VaultAndroidCredentialPromptResult
 import io.github.r0x4nk.nexnote.domain.model.VaultAutoLockTimeout
 import io.github.r0x4nk.nexnote.domain.model.VaultState
 import io.github.r0x4nk.nexnote.domain.repository.ChangeVaultPinResult
+import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
 import io.github.r0x4nk.nexnote.domain.repository.IUserPreferencesRepository
-import io.github.r0x4nk.nexnote.domain.repository.NoteStatisticsRepository
+import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.NoteRepository
+import io.github.r0x4nk.nexnote.domain.repository.NoteStatisticsRepository
 import io.github.r0x4nk.nexnote.domain.repository.RefreshVaultAndroidCredentialProtectedMaterialResult
 import io.github.r0x4nk.nexnote.domain.repository.ResetVaultResult
 import io.github.r0x4nk.nexnote.domain.repository.UnlockVaultWithAndroidCredentialResult
-import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
 import io.github.r0x4nk.nexnote.domain.repository.VaultNoteRepository
-import io.github.r0x4nk.nexnote.domain.repository.DuplicateVaultNoteResult
-import io.github.r0x4nk.nexnote.domain.repository.MoveNoteToVaultResult
+import io.github.r0x4nk.nexnote.domain.repository.VaultRepository
+import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtectedMaterialUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.DeleteAllStoredNotesUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAccentColorUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllNormalNoteCountUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveAllVaultNoteCountUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.ObserveAppFontUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveNoteStatisticsIndexStateUseCase
@@ -38,15 +44,11 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultAutoLockTimeoutUseCas
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultLockOnBackgroundUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultRecentPreviewsProtectionUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultStateUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ChangeVaultPinUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.ClearVaultAndroidCredentialProtectedMaterialUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.LockVaultUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.DeleteAllStoredNotesUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.UnlockVaultWithPinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RefreshVaultAndroidCredentialProtectedMaterialUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ResetVaultUseCase
-import io.github.r0x4nk.nexnote.domain.usecase.RebuildNoteStatisticsIndexUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetAccentColorUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.SetAppFontUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetFontScaleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetNoteCardStyleUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetTableLayoutModeUseCase
@@ -56,12 +58,13 @@ import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAndroidCredentialUnlockUs
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultAutoLockTimeoutUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultLockOnBackgroundUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.SetVaultRecentPreviewsProtectionUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UnlockVaultWithPinUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -98,8 +101,10 @@ class SettingsViewModelTest {
         val statisticsRepository = FakeNoteStatisticsRepository()
         viewModel = SettingsViewModel(
             observeThemeMode = ObserveThemeModeUseCase(fakeRepo),
+            observeAppFont = ObserveAppFontUseCase(fakeRepo),
             observeFontScale = ObserveFontScaleUseCase(fakeRepo),
             observeTimezoneId = ObserveTimezoneIdUseCase(fakeRepo),
+            observeDynamicColor = io.github.r0x4nk.nexnote.domain.usecase.ObserveDynamicColorUseCase(fakeRepo),
             observeAccentColor = ObserveAccentColorUseCase(fakeRepo),
             observeNoteCardStyle = ObserveNoteCardStyleUseCase(fakeRepo),
             observeTableLayoutMode = ObserveTableLayoutModeUseCase(fakeRepo),
@@ -131,8 +136,10 @@ class SettingsViewModelTest {
             clearVaultAndroidCredentialProtectedMaterialUseCase =
                 ClearVaultAndroidCredentialProtectedMaterialUseCase(fakeVaultRepo),
             setThemeModeUseCase = SetThemeModeUseCase(fakeRepo),
+            setAppFontUseCase = SetAppFontUseCase(fakeRepo),
             setFontScaleUseCase = SetFontScaleUseCase(fakeRepo),
             setTimezoneIdUseCase = SetTimezoneIdUseCase(fakeRepo),
+            setDynamicColorUseCase = io.github.r0x4nk.nexnote.domain.usecase.SetDynamicColorUseCase(fakeRepo),
             setAccentColorUseCase = SetAccentColorUseCase(fakeRepo),
             setNoteCardStyleUseCase = SetNoteCardStyleUseCase(fakeRepo),
             setTableLayoutModeUseCase = SetTableLayoutModeUseCase(fakeRepo),
@@ -209,6 +216,28 @@ class SettingsViewModelTest {
         assertEquals(FontScale.SMALL, fakeRepo.lastFontScale)
     }
 
+    // ── AppFont ───────────────────────────────────────────────────────────────
+
+    @Test
+    fun `initial appFont is SYSTEM`() = runViewModelTest {
+        advanceUntilIdle()
+        assertEquals(AppFont.SYSTEM, viewModel.uiState.value.appFont)
+    }
+
+    @Test
+    fun `setAppFont FIRA_CODE is reflected in uiState`() = runViewModelTest {
+        viewModel.setAppFont(AppFont.FIRA_CODE)
+        advanceUntilIdle()
+        assertEquals(AppFont.FIRA_CODE, viewModel.uiState.value.appFont)
+    }
+
+    @Test
+    fun `setAppFont delegates to repository`() = runViewModelTest {
+        viewModel.setAppFont(AppFont.LORA)
+        advanceUntilIdle()
+        assertEquals(AppFont.LORA, fakeRepo.lastAppFont)
+    }
+
     // ── TimezoneId ────────────────────────────────────────────────────────────
 
     @Test
@@ -252,9 +281,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `setNoteCardStyle delegates to repository`() = runViewModelTest {
-        viewModel.setNoteCardStyle(NoteCardStyle.TITLE_DATE)
+        viewModel.setNoteCardStyle(NoteCardStyle.TITLE_INFORMATION)
         advanceUntilIdle()
-        assertEquals(NoteCardStyle.TITLE_DATE, fakeRepo.lastNoteCardStyle)
+        assertEquals(NoteCardStyle.TITLE_INFORMATION, fakeRepo.lastNoteCardStyle)
     }
 
     @Test
@@ -1169,6 +1198,7 @@ private class FakeNoteStatisticsRepository : NoteStatisticsRepository {
 private class FakePreferencesRepository : IUserPreferencesRepository {
 
     private val _themeMode     = MutableStateFlow(ThemeMode.SYSTEM)
+    private val _appFont       = MutableStateFlow(AppFont.SYSTEM)
     private val _fontScale     = MutableStateFlow(FontScale.NORMAL)
     private val _timezoneId    = MutableStateFlow("")
     private val _accentColor   = MutableStateFlow(AccentColor.VIOLET)
@@ -1181,6 +1211,7 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     private val _unlockVaultWithAndroidCredential = MutableStateFlow(false)
 
     var lastThemeMode:     ThemeMode?     = null
+    var lastAppFont:       AppFont?       = null
     var lastFontScale:     FontScale?     = null
     var lastTimezoneId:    String?        = null
     var lastAccentColor:   AccentColor?   = null
@@ -1192,8 +1223,11 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     var lastUnlockVaultWithAndroidCredential: Boolean? = null
 
     override val themeMode:     Flow<ThemeMode>     = _themeMode
+    override val appFont:       Flow<AppFont>       = _appFont
     override val fontScale:     Flow<FontScale>     = _fontScale
     override val timezoneId:    Flow<String>        = _timezoneId
+    override val dynamicColor = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override suspend fun setDynamicColor(enabled: Boolean) { dynamicColor.value = enabled }
     override val accentColor:   Flow<AccentColor>   = _accentColor
     override val noteCardStyle: Flow<NoteCardStyle> = _noteCardStyle
     override val tableLayoutMode: Flow<TableLayoutMode> = _tableLayoutMode
@@ -1211,6 +1245,11 @@ private class FakePreferencesRepository : IUserPreferencesRepository {
     override suspend fun setFontScale(scale: FontScale) {
         lastFontScale    = scale
         _fontScale.value = scale
+    }
+
+    override suspend fun setAppFont(font: AppFont) {
+        lastAppFont    = font
+        _appFont.value = font
     }
 
     override suspend fun setTimezoneId(id: String) {

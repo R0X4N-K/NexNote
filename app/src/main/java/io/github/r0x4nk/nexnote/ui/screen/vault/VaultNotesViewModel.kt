@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.di.StringProvider
 import io.github.r0x4nk.nexnote.di.requireAppDependencies
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.NoteCardStyle
@@ -31,7 +33,9 @@ import io.github.r0x4nk.nexnote.domain.usecase.ObserveVaultTrashedNotesUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RemoveNoteFromVaultUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.RestoreVaultNoteFromTrashUseCase
 import io.github.r0x4nk.nexnote.domain.usecase.ToggleVaultNotePinUseCase
+import io.github.r0x4nk.nexnote.domain.usecase.UpdateVaultNoteCreationDateUseCase
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
+import io.github.r0x4nk.nexnote.ui.common.NoteOperationRunner
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.ui.common.nextIn
 import io.github.r0x4nk.nexnote.util.SearchUtils
@@ -40,12 +44,12 @@ import io.github.r0x4nk.nexnote.util.VaultTagAggregator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -111,8 +115,10 @@ class VaultNotesViewModel(
     private val toggleVaultNotePin: ToggleVaultNotePinUseCase,
     private val duplicateVaultNote: DuplicateVaultNoteUseCase,
     private val removeNoteFromVault: RemoveNoteFromVaultUseCase,
+    private val updateVaultNoteCreationDate: UpdateVaultNoteCreationDateUseCase,
     observeTemplates: ObserveTemplatesUseCase,
-    observeNoteCardStyle: ObserveNoteCardStyleUseCase
+    observeNoteCardStyle: ObserveNoteCardStyleUseCase,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -412,23 +418,32 @@ class VaultNotesViewModel(
         _selectedTagFilters.update { emptySet() }
     }
 
+    private val noteOperations = NoteOperationRunner(viewModelScope)
+    val operationProgress = noteOperations.progress
+
+    private fun performOperation(label: String, action: suspend () -> Unit) {
+        noteOperations.launch(label, onError = {
+            _vaultActionMessages.trySend(strings.get(R.string.vault_error_generic))
+        }, action = action)
+    }
+
     fun removeFromVault(note: Note) {
         if (!note.isInVault || !uiState.value.isUnlocked) return
 
-        viewModelScope.launch {
+        performOperation(strings.get(R.string.vault_progress_move_note)) {
             try {
                 val removed = removeNoteFromVault(note.id)
                 _vaultActionMessages.trySend(
                     if (removed) {
-                        "Note removed from Vault"
+                        strings.get(R.string.vault_message_removed)
                     } else {
-                        "Could not remove note from Vault"
+                        strings.get(R.string.vault_error_remove)
                     }
                 )
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not remove note from Vault")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_remove))
             }
         }
     }
@@ -446,7 +461,7 @@ class VaultNotesViewModel(
         }
         if (movableNotes.isEmpty()) return
 
-        viewModelScope.launch {
+        performOperation(strings.get(R.string.vault_progress_move_trash)) {
             try {
                 val movedIds = mutableListOf<Long>()
                 movableNotes.forEach { note ->
@@ -462,12 +477,12 @@ class VaultNotesViewModel(
                         )
                     )
                 } else {
-                    _vaultActionMessages.trySend("Could not move note to trash")
+                    _vaultActionMessages.trySend(strings.get(R.string.vault_error_move_trash))
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not move note to trash")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_move_trash))
             }
         }
     }
@@ -489,12 +504,12 @@ class VaultNotesViewModel(
             try {
                 val restored = restoreVaultNoteFromTrash(noteId)
                 if (!restored) {
-                    _vaultActionMessages.trySend("Could not restore note")
+                    _vaultActionMessages.trySend(strings.get(R.string.vault_error_restore))
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not restore note")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_restore))
             }
         }
     }
@@ -518,12 +533,12 @@ class VaultNotesViewModel(
             try {
                 val moved = moveVaultNoteToTrash(noteId)
                 if (!moved) {
-                    _vaultActionMessages.trySend("Could not move note to trash")
+                    _vaultActionMessages.trySend(strings.get(R.string.vault_error_move_trash))
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not move note to trash")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_move_trash))
             }
         }
     }
@@ -535,12 +550,35 @@ class VaultNotesViewModel(
             try {
                 val toggled = toggleVaultNotePin(note)
                 if (!toggled) {
-                    _vaultActionMessages.trySend("Could not update note pin")
+                    _vaultActionMessages.trySend(strings.get(R.string.vault_error_pin))
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not update note pin")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_pin))
+            }
+        }
+    }
+
+    fun updateCreationDate(note: Note, creationDate: Long) {
+        if (!note.isInVault || note.isDeleted || !uiState.value.isUnlocked) return
+
+        performOperation(strings.get(R.string.note_op_update_date_progress)) {
+            try {
+                val updated = updateVaultNoteCreationDate(note.id, creationDate)
+                _vaultActionMessages.trySend(
+                    strings.get(
+                        if (updated) {
+                            R.string.note_op_date_updated
+                        } else {
+                            R.string.note_op_date_update_failed
+                        }
+                    )
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                _vaultActionMessages.trySend(strings.get(R.string.note_op_date_update_failed))
             }
         }
     }
@@ -548,13 +586,13 @@ class VaultNotesViewModel(
     fun duplicate(note: Note) {
         if (!note.isInVault || note.isDeleted || !uiState.value.isUnlocked) return
 
-        viewModelScope.launch {
+        performOperation(strings.get(R.string.vault_progress_duplicate)) {
             try {
-                _vaultActionMessages.trySend(duplicateVaultNote(note.id).toMessage())
+                _vaultActionMessages.trySend(duplicateVaultNote(note.id).toMessage(strings))
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not duplicate note")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_duplicate))
             }
         }
     }
@@ -565,18 +603,18 @@ class VaultNotesViewModel(
             return
         }
 
-        viewModelScope.launch {
+        performOperation(strings.get(R.string.vault_progress_restore)) {
             try {
                 val restored = restoreVaultNoteFromTrash(note.id)
                 if (restored) {
                     _vaultTrashEvents.trySend(VaultTrashSnackbarEvent.RestoredFromTrash(note.id))
                 } else {
-                    _vaultActionMessages.trySend("Could not restore note")
+                    _vaultActionMessages.trySend(strings.get(R.string.vault_error_restore))
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not restore note")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_restore))
             }
         }
     }
@@ -599,20 +637,20 @@ class VaultNotesViewModel(
         _notePendingPermanentDeleteId.update { null }
         if (!uiState.value.isUnlocked) return
 
-        viewModelScope.launch {
+        performOperation(strings.get(R.string.vault_progress_delete)) {
             try {
                 val deleted = deleteVaultNotePermanently(noteId)
                 _vaultActionMessages.trySend(
                     if (deleted) {
-                        "Note permanently deleted"
+                        strings.get(R.string.vault_message_deleted)
                     } else {
-                        "Could not delete note"
+                        strings.get(R.string.vault_error_delete)
                     }
                 )
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not delete note")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_delete))
             }
         }
     }
@@ -620,13 +658,13 @@ class VaultNotesViewModel(
     fun moveNormalNoteToVault(noteId: Long) {
         if (noteId <= 0L || !uiState.value.isUnlocked) return
 
-        viewModelScope.launch {
+        performOperation(strings.get(R.string.vault_progress_move_to_vault)) {
             try {
-                _vaultActionMessages.trySend(moveNoteToVault(noteId).toMessage())
+                _vaultActionMessages.trySend(moveNoteToVault(noteId).toMessage(strings))
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _vaultActionMessages.trySend("Could not move note to Vault")
+                _vaultActionMessages.trySend(strings.get(R.string.vault_error_move_to_vault))
             }
         }
     }
@@ -663,25 +701,27 @@ class VaultNotesViewModel(
                     toggleVaultNotePin = vault.toggleVaultNotePin,
                     duplicateVaultNote = vault.duplicateVaultNote,
                     removeNoteFromVault = vault.removeNoteFromVault,
+                    updateVaultNoteCreationDate = vault.updateVaultNoteCreationDate,
                     observeTemplates = app.useCases.templates.observeTemplates,
-                    observeNoteCardStyle = app.useCases.preferences.observeNoteCardStyle
+                    observeNoteCardStyle = app.useCases.preferences.observeNoteCardStyle,
+                    strings = app.strings
                 )
             }
         }
     }
 }
 
-private fun MoveNoteToVaultResult.toMessage(): String =
+private fun MoveNoteToVaultResult.toMessage(strings: StringProvider): String =
     when (this) {
-        MoveNoteToVaultResult.Success -> "Note moved to Vault"
-        MoveNoteToVaultResult.NotFound -> "Could not move note to Vault"
+        MoveNoteToVaultResult.Success -> strings.get(R.string.vault_message_moved)
+        MoveNoteToVaultResult.NotFound -> strings.get(R.string.vault_error_move_to_vault)
     }
 
-private fun DuplicateVaultNoteResult.toMessage(): String =
+private fun DuplicateVaultNoteResult.toMessage(strings: StringProvider): String =
     when (this) {
-        is DuplicateVaultNoteResult.Success -> "Vault note duplicated"
+        is DuplicateVaultNoteResult.Success -> strings.get(R.string.vault_message_duplicated)
         DuplicateVaultNoteResult.NotFound,
-        DuplicateVaultNoteResult.Failed -> "Could not duplicate note"
+        DuplicateVaultNoteResult.Failed -> strings.get(R.string.vault_error_duplicate)
     }
 
 private data class VaultNotesSource(

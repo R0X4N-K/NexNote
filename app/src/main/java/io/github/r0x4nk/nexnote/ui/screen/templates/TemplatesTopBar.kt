@@ -21,6 +21,9 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
@@ -87,13 +90,20 @@ private fun TemplatesTopBarTitle(
         ) {
             Column {
                 Text(
-                    text = "Templates",
-                    style = MaterialTheme.typography.titleLarge
+                    text = stringResource(R.string.templates_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${uiState.predefined.size + uiState.custom.size} starting points",
+                    text = stringResource(
+                        R.string.templates_starting_points,
+                        uiState.predefined.size + uiState.custom.size
+                    ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -109,7 +119,7 @@ private fun TemplatesSearchField(
     NexSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = "Search templates",
+        placeholder = stringResource(R.string.home_search_templates),
         modifier = Modifier
             .fillMaxWidth(),
         focusRequester = focusRequester,
@@ -128,7 +138,7 @@ private fun TemplatesTopBarActions(
     if (uiState.isSearchActive) {
         NexIconButton(
             imageVector = Icons.Default.Close,
-            contentDescription = "Close search",
+            contentDescription = stringResource(R.string.common_close_search),
             onClick = { onSearchToggle(false) }
         )
     } else {
@@ -152,7 +162,7 @@ private fun TemplatesDefaultActions(
 ) {
     NexIconButton(
         imageVector = Icons.Default.Search,
-        contentDescription = "Search",
+        contentDescription = stringResource(R.string.common_search),
         onClick = { onSearchToggle(true) }
     )
     NoteListSortButton(
@@ -178,7 +188,7 @@ private fun TemplatesOverflowMenu(
         availableViewModes = NoteListViewMode.listGridModes
     ) { dismiss ->
         DropdownMenuItem(
-            text = { Text("Select templates") },
+            text = { Text(stringResource(R.string.templates_select)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.SelectAll,

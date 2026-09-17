@@ -26,18 +26,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Actions supported by a collection card's horizontal swipe surface. */
 internal sealed interface SwipeCollectionAction {
-    val contentDescription: String
-
     data class Delete(
-        override val contentDescription: String
+        val label: String
     ) : SwipeCollectionAction
 
     data class TogglePin(
         val isCurrentlyPinned: Boolean
-    ) : SwipeCollectionAction {
-        override val contentDescription: String =
-            if (isCurrentlyPinned) "Unpin" else "Pin to top"
-    }
+    ) : SwipeCollectionAction
 }
 
 /**

@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -31,22 +32,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.HomeSearchSort
+import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.NexSearchField
 import io.github.r0x4nk.nexnote.ui.component.NoteListOverflowMenu
 import io.github.r0x4nk.nexnote.ui.component.NoteListSortButton
 import io.github.r0x4nk.nexnote.ui.component.NoteSearchSortMenu
+import io.github.r0x4nk.nexnote.ui.component.NoteTagFolderExpansionState
+import io.github.r0x4nk.nexnote.ui.component.TagFolderExpandAllButton
 import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +60,7 @@ import io.github.r0x4nk.nexnote.ui.component.nexTopAppBarColors
 internal fun HomeTopAppBar(
     uiState: HomeUiState,
     scrollBehavior: TopAppBarScrollBehavior,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     searchFocusRequester: FocusRequester,
     onSearchQueryChange: (String) -> Unit,
     onSearchToggle: (Boolean) -> Unit,
@@ -77,6 +84,7 @@ internal fun HomeTopAppBar(
         actions = {
             HomeTopAppBarActions(
                 uiState = uiState,
+                tagFolderExpansion = tagFolderExpansion,
                 onSearchToggle = onSearchToggle,
                 onOpenSearchFilters = onOpenSearchFilters,
                 onSearchSortChange = onSearchSortChange,
@@ -102,8 +110,8 @@ private fun HomeTopAppBarTitle(
     Box(modifier = Modifier.fillMaxWidth()) {
         AnimatedVisibility(
             visible = uiState.isSearchActive,
-            enter = fadeIn(tween(120)),
-            exit = fadeOut(tween(100))
+            enter = fadeIn(tween(180)) + slideInHorizontally(tween(220)) { it / 8 },
+            exit = fadeOut(tween(100)) + slideOutHorizontally(tween(120)) { it / 8 }
         ) {
             HomeSearchField(
                 value = uiState.searchQuery,
@@ -130,29 +138,38 @@ private fun HomeBrandTitle(noteCount: Int, isLoading: Boolean) {
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF2D2D2A))
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.primaryContainer)
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_launcher_foreground),
-                contentDescription = "NexNote app icon",
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimaryContainer),
+                contentDescription = stringResource(R.string.home_app_icon),
                 modifier = Modifier.fillMaxSize()
             )
         }
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
-                text = "Notes",
-                style = MaterialTheme.typography.titleLarge
+                text = stringResource(R.string.home_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = when {
-                    isLoading -> "Loading local notes"
-                    noteCount == 1 -> "1 note"
-                    else -> "$noteCount notes"
+                    isLoading -> stringResource(R.string.home_loading_notes)
+                    else -> pluralStringResource(
+                        R.plurals.home_note_count,
+                        noteCount,
+                        noteCount
+                    )
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -167,7 +184,7 @@ private fun HomeSearchField(
     NexSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = "Search notes",
+        placeholder = stringResource(R.string.home_search_notes),
         modifier = Modifier
             .fillMaxWidth(),
         focusRequester = focusRequester,
@@ -178,6 +195,7 @@ private fun HomeSearchField(
 @Composable
 private fun HomeTopAppBarActions(
     uiState: HomeUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onSearchToggle: (Boolean) -> Unit,
     onOpenSearchFilters: () -> Unit,
     onSearchSortChange: (HomeSearchSort) -> Unit,
@@ -195,18 +213,19 @@ private fun HomeTopAppBarActions(
         )
         NexIconButton(
             imageVector = Icons.Default.FilterAlt,
-            contentDescription = "Filter search results",
+            contentDescription = stringResource(R.string.common_filter_search_results),
             selected = uiState.hasActiveSearchFilters,
             onClick = onOpenSearchFilters
         )
         NexIconButton(
             imageVector = Icons.Default.Close,
-            contentDescription = "Close search",
+            contentDescription = stringResource(R.string.common_close_search),
             onClick = { onSearchToggle(false) }
         )
     } else {
         HomeBrowsingActions(
             uiState = uiState,
+            tagFolderExpansion = tagFolderExpansion,
             onSearchToggle = onSearchToggle,
             onSortToggle = onSortToggle,
             onViewModeToggle = onViewModeToggle,
@@ -221,6 +240,7 @@ private fun HomeTopAppBarActions(
 @Composable
 private fun HomeBrowsingActions(
     uiState: HomeUiState,
+    tagFolderExpansion: NoteTagFolderExpansionState,
     onSearchToggle: (Boolean) -> Unit,
     onSortToggle: () -> Unit,
     onViewModeToggle: () -> Unit,
@@ -231,13 +251,19 @@ private fun HomeBrowsingActions(
 ) {
     NexIconButton(
         imageVector = Icons.Default.Search,
-        contentDescription = "Search",
+        contentDescription = stringResource(R.string.common_search),
         onClick = { onSearchToggle(true) }
     )
     NoteListSortButton(
         sortOrder = uiState.sortOrder,
         onToggleSortOrder = onSortToggle
     )
+    if (uiState.viewMode == NoteListViewMode.TAGS && uiState.notes.isNotEmpty()) {
+        TagFolderExpandAllButton(
+            isAllCollapsed = tagFolderExpansion.isAllCollapsed,
+            onClick = tagFolderExpansion::toggleAll
+        )
+    }
     HomeOverflowMenu(
         uiState = uiState,
         onViewModeToggle = onViewModeToggle,
@@ -247,6 +273,8 @@ private fun HomeBrowsingActions(
         onStartSelection = onStartSelection
     )
 }
+
+
 
 @Composable
 private fun HomeOverflowMenu(
@@ -262,7 +290,7 @@ private fun HomeOverflowMenu(
         onToggleViewMode = onViewModeToggle
     ) { dismiss ->
         DropdownMenuItem(
-            text = { Text("Statistics") },
+            text = { Text(stringResource(R.string.statistics_title)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Insights,
@@ -275,7 +303,7 @@ private fun HomeOverflowMenu(
             }
         )
         DropdownMenuItem(
-            text = { Text("Select notes") },
+            text = { Text(stringResource(R.string.home_select_notes)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.SelectAll,
@@ -288,7 +316,7 @@ private fun HomeOverflowMenu(
             }
         )
         DropdownMenuItem(
-            text = { Text("Access Vault") },
+            text = { Text(stringResource(R.string.home_access_vault)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Security,
@@ -301,7 +329,7 @@ private fun HomeOverflowMenu(
             }
         )
         DropdownMenuItem(
-            text = { Text("Trash") },
+            text = { Text(stringResource(R.string.trash_title)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Delete,

@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -42,28 +43,35 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import kotlin.math.max
 
-internal const val HOME_VAULT_PULL_IDLE_TEXT = "Pull to unlock Vault"
-internal const val HOME_VAULT_PULL_READY_TEXT = "Release to unlock Vault"
-
-private const val PULL_RESISTANCE_STRENGTH = 0.72f
-private const val RESET_ANIMATION_MS = 180
+private const val PULL_RESISTANCE_STRENGTH = 0.35f
+private const val RESET_ANIMATION_MS = 160
 private const val PULL_ICON_SCALE_DELTA = 0.12f
 private const val PULL_TEXT_SCALE_DELTA = 0.025f
 private const val PULL_CONTENT_GAP_MIN_DP = 14f
 private const val PULL_CONTENT_GAP_DELTA_DP = 6f
 
-internal val VaultPullThreshold = 172.dp
-private val VaultPullMaxReveal = 244.dp
+/**
+ * Telegram-style reveal distance. The threshold is intentionally short and the
+ * resistance light so a deliberate pull-down at the top of the list opens the
+ * Vault without a long drag. Fling events are ignored by [canHandleUserScroll],
+ * so a fast scroll that merely passes through the top never triggers it.
+ */
+internal val VaultPullThreshold = 80.dp
+private val VaultPullMaxReveal = 120.dp
 private val VaultPullVisualSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = Spring.StiffnessMedium
@@ -76,7 +84,6 @@ private val VaultPullGapSpring = spring<Dp>(
 internal data class HomeVaultPullIndicatorState(
     val progress: Float,
     val thresholdReached: Boolean,
-    val text: String,
     val contentAlpha: Float,
     val iconScale: Float,
     val textScale: Float,
@@ -97,7 +104,6 @@ internal fun homeVaultPullIndicatorState(
     return HomeVaultPullIndicatorState(
         progress = progress,
         thresholdReached = thresholdReached,
-        text = if (thresholdReached) HOME_VAULT_PULL_READY_TEXT else HOME_VAULT_PULL_IDLE_TEXT,
         contentAlpha = homeVaultPullContentAlpha(progress),
         iconScale = homeVaultPullIconScale(progress),
         textScale = homeVaultPullTextScale(progress),
@@ -324,6 +330,17 @@ private fun VaultPullAccessIndicatorContent(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val emphasized = indicatorState.thresholdReached
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(emphasized) {
+        if (emphasized) {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+    val pullLabel = if (emphasized) {
+        stringResource(R.string.home_vault_pull_ready)
+    } else {
+        stringResource(R.string.home_vault_pull_idle)
+    }
     val idleContainerColor = colorScheme.surfaceContainerLow
     val readyContainerColor = colorScheme.primaryContainer.copy(alpha = 0.86f)
     val contentColor by animateColorAsState(
@@ -394,7 +411,7 @@ private fun VaultPullAccessIndicatorContent(
             }
             Spacer(Modifier.width(contentGap))
             Text(
-                text = indicatorState.text,
+                text = pullLabel,
                 modifier = Modifier
                     .weight(1f)
                     .graphicsLayer {

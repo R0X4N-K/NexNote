@@ -1,13 +1,18 @@
 package io.github.r0x4nk.nexnote.ui.screen.settings
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.r0x4nk.nexnote.BuildConfig
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
 import io.github.r0x4nk.nexnote.ui.screen.vault.VaultAndroidCredentialPromptCoordinator
 
 internal const val NEXNOTE_SOURCE_CODE_URL = "https://github.com/R0X4N-K/NexNote"
@@ -40,7 +45,9 @@ fun SettingsScreen(
         statisticsIndexState = statisticsIndexState,
         floatingBottomPadding = floatingBottomPadding,
         onThemeModeChange = viewModel::setThemeMode,
+        onDynamicColorChange = viewModel::setDynamicColor,
         onAccentColorChange = viewModel::setAccentColor,
+        onAppFontChange = viewModel::setAppFont,
         onFontScaleChange = viewModel::setFontScale,
         onNoteCardStyleChange = viewModel::setNoteCardStyle,
         onTableLayoutModeChange = viewModel::setTableLayoutMode,
@@ -67,4 +74,13 @@ fun SettingsScreen(
             runCatching { uriHandler.openUri(NEXNOTE_SOURCE_CODE_URL) }
         }
     )
+    OperationProgressDialog(
+        when {
+            deleteAllNotesState.isBusy -> stringResource(R.string.settings_progress_deleting)
+            vaultResetState.isBusy -> stringResource(R.string.settings_progress_resetting_vault)
+            vaultPinChangeState.isBusy -> stringResource(R.string.settings_progress_updating_vault)
+            else -> null
+        }
+    )
+
 }

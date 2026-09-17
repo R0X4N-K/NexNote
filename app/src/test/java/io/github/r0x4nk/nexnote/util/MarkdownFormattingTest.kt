@@ -8,7 +8,7 @@ class MarkdownFormattingTest {
 
     @Test
     fun `bold wraps selection`() {
-        val result = MarkdownInlineToggle.bold("hello world", TextRange(0, 5))
+        val result = MarkdownInlineToggle.bold("hello world", TextRange(0, 5), placeholder = "text")
 
         assertEquals("**hello** world", result.text)
         assertEquals(TextRange(2, 7), result.selection)
@@ -16,7 +16,7 @@ class MarkdownFormattingTest {
 
     @Test
     fun `bold unwraps selection with adjacent markers`() {
-        val result = MarkdownInlineToggle.bold("**hello** world", TextRange(2, 7))
+        val result = MarkdownInlineToggle.bold("**hello** world", TextRange(2, 7), placeholder = "text")
 
         assertEquals("hello world", result.text)
         assertEquals(TextRange(0, 5), result.selection)
@@ -24,7 +24,7 @@ class MarkdownFormattingTest {
 
     @Test
     fun `bold inserts placeholder around empty selection`() {
-        val result = MarkdownInlineToggle.bold("xy", TextRange(1))
+        val result = MarkdownInlineToggle.bold("xy", TextRange(1), placeholder = "text")
 
         // A selected placeholder lets the user immediately see the formatting
         // in the preview and overtype it with their own text.
@@ -34,7 +34,7 @@ class MarkdownFormattingTest {
 
     @Test
     fun `italic inserts placeholder around empty selection`() {
-        val result = MarkdownInlineToggle.italic("", TextRange(0))
+        val result = MarkdownInlineToggle.italic("", TextRange(0), placeholder = "text")
 
         assertEquals("*text*", result.text)
         assertEquals(TextRange(1, 5), result.selection)
@@ -77,7 +77,7 @@ class MarkdownFormattingTest {
 
     @Test
     fun `link wraps selection and selects url placeholder`() {
-        val result = MarkdownInlineToggle.link("open site", TextRange(5, 9))
+        val result = MarkdownInlineToggle.link("open site", TextRange(5, 9), placeholder = "text")
 
         assertEquals("open [site](url)", result.text)
         assertEquals(TextRange("open [site](".length, "open [site](url".length), result.selection)
@@ -123,5 +123,49 @@ class MarkdownFormattingTest {
         val result = MarkdownLineToggle.taskList("- write docs", TextRange(4))
 
         assertEquals("- [ ] write docs", result.text)
+    }
+
+    @Test
+    fun `indent adds two spaces and keeps caret after the indent`() {
+        val result = MarkdownLineToggle.indent("todo", TextRange(0))
+
+        assertEquals("  todo", result.text)
+        assertEquals(TextRange(2), result.selection)
+    }
+
+    @Test
+    fun `indent applies to every selected line`() {
+        val result = MarkdownLineToggle.indent("a\nb", TextRange(0, 3))
+
+        assertEquals("  a\n  b", result.text)
+    }
+
+    @Test
+    fun `indent also indents checklist items`() {
+        val result = MarkdownLineToggle.indent("- [ ] task", TextRange(0))
+
+        assertEquals("  - [ ] task", result.text)
+    }
+
+    @Test
+    fun `outdent removes one indentation level`() {
+        val result = MarkdownLineToggle.outdent("    - [ ] task", TextRange(0))
+
+        assertEquals("  - [ ] task", result.text)
+    }
+
+    @Test
+    fun `outdent removes partial leading indentation`() {
+        val result = MarkdownLineToggle.outdent(" - item", TextRange(0))
+
+        assertEquals("- item", result.text)
+    }
+
+    @Test
+    fun `outdent keeps caret anchored to the text`() {
+        val result = MarkdownLineToggle.outdent("  text", TextRange(5))
+
+        assertEquals("text", result.text)
+        assertEquals(TextRange(3), result.selection)
     }
 }

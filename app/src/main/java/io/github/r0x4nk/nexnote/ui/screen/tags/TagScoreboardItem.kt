@@ -30,11 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.domain.model.Tag
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
-import io.github.r0x4nk.nexnote.util.DateUtils
+import io.github.r0x4nk.nexnote.ui.common.noteRelativeTimeLabel
 
 @Composable
 internal fun TagScoreboardItem(
@@ -52,7 +55,7 @@ internal fun TagScoreboardItem(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = if (isExpanded) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.58f)
+            MaterialTheme.colorScheme.surfaceContainerLow
         } else {
             MaterialTheme.colorScheme.surfaceContainerLow
         },
@@ -120,7 +123,7 @@ private fun TagUsageColumn(
             Text(
                 text = tag.noteCount.toString(),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -143,8 +146,8 @@ private fun ExpandCollapseIcon(isExpanded: Boolean) {
         } else {
             Icons.Default.KeyboardArrowDown
         },
-        contentDescription = if (isExpanded) "Collapse" else "Expand",
-        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+        contentDescription = if (isExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(20.dp)
     )
 }
@@ -153,7 +156,7 @@ private fun ExpandCollapseIcon(isExpanded: Boolean) {
 private fun DeleteTagButton(tagName: String, onDeleteClick: () -> Unit) {
     NexIconButton(
         imageVector = Icons.Default.Delete,
-        contentDescription = "Delete #$tagName",
+        contentDescription = stringResource(R.string.delete_tag_action, tagName),
         onClick = onDeleteClick,
         destructive = true,
         modifier = Modifier.size(36.dp)
@@ -203,9 +206,9 @@ private fun ExpandedNotesContent(
 @Composable
 private fun EmptyNotesText() {
     Text(
-        text = "No notes",
+        text = stringResource(R.string.no_notes),
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -225,9 +228,11 @@ private fun NotesPreviewList(
     }
     if (notes.size > MAX_NOTES_SHOWN) {
         Text(
-            text = "+${notes.size - MAX_NOTES_SHOWN} more",
+            text = pluralStringResource(
+                R.plurals.more_notes, notes.size - MAX_NOTES_SHOWN, notes.size - MAX_NOTES_SHOWN
+            ),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
     }
@@ -248,7 +253,7 @@ private fun NoteRowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = note.title.ifBlank { "Untitled note" },
+            text = note.title.ifBlank { stringResource(R.string.untitled_note) },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
@@ -256,9 +261,9 @@ private fun NoteRowItem(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = DateUtils.formatRelative(note.lastModifiedDate),
+            text = noteRelativeTimeLabel(note.lastModifiedDate),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

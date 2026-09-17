@@ -3,6 +3,7 @@ package io.github.r0x4nk.nexnote.ui.component.radial
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -44,7 +45,9 @@ internal fun RadialMenuSnackbarHost(
     hostState: SnackbarHostState,
     modifier: Modifier = Modifier,
     bottomInset: Dp = 0.dp,
-    snackbar: @Composable (SnackbarData) -> Unit = { data -> Snackbar(snackbarData = data) }
+    snackbar: @Composable (SnackbarData) -> Unit = { data ->
+        Snackbar(snackbarData = data, shape = MaterialTheme.shapes.large)
+    }
 ) {
     val controller = LocalRadialMenuController.current
 

@@ -2,6 +2,7 @@ package io.github.r0x4nk.nexnote.ui.screen.editor
 
 import android.content.Context
 import android.net.Uri
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -205,20 +206,29 @@ internal fun rememberLaunchImagePickerAtCursor(
     state: EditorScreenState,
     viewModel: EditorViewModel
 ): () -> Unit {
+    val pickerScope = androidx.compose.runtime.rememberCoroutineScope()
     val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         handlePickedImage(uri, context, state, viewModel)
     }
 
-    return remember(state.contentFieldValueState, imageLauncher, state.pendingImageInsertionOffsetState) {
+    return remember(state.contentFieldValueState, imageLauncher, state.pendingAttachmentInsertionOffsetState) {
         {
             val current = state.currentContentTextFieldValue()
-            state.pendingImageInsertionOffsetState.value =
+            state.pendingAttachmentInsertionOffsetState.value =
                 current.selection.end.coerceIn(0, current.text.length)
-            imageLauncher.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-            )
+            pickerScope.launch {
+                if (viewModel.pendingAttachment.prepare()) {
+                    try {
+                        imageLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        viewModel.pendingAttachment.cancel()
+                    }
+                }
+            }
         }
     }
 }
@@ -229,14 +239,14 @@ private fun handlePickedImage(
     state: EditorScreenState,
     viewModel: EditorViewModel
 ) {
-    val insertionOffset = state.pendingImageInsertionOffsetState.value
+    val insertionOffset = state.pendingAttachmentInsertionOffsetState.value
         ?: state.currentContentTextFieldValue().selection.end
-    state.pendingImageInsertionOffsetState.value = null
+    state.pendingAttachmentInsertionOffsetState.value = null
     uri?.let {
         val resolver = context.applicationContext.contentResolver
-        viewModel.onImagePicked(
+        viewModel.pendingAttachment.accept { viewModel.onImagePicked(
             openImageInputStream = { resolver.openInputStream(it) },
             insertionOffset = insertionOffset
-        )
-    }
+        ) }
+    } ?: viewModel.pendingAttachment.cancel()
 }

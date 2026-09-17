@@ -16,7 +16,6 @@ class HomeVaultPullAccessTest {
 
         assertEquals(0.64f, state.progress, 0.001f)
         assertFalse(state.thresholdReached)
-        assertEquals(HOME_VAULT_PULL_IDLE_TEXT, state.text)
     }
 
     @Test
@@ -28,7 +27,6 @@ class HomeVaultPullAccessTest {
 
         assertEquals(1f, state.progress, 0.001f)
         assertTrue(state.thresholdReached)
-        assertEquals(HOME_VAULT_PULL_READY_TEXT, state.text)
     }
 
     @Test

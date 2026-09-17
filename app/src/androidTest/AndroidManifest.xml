@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Foreign callers exist only in the instrumentation APK, never in the app. -->
+        <activity android:name="io.github.r0x4nk.nexnote.fileimport.ExternalTaskSenderActivity"
+            android:exported="true" android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.sender"
+            android:theme="@android:style/Theme.Material.Light" />
+        <activity android:name="io.github.r0x4nk.nexnote.fileimport.ExternalOverlaySenderActivity"
+            android:exported="true" android:theme="@android:style/Theme.Material.Light" />
+        <provider android:name="io.github.r0x4nk.nexnote.fileimport.ForeignShareFixtureProvider"
+            android:authorities="${applicationId}.fixture" android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

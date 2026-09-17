@@ -18,8 +18,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.common.NoteListViewMode
 import io.github.r0x4nk.nexnote.ui.common.SortOrder
 import io.github.r0x4nk.nexnote.domain.model.NoteSearchSort
@@ -60,6 +63,7 @@ internal fun AgendaControlsRow(
                 searchSort = searchSort,
                 hasActiveSearchFilters = hasActiveSearchFilters,
                 searchFocusRequester = searchFocusRequester,
+                placeholder = stringResource(R.string.agenda_search_day),
                 actions = actions
             )
         } else {
@@ -77,17 +81,18 @@ internal fun AgendaControlsRow(
 }
 
 @Composable
-private fun RowScope.AgendaSearchControls(
+internal fun RowScope.AgendaSearchControls(
     searchQuery: String,
     searchSort: NoteSearchSort,
     hasActiveSearchFilters: Boolean,
     searchFocusRequester: FocusRequester,
+    placeholder: String,
     actions: AgendaActions
 ) {
     NexSearchField(
         value = searchQuery,
         onValueChange = actions.onSearchQueryChange,
-        placeholder = "Search this day",
+        placeholder = placeholder,
         modifier = Modifier
             .weight(1f),
         focusRequester = searchFocusRequester,
@@ -99,13 +104,13 @@ private fun RowScope.AgendaSearchControls(
     )
     NexIconButton(
         imageVector = Icons.Default.FilterAlt,
-        contentDescription = "Filter search results",
+        contentDescription = stringResource(R.string.common_filter_search_results),
         selected = hasActiveSearchFilters,
         onClick = actions.onOpenSearchFilters
     )
     NexIconButton(
         imageVector = Icons.Default.Close,
-        contentDescription = "Close search",
+        contentDescription = stringResource(R.string.common_close_search),
         onClick = { actions.onSearchToggle(false) }
     )
 }
@@ -129,7 +134,7 @@ private fun RowScope.AgendaToolbarControls(
     )
     NexIconButton(
         imageVector = Icons.Default.Search,
-        contentDescription = "Search",
+        contentDescription = stringResource(R.string.common_search),
         onClick = { actions.onSearchToggle(true) }
     )
     NoteListSortButton(
@@ -150,7 +155,12 @@ private fun SelectedDateSummary(
     noteCount: Int,
     modifier: Modifier = Modifier
 ) {
-    val labels = androidx.compose.runtime.remember(year, month, day, noteCount) {
+    val noteCountText = pluralStringResource(
+        R.plurals.home_note_count,
+        noteCount,
+        noteCount
+    )
+    val labels = androidx.compose.runtime.remember(year, month, day, noteCountText) {
         val date = Calendar.getInstance().apply { set(year, month, day) }.time
         val locale = Locale.getDefault()
         AgendaDateLabels(
@@ -158,7 +168,7 @@ private fun SelectedDateSummary(
             supporting = buildString {
                 append(SimpleDateFormat("EEEE", locale).format(date))
                 append(" · ")
-                append(if (noteCount == 1) "1 note" else "$noteCount notes")
+                append(noteCountText)
             }
         )
     }
@@ -196,7 +206,7 @@ private fun AgendaOverflowMenu(
         onToggleViewMode = actions.onToggleView
     ) { dismiss ->
         DropdownMenuItem(
-            text = { Text("Select notes") },
+            text = { Text(stringResource(R.string.home_select_notes)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.SelectAll,

@@ -15,7 +15,9 @@ class NoteTagFoldersTest {
 
         val folders = buildNoteTagFolders(listOf(work, home, untagged))
 
-        assertEquals(listOf("#android", "#home", "#work", "Untagged"), folders.map { it.title })
+        assertEquals(listOf("#android", "#home", "#work"), folders.dropLast(1).map { it.title })
+        assertEquals("", folders.last().title)
+        assertEquals(true, folders.last().isUntagged)
         assertEquals(listOf(1L), folders[0].items.map { it.note.id })
         assertEquals(listOf(2L), folders[1].items.map { it.note.id })
         assertEquals(listOf(1L), folders[2].items.map { it.note.id })

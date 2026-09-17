@@ -8,8 +8,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,16 +34,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.component.NexIconButton
 import io.github.r0x4nk.nexnote.ui.component.roundedClickableTarget
 import io.github.r0x4nk.nexnote.util.DateUtils
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 import java.util.Calendar
+import java.util.Locale
 
 @Composable
 internal fun AgendaCalendarSection(
@@ -126,7 +131,7 @@ private fun CalendarMonthHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "MONTH",
+                text = stringResource(R.string.agenda_month_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -139,12 +144,12 @@ private fun CalendarMonthHeader(
         }
         NexIconButton(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-            contentDescription = "Previous month",
+            contentDescription = stringResource(R.string.agenda_previous_month),
             onClick = onPreviousMonth
         )
         NexIconButton(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = "Next month",
+            contentDescription = stringResource(R.string.agenda_next_month),
             onClick = onNextMonth
         )
     }
@@ -208,17 +213,20 @@ private data class AgendaToday(
 
 @Composable
 private fun WeekdayHeader() {
+    val labels = remember {
+        DayOfWeek.entries.map { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su").forEach { label ->
+        labels.forEach { label ->
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -302,7 +310,7 @@ private fun DayCell(
         Color.Transparent
     }
     val textColor = dayTextColor(isSelected, isToday)
-    val dotColor = dayDotColor(hasDot, isSelected)
+    val dotColor = dayDotColor(hasDot)
 
     Column(
         modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp),
@@ -339,10 +347,9 @@ private fun dayTextColor(isSelected: Boolean, isToday: Boolean) = when {
 }
 
 @Composable
-private fun dayDotColor(hasDot: Boolean, isSelected: Boolean) = when {
+private fun dayDotColor(hasDot: Boolean) = when {
     !hasDot -> Color.Transparent
-    isSelected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-    else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    else -> MaterialTheme.colorScheme.primary
 }
 
 @Composable
@@ -354,6 +361,10 @@ private fun DayNumber(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val selectedTodayDescription = stringResource(R.string.agenda_day_selected_today)
+    val selectedDescription = stringResource(R.string.agenda_day_selected)
+    val todayDescription = stringResource(R.string.agenda_today)
+
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -361,9 +372,9 @@ private fun DayNumber(
                 selected = isSelected
                 if (isSelected || isToday) {
                     stateDescription = when {
-                        isSelected && isToday -> "Selected, today"
-                        isSelected -> "Selected"
-                        else -> "Today"
+                        isSelected && isToday -> selectedTodayDescription
+                        isSelected -> selectedDescription
+                        else -> todayDescription
                     }
                 }
             }

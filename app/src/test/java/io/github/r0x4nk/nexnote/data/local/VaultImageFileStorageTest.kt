@@ -220,6 +220,22 @@ class VaultImageFileStorageTest {
         assertTrue(file.parentFile?.listFiles()?.none { it.name.contains(".rekey-old-") } == true)
     }
 
+    @Test
+    fun `truncated ciphertext cannot replace original during restore or rekey`() = runTest {
+        val storage = TestNoteImageStorage(tempFolder.root)
+        val vault = VaultImageFileStorage(storage, fileCipher)
+        val path = "images/large.pdf"
+        val file = writeImage(storage, path, ByteArray(180_000) { it.toByte() })
+        vault.encryptInPlace(path, key)
+        val truncated = file.readBytes().dropLast(1).toByteArray()
+        file.writeBytes(truncated)
+        assertTrue(runCatching { vault.decryptInPlace(path, key) }.isFailure)
+        assertArrayEquals(truncated, file.readBytes())
+        assertTrue(runCatching { vault.rewrapInPlace(path, key, differentKey) }.isFailure)
+        assertArrayEquals(truncated, file.readBytes())
+        assertEquals(listOf(file.name), file.parentFile!!.list()!!.toList())
+    }
+
     private fun writeImage(
         imageStorage: NoteImageStorage,
         relativePath: String,

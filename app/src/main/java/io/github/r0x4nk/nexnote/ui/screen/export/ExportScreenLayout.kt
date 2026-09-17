@@ -14,7 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import io.github.r0x4nk.nexnote.ui.theme.nexNoteBackground
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -22,11 +24,20 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
+import io.github.r0x4nk.nexnote.ui.component.OperationLoadingState
+import io.github.r0x4nk.nexnote.ui.component.OperationProgressDialog
 
 @Composable
 internal fun ExportScreenLayout(
@@ -36,7 +47,12 @@ internal fun ExportScreenLayout(
     onBack: () -> Unit,
     actions: ExportActions
 ) {
+    OperationProgressDialog(
+        stringResource(R.string.export_preparing).takeIf { uiState.isExporting }
+    )
     Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier.nexNoteBackground(),
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = { ExportTopBar(onBack = onBack) }
     ) { padding ->
@@ -63,7 +79,7 @@ private fun ExportLoadingState(modifier: Modifier = Modifier) {
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        OperationLoadingState()
     }
 }
 
@@ -74,11 +90,12 @@ private fun ExportScreenContent(
     actions: ExportActions,
     modifier: Modifier = Modifier
 ) {
+    val includeMediaDescription = stringResource(R.string.export_include_media)
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         ExportSection {
@@ -104,6 +121,38 @@ private fun ExportScreenContent(
             )
             Spacer(Modifier.height(12.dp))
             ExportSummary(noteCount = uiState.notes.size)
+            ListItem(
+                headlineContent = { Text(includeMediaDescription) },
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            if (uiState.format.embedsImages) {
+                                R.string.export_include_media_hint_files
+                            } else {
+                                R.string.export_include_media_hint_text
+                            }
+                        )
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.includeMedia,
+                        onCheckedChange = actions.onIncludeMediaChange,
+                        enabled = !uiState.isExporting,
+                        modifier = Modifier.semantics {
+                            contentDescription = includeMediaDescription
+                        }
+                    )
+                }
+            )
+            if (uiState.includeMedia) Text(
+                text = stringResource(
+                    if (uiState.format == ExportFormat.PRINT) R.string.attachment_print_hint
+                    else R.string.attachment_export_hint
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         Spacer(Modifier.height(4.dp))
         ExportButton(
@@ -120,7 +169,7 @@ private fun ExportSection(content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -138,7 +187,7 @@ private fun ExportScopeSelector(
     hasInitialNote: Boolean,
     onScopeSelect: (ExportScope) -> Unit
 ) {
-    SectionLabel("Export scope")
+    SectionLabel(stringResource(R.string.export_scope_label))
 
     val scopeOptions = buildList {
         if (hasInitialNote) add(ExportScope.SingleNote)
@@ -164,7 +213,7 @@ private fun ExportFormatSelector(
     selectedFormat: ExportFormat,
     onFormatSelect: (ExportFormat) -> Unit
 ) {
-    SectionLabel("Format")
+    SectionLabel(stringResource(R.string.export_format_label))
 
     val formatOptions = ExportFormat.entries
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -183,8 +232,11 @@ private fun ExportFormatSelector(
 @Composable
 private fun ExportSummary(noteCount: Int) {
     Text(
-        text = if (noteCount == 0) "No notes in selected range"
-        else "$noteCount ${if (noteCount == 1) "note selected" else "notes selected"}",
+        text = if (noteCount == 0) {
+            stringResource(R.string.export_no_notes_selected)
+        } else {
+            pluralStringResource(R.plurals.export_notes_selected, noteCount, noteCount)
+        },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurface.copy(
             alpha = if (noteCount == 0) 0.45f else 0.7f
@@ -211,7 +263,13 @@ private fun ExportButton(
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
             )
         } else {
-            Text(if (uiState.format == ExportFormat.PRINT) "Print" else "Export")
+            Text(
+                if (uiState.format == ExportFormat.PRINT) {
+                    stringResource(R.string.export_format_print)
+                } else {
+                    stringResource(R.string.export_title)
+                }
+            )
         }
     }
 }

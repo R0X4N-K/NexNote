@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug-only developer tools. Kept English-only and excluded from translation checks. -->
+    <string name="debug_developer_tools" translatable="false">Developer tools</string>
+    <string name="debug_generate_notes_description" translatable="false">Create realistic test notes for list, search, agenda, tag, and Markdown performance checks. Generated data is added to your existing notes.</string>
+    <string name="debug_number_of_notes" translatable="false">Number of notes</string>
+    <string name="debug_allowed_range" translatable="false">Allowed range: %1$d–%2$d</string>
+    <string name="debug_generate_test_notes" translatable="false">Generate test notes</string>
+    <string name="debug_error_invalid_count" translatable="false">Enter a number in the allowed range.</string>
+    <string name="debug_error_generation_stopped" translatable="false">Generation stopped after %1$d notes.</string>
+    <string name="debug_generated_count" translatable="false">Generated %1$d test notes.</string>
+</resources>

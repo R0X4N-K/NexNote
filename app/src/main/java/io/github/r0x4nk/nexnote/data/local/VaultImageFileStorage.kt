@@ -1,6 +1,12 @@
 package io.github.r0x4nk.nexnote.data.local
 
 import io.github.r0x4nk.nexnote.data.security.VaultFileCipher
+import io.github.r0x4nk.nexnote.data.security.VaultFileStreams
+import io.github.r0x4nk.nexnote.data.security.VaultDecryptionException
+import io.github.r0x4nk.nexnote.util.copyStreaming
+import java.io.InputStream
+import java.io.OutputStream
+import kotlinx.coroutines.ensureActive
 import io.github.r0x4nk.nexnote.domain.repository.NoteImageStorage
 import java.io.File
 import java.io.IOException
@@ -59,38 +65,44 @@ internal open class VaultImageFileStorage(
         val file = imageStorage.getImageFile(relativePath)
         if (!file.isFile) return@withContext VaultImageFileEncryptionResult.Missing
 
-        val plainOrEncryptedBytes = file.readBytes()
-        var encryptedBytes = ByteArray(0)
-
-        try {
-            if (fileCipher.isEncryptedPayload(plainOrEncryptedBytes)) {
-                return@withContext VaultImageFileEncryptionResult.AlreadyEncrypted
-            }
-
-            encryptedBytes = fileCipher.encryptToByteArray(plainOrEncryptedBytes, key)
-            replaceFileConservatively(file, encryptedBytes)
-            VaultImageFileEncryptionResult.Encrypted
-        } finally {
-            plainOrEncryptedBytes.fill(0)
-            encryptedBytes.fill(0)
+        if (isEncrypted(file)) return@withContext VaultImageFileEncryptionResult.AlreadyEncrypted
+        val context = coroutineContext
+        replaceFileConservatively(file) { output ->
+            file.inputStream().use { input -> streams.encrypt(input, output, key, context::ensureActive) }
         }
+        VaultImageFileEncryptionResult.Encrypted
     }
 
+    private val streams = VaultFileStreams(fileCipher)
+
+    /** Only image decoding should materialize plaintext. Documents use [openDecryptedStream]. */
     open suspend fun decryptToByteArray(
         relativePath: String,
         key: SecretKey
     ): VaultImageFileDecryptionResult = withContext(ioDispatcher) {
-        val file = imageStorage.getImageFile(relativePath)
-        if (!file.isFile) return@withContext VaultImageFileDecryptionResult.Missing
-
-        val encryptedBytes = file.readBytes()
+        val input = openDecryptedStream(relativePath, key)
+            ?: return@withContext VaultImageFileDecryptionResult.Missing
         try {
-            VaultImageFileDecryptionResult.Decrypted(
-                fileCipher.decryptToByteArray(encryptedBytes, key)
-            )
-        } finally {
-            encryptedBytes.fill(0)
+            VaultImageFileDecryptionResult.Decrypted(input.use { it.readBytes() })
+        } catch (error: Exception) {
+            throw VaultDecryptionException("Vault file could not be decrypted.", error)
         }
+    }
+
+    fun openDecryptedStream(relativePath: String, key: SecretKey): InputStream? {
+        val file = imageStorage.getImageFile(relativePath)
+        return if (file.isFile) streams.decrypting(file.inputStream(), key) else null
+    }
+
+    private fun isEncrypted(file: File): Boolean = file.inputStream().use { input ->
+        val header = ByteArray(32)
+        var size = 0
+        while (size < header.size) {
+            val read = input.read(header, size, header.size - size)
+            if (read < 0) break
+            size += read
+        }
+        fileCipher.isEncryptedPayload(header.copyOf(size))
     }
 
     /**
@@ -109,29 +121,22 @@ internal open class VaultImageFileStorage(
         val file = imageStorage.getImageFile(relativePath)
         if (!file.isFile) return@withContext VaultImageFileRestoreResult.Missing
 
-        val encryptedOrPlainBytes = file.readBytes()
-        var plainBytes = ByteArray(0)
-
-        try {
-            if (!fileCipher.isEncryptedPayload(encryptedOrPlainBytes)) {
-                return@withContext VaultImageFileRestoreResult.AlreadyPlaintext
+        if (!isEncrypted(file)) return@withContext VaultImageFileRestoreResult.AlreadyPlaintext
+        val context = coroutineContext
+        replaceFileConservatively(file) { output ->
+            streams.decrypting(file.inputStream(), key).use { input ->
+                copyStreaming(input, output, context::ensureActive)
             }
-
-            plainBytes = fileCipher.decryptToByteArray(encryptedOrPlainBytes, key)
-            replaceFileConservatively(file, plainBytes)
-            VaultImageFileRestoreResult.Restored
-        } finally {
-            encryptedOrPlainBytes.fill(0)
-            plainBytes.fill(0)
         }
+        VaultImageFileRestoreResult.Restored
     }
 
     /**
      * Re-encrypt one existing Vault image from [currentKey] to [newKey].
      *
      * The old ciphertext is copied to a private sibling backup before the new
-     * ciphertext replaces the target. Plaintext exists only in memory and is
-     * zeroed before returning. Missing files need no rollback token.
+     * ciphertext replaces the target. Plaintext passes through bounded in-memory
+     * buffers and is never staged on disk during rekey. Missing files need no rollback token.
      */
     open suspend fun rewrapInPlace(
         relativePath: String,
@@ -142,50 +147,36 @@ internal open class VaultImageFileStorage(
         val target = imageStorage.getImageFile(relativePath)
         if (!target.isFile) return@withContext null
 
-        val oldCiphertext = target.readBytes()
-        var plaintext = ByteArray(0)
-        var newCiphertext = ByteArray(0)
-        var backup: File? = null
+        if (!isEncrypted(target)) throw IOException("Vault file payload is not encrypted.")
+        val parent = target.parentFile ?: throw IOException("Vault file parent is unavailable.")
+        val backup = File.createTempFile(".${target.name}.rekey-old-", ".tmp", parent)
         var replaced = false
-
+        val context = coroutineContext
         try {
-            if (!fileCipher.isEncryptedPayload(oldCiphertext)) {
-                throw IOException("Vault image payload is not encrypted.")
+            target.inputStream().use { input ->
+                backup.outputStream().use { output ->
+                    copyStreaming(input, output, context::ensureActive)
+                    output.fd.sync()
+                }
             }
-            plaintext = fileCipher.decryptToByteArray(oldCiphertext, currentKey)
-            newCiphertext = fileCipher.encryptToByteArray(plaintext, newKey)
-
-            val parent = target.parentFile
-                ?: throw IOException("Vault image parent is unavailable.")
-            backup = File.createTempFile(".${target.name}.rekey-old-", ".tmp", parent)
-            backup.writeBytes(oldCiphertext)
-            replaceFileConservatively(target, newCiphertext)
+            replaceFileConservatively(target) { output ->
+                streams.decrypting(target.inputStream(), currentKey).use { input ->
+                    streams.encrypt(input, output, newKey, context::ensureActive)
+                }
+            }
             replaced = true
-            VaultImageFileRewrapBackup(targetFile = target, backupFile = backup).also(
-                onBackupCreated
-            )
+            VaultImageFileRewrapBackup(target, backup).also(onBackupCreated)
         } finally {
-            oldCiphertext.fill(0)
-            plaintext.fill(0)
-            newCiphertext.fill(0)
-            if (!replaced) {
-                backup?.delete()
-            }
+            if (!replaced) backup.delete()
         }
     }
 
-    /** Restore the original encrypted payload represented by [backup]. */
-    open suspend fun rollbackRewrap(
-        backup: VaultImageFileRewrapBackup
-    ) = withContext(ioDispatcher) {
-        if (!backup.backupFile.isFile) {
-            throw IOException("Vault image rewrap backup is missing.")
-        }
-        val oldCiphertext = backup.backupFile.readBytes()
-        try {
-            replaceFileConservatively(backup.targetFile, oldCiphertext)
-        } finally {
-            oldCiphertext.fill(0)
+    /** Restore the exact original ciphertext without materializing it. */
+    open suspend fun rollbackRewrap(backup: VaultImageFileRewrapBackup) = withContext(ioDispatcher) {
+        if (!backup.backupFile.isFile) throw IOException("Vault file rewrap backup is missing.")
+        val context = coroutineContext
+        replaceFileConservatively(backup.targetFile) { output ->
+            backup.backupFile.inputStream().use { input -> copyStreaming(input, output, context::ensureActive) }
         }
     }
 
@@ -198,7 +189,7 @@ internal open class VaultImageFileStorage(
         }
     }
 
-    private fun replaceFileConservatively(target: File, replacementBytes: ByteArray) {
+    private fun replaceFileConservatively(target: File, writeReplacement: (OutputStream) -> Unit) {
         val parent = target.parentFile
             ?: throw IOException("Vault image parent is unavailable.")
         if (!parent.exists() && !parent.mkdirs()) {
@@ -209,7 +200,10 @@ internal open class VaultImageFileStorage(
         var replaced = false
 
         try {
-            tempFile.writeBytes(replacementBytes)
+            tempFile.outputStream().use { output ->
+                writeReplacement(output)
+                output.fd.sync()
+            }
             moveReplacing(tempFile, target)
             replaced = true
         } finally {

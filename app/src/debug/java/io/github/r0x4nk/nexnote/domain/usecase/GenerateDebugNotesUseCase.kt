@@ -1,5 +1,6 @@
 package io.github.r0x4nk.nexnote.domain.usecase
 
+import io.github.r0x4nk.nexnote.domain.model.NOTE_COLOR_PALETTE
 import io.github.r0x4nk.nexnote.domain.model.Note
 import io.github.r0x4nk.nexnote.util.NoteLinkMarkdown
 import java.util.TimeZone
@@ -48,7 +49,7 @@ internal class GenerateDebugNotesUseCase(
                     creationDate = creationDate,
                     timezone = timezone,
                     isPinned = index > 0 && index % PIN_INTERVAL == 0,
-                    backgroundColor = backgroundColors[index % backgroundColors.size],
+                    backgroundColor = NOTE_COLOR_PALETTE[index % NOTE_COLOR_PALETTE.size],
                     isPreviewMode = index % PREVIEW_INTERVAL == 0
                 )
             )
@@ -153,13 +154,7 @@ internal class GenerateDebugNotesUseCase(
         private const val INLINE_FORMAT_INTERVAL = 3
 
         private val paragraphCounts = intArrayOf(1, 3, 7, 14, 28)
-        private val backgroundColors = listOf(
-            null,
-            0xFFFFF3E0.toInt(),
-            0xFFE8F5E9.toInt(),
-            0xFFE3F2FD.toInt(),
-            0xFFF3E5F5.toInt()
-        )
+
         private val titleAdjectives = listOf(
             "Focused", "Practical", "Weekly", "Detailed", "Quick", "Exploratory",
             "Reliable", "Technical", "Creative", "Field"

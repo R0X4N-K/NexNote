@@ -13,6 +13,7 @@ import io.github.r0x4nk.nexnote.ui.screen.editor.EditorSaveCoordinator
 internal interface AppDependencies {
     val useCases: AppUseCases
     val editorSaveCoordinator: EditorSaveCoordinator
+    val strings: StringProvider
 }
 
 internal fun CreationExtras.requireAppDependencies(): AppDependencies =

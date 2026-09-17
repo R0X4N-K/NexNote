@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import io.github.r0x4nk.nexnote.R
 import io.github.r0x4nk.nexnote.ui.theme.NexNoteTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -74,14 +76,19 @@ class MarkdownPreviewVaultImageTest {
         }
 
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText("Immagine non trovata")
+            composeRule.onAllNodesWithText(missingImageLabel())
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
 
-        composeRule.onNodeWithText("Immagine non trovata").assertIsDisplayed()
+        composeRule.onNodeWithText(missingImageLabel()).assertIsDisplayed()
     }
 }
+
+private fun missingImageLabel(): String =
+    InstrumentationRegistry.getInstrumentation().targetContext.getString(
+        R.string.markdown_image_missing
+    )
 
 private fun createPngBytes(): ByteArray {
     val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)

@@ -10,6 +10,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import io.github.r0x4nk.nexnote.R
 
 @Composable
 internal fun TagsOverflowMenu(
@@ -24,7 +26,7 @@ internal fun TagsOverflowMenu(
         DropdownMenuItem(
             text = {
                 Text(
-                    if (viewMode == TagsViewMode.LIST) "Treemap view" else "List view"
+                    if (viewMode == TagsViewMode.LIST) stringResource(R.string.treemap_view) else stringResource(R.string.list_view)
                 )
             },
             leadingIcon = {
@@ -40,10 +42,10 @@ internal fun TagsOverflowMenu(
             onClick = onViewModeToggle
         )
         HorizontalDivider()
-        SortOption(TagSortOrder.USAGE_DESC, "Usage: most first", current, onSelect)
-        SortOption(TagSortOrder.USAGE_ASC, "Usage: least first", current, onSelect)
-        SortOption(TagSortOrder.DATE_DESC, "Date: newest first", current, onSelect)
-        SortOption(TagSortOrder.DATE_ASC, "Date: oldest first", current, onSelect)
+        SortOption(TagSortOrder.USAGE_DESC, stringResource(R.string.sort_usage_desc), current, onSelect)
+        SortOption(TagSortOrder.USAGE_ASC, stringResource(R.string.sort_usage_asc), current, onSelect)
+        SortOption(TagSortOrder.DATE_DESC, stringResource(R.string.sort_date_desc), current, onSelect)
+        SortOption(TagSortOrder.DATE_ASC, stringResource(R.string.sort_date_asc), current, onSelect)
     }
 }
 

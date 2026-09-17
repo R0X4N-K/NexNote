@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 
 class AgendaFakeNoteDao : NoteDao {
+    override suspend fun getNoteForAttachmentRecovery(id: Long): NoteEntity? = getNoteById(id)
+
 
     private val notes = MutableStateFlow<List<NoteEntity>>(emptyList())
 

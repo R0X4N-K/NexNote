@@ -21,8 +21,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.r0x4nk.nexnote.R
 
 internal object RadialMenuOverlayDefaults {
     val fabSize = 56.dp
@@ -196,7 +199,12 @@ fun RadialMenuOverlay(
 
             Box(Modifier.fillMaxSize()) {
                 // ── App content ──────────────────────────────────────────────────
-                content()
+                Box(
+                    Modifier.fillMaxSize().then(
+                        if (menuState.isOpen && hasMenuItems) Modifier.clearAndSetSemantics { }
+                        else Modifier
+                    )
+                ) { content() }
 
                 // ── Radial menu (renders below the FAB in z-order) ───────────────
                 if (menuState.isOpen && hasMenuItems) {
@@ -216,7 +224,7 @@ fun RadialMenuOverlay(
                 // ── Scroll shortcut buttons (editor-only, stacked above the FAB slot) ──
                 // Shown only while an editor screen has registered scroll callbacks
                 // and the screen has not explicitly suppressed floating controls.
-                if (showScrollShortcuts) {
+                if (showScrollShortcuts && !menuState.isOpen) {
                     ScrollShortcutButtons(
                         fabX             = fabX,
                         fabY             = fabY,
@@ -231,6 +239,7 @@ fun RadialMenuOverlay(
                 if (showFab) {
                     StaticMenuButton(
                         isMenuOpen   = menuState.isOpen,
+                        opensMenu = directFabAction == null && hasMenuItems,
                         fabX         = fabX,
                         fabY         = fabY,
                         buttonSizePx = buttonSizePx,
@@ -265,7 +274,8 @@ fun RadialMenuOverlay(
     }
 }
 
+@Composable
 private fun closedFabContentDescription(
     hasDirectAction: Boolean,
     customDescription: String?
-): String = customDescription ?: if (hasDirectAction) "Activate action" else "Open menu"
+): String = customDescription ?: if (hasDirectAction) stringResource(R.string.activate_action) else stringResource(R.string.open_menu)
