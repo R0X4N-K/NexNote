@@ -1,62 +1,66 @@
 # Contributing to NexNote
 
-Thanks for helping keep NexNote small, useful, and F-Droid friendly.
+Bug reports, fixes, translations, and documentation improvements are welcome.
+Keep each change focused so it is easy to review.
 
-## Development Setup
+## Getting started
 
-1. Install Android Studio or the Android SDK.
-2. Use JDK 21.
-3. Clone the repository.
-4. Run:
+1. Clone the repository and install Android Studio or the Android SDK platform 36.1.
+2. Select a [complete JDK 21](docs/build-jdk.md).
+3. Run `./gradlew assembleDebug` and `./gradlew ci`.
 
-```bash
-./gradlew clean assembleDebug
-./gradlew testDebugUnitTest
-./gradlew lintDebug
-```
+On Windows, use `.\gradlew.bat` instead of `./gradlew`.
+See [Running tests](docs/testing.md) for device tests and targeted checks.
 
-On Windows:
+## Working on the app
 
-```powershell
-.\gradlew.bat clean assembleDebug
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat lintDebug
-```
+Follow the package boundaries described in [Architecture](docs/architecture.md).
+Reuse the existing UI components and [theme roles](docs/color-design-system.md)
+where possible. Put user-facing text in string or plural resources and update
+the existing translations.
 
-## Project Rules
+Keep dependencies at fixed versions and preserve checksum verification. When
+changing dependencies, review the lockfiles and third-party notices too; the
+[build guide](docs/fdroid-build-supply-chain.md) describes the process.
 
-- Keep the app single-module unless there is a real, repeated boundary that justifies a new module.
-- Prefer existing package patterns under `data`, `domain`, `ui`, `di`, and `util`.
-- Do not add Firebase, Google Play Services, analytics SDKs, crash-reporting SDKs, or proprietary runtime services.
-- Do not commit keystores, passwords, tokens, API keys, local properties, APKs, AABs, or build output.
-- Use fixed dependency versions in `gradle/libs.versions.toml`; do not use `+` or snapshots.
-- Keep user data local unless a future feature is explicitly designed and documented around sync.
+The app keeps user data local. Do not introduce accounts, analytics, advertising,
+or proprietary runtime services without first discussing a change to that design.
+Never commit signing keys, credentials, local machine settings, APKs, or build output.
 
-## Branches
+## Pull requests
 
-Use short branch names:
+Explain the problem, the change, and how you checked it. For code changes, run
+`./gradlew ci` and any device tests relevant to the behavior you changed. For
+documentation-only edits, check facts, links, and `git diff --check`; a full
+Android build is usually unnecessary.
 
-- `feature/note-links`
-- `fix/editor-save`
-- `docs/fdroid`
-- `test/repository`
+Include screenshots for visible UI changes where they help the review. Update
+the unreleased changelog and documentation when behavior changes. If a check
+could not run, say which one and why.
 
-## Pull Request Checklist
+## Releases
 
-- [ ] The change is scoped and does not include unrelated refactors.
-- [ ] `./gradlew testDebugUnitTest` passes.
-- [ ] `./gradlew lintDebug` passes or any lint issue is explained.
-- [ ] F-Droid compatibility is preserved.
-- [ ] Documentation or metadata is updated when user-facing behavior changes.
-- [ ] No secrets, signing files, generated APKs, or local IDE state are included.
+1. Choose a new `versionName` and increase `baseVersionCode` in
+   `app/build.gradle.kts`. Existing releases must keep their original tags.
+2. Move the relevant entries out of `Unreleased` in `CHANGELOG.md` and add
+   `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
+   Update the store description and screenshots to match the release.
+3. Validate the release commit from a clean checkout with `./gradlew ci` and
+   the Android tests. Check migrations and upgrades from the previous release.
+4. Verify that the universal release APK includes `armeabi-v7a`, `arm64-v8a`,
+   `x86`, and `x86_64`. The workflows require an R8 mapping file and an
+   unsigned APK smaller than 15 MiB.
+5. Create and push a `v<versionName>` tag pointing to that commit.
 
-## Release Checklist
+Pushing the tag starts the release workflow, which signs the APK and publishes a
+GitHub release. It requires these repository secrets:
 
-- Update `CHANGELOG.md`.
-- Update `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
-- Ensure `versionName` and the git tag match, for example `1.0.0` and `v1.0.0`.
-- Ensure `versionCode` only increases.
-- Keep R8 minification and resource shrinking enabled for release builds.
-- Verify that the universal APK contains all four packaged ABIs and stays below
-  the release-size guard.
-- Build from a clean clone before tagging.
+- `KEYSTORE_FILE`: the production keystore encoded as base64.
+- `KEYSTORE_PASSWORD`
+- `KEY_ALIAS`
+- `KEY_PASSWORD`
+
+Keep the established [signing identity](signature/README.md). The release workflow
+checks the version, ABIs, size, and alignment; it does not run the full test suite,
+so complete the checks before tagging. Verify the F-Droid recipe and reproducible
+build result separately for each release.

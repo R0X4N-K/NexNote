@@ -19,6 +19,8 @@ Do not publish working exploits or sensitive user data in public issues.
 
 ## Signing Key
 
-No production signing fingerprint is published yet. After the first signed release, add the SHA-256 certificate fingerprint to `signature/README.md` and keep using the same release key for all future updates.
+The production certificate fingerprint is published in
+[Release signature](signature/README.md). Release updates must retain the same
+signing identity.
 
 Never commit keystores, passwords, tokens, or signing property files.

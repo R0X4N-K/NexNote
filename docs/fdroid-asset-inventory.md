@@ -35,10 +35,12 @@ physical-dimension profiles are retained.
 
 ## Screenshots
 
-The Fastlane screenshots show the current NexNote interface with only the
+The Fastlane screenshots predate the 1.0.4 restyling. They show the
+release interface with only the
 built-in Checklist template and the synthetic title “Weekly checklist”. They
 contain no personal or third-party content. Both files are 1392×3120 RGBA sRGB
-PNGs and are distributed with NexNote under `GPL-3.0-only`.
+PNGs and are distributed with NexNote under `GPL-3.0-only`. Replace them with
+screenshots of the release being prepared before publishing new store metadata.
 
 ## Distributed assets
 
@@ -57,8 +59,22 @@ PNGs and are distributed with NexNote under `GPL-3.0-only`.
 Source vectors, production exports, and the visual validation sheet are retained
 under `artwork/`; `artwork/README.md` describes their relationships.
 
-## Legacy assets
+## Bundled fonts
 
-The density-specific Android Studio template launcher files were removed in
-favor of the adaptive icon resources used by every supported platform
-(`minSdk = 29`). They are not part of the current distribution.
+The Settings typeface preference uses unmodified variable fonts from the
+`google/fonts` repository. They are licensed under the SIL Open Font License
+1.1 (OFL-1.1). No reserved font name is
+reused for a modified version, and the license text and copyright notices are
+packaged in `THIRD_PARTY_NOTICES.md` under `assets/legal/`.
+
+| Asset | SHA-256 | Provenance and license |
+|---|---|---|
+| `app/src/main/res/font/inter_variable.ttf` | `29160A80FF49DDCAB2C97711247E08B1FAB27A484A329CE8B813D820DC559031` | Inter, `ofl/inter/Inter[opsz,wght].ttf`; OFL-1.1, Copyright 2020 The Inter Project Authors |
+| `app/src/main/res/font/lora_variable.ttf` | `822A6621CCBE8D97D20AC88C1C41F5615C9C2C202EAA75F272CD452AAC6475A7` | Lora, `ofl/lora/Lora[wght].ttf`; OFL-1.1, Copyright 2011 The Lora Project Authors (Reserved Font Name "Lora") |
+| `app/src/main/res/font/fira_code_variable.ttf` | `9335B082B3C7850D98A64B584F3417F65355F3471278BB5EEB8C6C0E8657AEEB` | Fira Code, `ofl/firacode/FiraCode[wght].ttf`; OFL-1.1, Copyright 2014-2020 The Fira Code Project Authors |
+| `app/src/main/res/font/jetbrains_mono_variable.ttf` | `48715A42EC242C21E9F02692891E147D022299A52E48D5E413E1A942193FFEDA` | JetBrains Mono, `ofl/jetbrainsmono/JetBrainsMono[wght].ttf`; OFL-1.1, Copyright 2020 The JetBrains Mono Project Authors |
+
+The upstream license for each file is `OFL.txt` alongside the font in the
+`google/fonts` repository, for example
+<https://github.com/google/fonts/blob/main/ofl/firacode/OFL.txt>. The font
+resources are loaded locally and require no network access.

@@ -1,27 +1,23 @@
-NexNote is a local-first note-taking app for Android.
+NexNote keeps your notes on your Android device, without accounts, ads, analytics, or a remote server.
 
-It is built for fast personal notes without accounts, analytics, advertising, or proprietary runtime services.
+Write with Markdown tools and preview checklists, tables, images, and file attachments. Find notes with full-text search, tags, filters, and sorting. Browse Calendar and Agenda, reuse templates, and see your writing activity.
 
 Features:
 
-* Write and edit notes with Markdown-oriented tools.
-* Organize notes with tags and full-text search.
-* Filter search by text scope and pinned state, then choose the result order.
-* Browse notes by date in the agenda view.
-* Create and reuse templates.
-* Review local writing statistics, activity history, streaks, and tag insights.
-* Move deleted notes to trash before permanent deletion.
-* Select notes in bulk or delete all stored notes from Settings.
-* Put selected notes and their images in a PIN-protected encrypted Vault.
-* Export notes and share generated files through Android's system share flow.
-* Customize theme, accent color, font scale, timezone, and left-handed layout preference.
+* Pin notes, select them for bulk actions, and recover deleted notes from trash.
+* Keep selected notes, images, and documents in a PIN-protected encrypted Vault.
+* Receive text and images shared from other apps, or open supported UTF-8 text files as new notes.
+* Attach documents, audio, archives, and other files. Open ordinary-note attachments in an installed viewer.
+* Export notes as text, Markdown, or PDF, or print them. Exports with document attachments can include a ZIP of the referenced files.
+* Choose light, dark, OLED, or system appearance, nine accent colors, and optional Android 12+ device colors.
+* Choose System, Inter, Lora, Fira Code, or JetBrains Mono text, and adjust the text size.
 
-Privacy:
+Privacy and backup:
 
-* Notes are stored locally on the device.
-* Android cloud backup and device-to-device transfer are disabled; export data before uninstalling or changing devices.
-* No account is required.
-* No Firebase, Google Play Services, analytics, ads, or remote backend are included.
-* Search and statistics indexes stay in the app's private on-device database.
+* Notes, preferences, search indexes, and writing statistics stay on your device.
+* Ordinary notes use Android's private app storage. Vault titles, text, file lists, and files have additional PIN-based encryption.
+* Vault notes must be moved out of the Vault before exporting, printing, or opening attached files externally.
+* Android cloud backup and device-to-device transfer are disabled. Export files you want to keep before uninstalling or changing devices; exports are not a full app backup.
+* Files shared with other apps are outside NexNote's control.
 
-NexNote is free software licensed under GPL-3.0-only.
+NexNote requires Android 10 or later and is free software licensed under GPL-3.0-only.

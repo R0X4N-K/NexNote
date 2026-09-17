@@ -15,11 +15,16 @@ upstream-signed APK as a reproducible build.
 - `NexNote-v1.0.1.apk` SHA-256:
   `C01681FB8A87F37615E15BB9FB5A62BDDCB7D771ECF6BC13002E0C368B40E79A`
 
-Generate it with:
+Inspect the certificate stored in a keystore with:
 
 ```bash
-keytool -list -v -keystore release.keystore -alias YOUR_ALIAS
+keytool -list -v -keystore release.keystore -alias nexnote-release
 ```
+
+To inspect a release APK without opening the keystore, run
+`apksigner verify --verbose --print-certs NexNote-v<version>.apk` and compare
+its certificate fingerprint with the one above. The two APK hashes listed here
+are historical file hashes, not the hash of every release.
 
 Do not commit the keystore or signing passwords. F-Droid metadata pins this
 certificate with `AllowedAPKSigningKeys`, so GitHub and F-Droid releases share

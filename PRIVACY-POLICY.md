@@ -1,44 +1,48 @@
 # Privacy Policy
 
-Last updated: 2026-08-22
+Last updated: 2026-09-17
 
-NexNote is a local-first note-taking app.
+NexNote keeps your notes on your device. It does not require an account, send
+notes to a server, or include advertising, analytics, or crash-reporting services.
 
-## Data Stored By The App
+## What the app stores
 
-NexNote stores notes, tags, templates, preferences, imported note images, and
-derived search and writing-statistics indexes on the device. The app uses local
-Android storage, Room, and DataStore. The derived indexes are rebuilt from
-ordinary notes and do not include notes kept in the Vault or trash.
+The app stores notes, tags, templates, preferences, images, and document
+attachments in Android's private app storage. It also keeps local search and
+writing-statistics indexes for ordinary notes, excluding Vault and trashed notes.
 
-Ordinary notes rely on Android's private app sandbox and are not encrypted by a
-separate NexNote key. Notes and images placed in the Vault are additionally
-encrypted at rest using a key derived from the user's Vault PIN. The optional
-Android device-credential unlock stores protected Vault unlock material in the
-Android Keystore; it is disabled by default. See `docs/vault-and-backup.md` for
-security boundaries and limitations.
+Ordinary notes and files are protected by Android's app sandbox. Vault content
+has additional encryption using a key derived from your PIN. Optional unlock
+with your Android screen-lock credential keeps protected unlock material in
+Android Keystore. This option is off by default.
 
-## Network And Accounts
+## Importing, opening, and sharing
 
-NexNote currently does not require an account, does not use a remote backend, and does not include analytics, advertising, Firebase, Google Play Services, or crash-reporting SDKs.
+Files you import are copied into NexNote's private storage. Text or images you
+share to NexNote become new notes.
 
-## Export And Sharing
+When you export a note or open an attachment in another app, NexNote creates a
+temporary file and grants the receiving app read access through Android's
+FileProvider. Incomplete exports are removed, print files are deleted when the
+print flow finishes, and shared files older than 24 hours are cleaned up on a
+later launch or export. Android may clear the cache sooner. Copies made by
+another app are outside NexNote's control.
 
-When you export or share a note, Android's system share sheet and FileProvider may give another app temporary read access to the exported file you choose to share. NexNote stores these files in its cache with unique names. It deletes incomplete exports immediately, deletes print files when the print flow finishes, and removes share files older than 24 hours on a later app launch or export. Android may clear cache files sooner. Files saved by another app are outside NexNote's control.
+Vault notes must be moved out of the Vault before export, printing, or external
+file opening. Those exported copies are not encrypted by NexNote.
 
-When you copy note text, that text is placed on the Android system clipboard and can be pasted into other apps. NexNote marks it as sensitive so compatible system surfaces obscure the clipboard preview; this flag does not encrypt the clipboard.
+Copying text places it on the Android clipboard. NexNote marks it as sensitive
+to hide previews on compatible system surfaces; this does not encrypt it.
 
-## Backups
+## Backup and deletion
 
-NexNote opts its private app data out of Android cloud backup and device-to-device transfer. Reinstalling the app or moving to a new device therefore does not restore notes automatically. Use the app's export feature to create files you can manage and transfer yourself.
+NexNote disables Android cloud backup and device-to-device transfer for its data.
+Uninstalling, clearing app data, or changing devices does not restore notes.
+Export files you want to keep first. Exports are not a full database backup.
 
-## User Control
+You can delete notes individually. The delete-all action in Settings removes
+ordinary notes, including their trash; resetting the Vault removes Vault notes
+separately. Files already saved outside the app must be deleted at their destination.
 
-Notes can be deleted individually or through the delete-all action in Settings.
-Clearing app data removes local app data according to Android's normal storage
-behavior. Exported files that you save or share outside the app must be managed
-separately.
-
-## Changes
-
-This policy will be updated when NexNote adds behavior that changes how user data is stored, shared, synced, or transmitted.
+See [Vault and backup](docs/vault-and-backup.md) for encryption details, PIN
+recovery limits, and behavior during interrupted operations.

@@ -2,154 +2,104 @@
 
 [![Build](https://github.com/R0X4N-K/NexNote/actions/workflows/build.yml/badge.svg)](https://github.com/R0X4N-K/NexNote/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/R0X4N-K/NexNote)](https://github.com/R0X4N-K/NexNote/releases/latest)
-[![F-Droid submission](https://img.shields.io/badge/F--Droid-submission%20under%20review-orange)](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-NexNote is an offline, local-first Android note-taking app built with Kotlin,
-Jetpack Compose, Material 3, Room, DataStore, Coroutines, and Flow.
+NexNote is an Android app for keeping notes on your device. It works without an
+account, a server, or an internet connection. It has no ads or analytics.
 
-## Features
+This README describes NexNote 1.0.4. See the
+[changelog](CHANGELOG.md#104---2026-09-18) for the changes in this release.
 
-- Local notes stored on device with Room.
-- Markdown-oriented editing and preview.
-- Full-text search with scope, pin, and ordering controls.
-- Tags, agenda view, reusable templates, and trash.
-- On-device writing statistics with yearly activity and streak insights.
-- An encrypted Vault for selected notes and their images.
-- PDF/export flow with Android FileProvider sharing.
-- Theme, accent color, font scale, timezone, and left-handed preferences.
-- Select-all and bulk data-management actions, including deleting all notes.
-- No account, analytics, Firebase, Google Play Services, or remote backend.
+## What you can do
 
-Ordinary notes are protected by Android's private app sandbox. Vault note fields
-and images are additionally encrypted at rest with a PIN-derived key. Android
-backup and device-to-device transfer are disabled, so users must export data they
-want to keep before uninstalling or moving devices. See
-[`docs/vault-and-backup.md`](docs/vault-and-backup.md) for the exact guarantees
-and limitations.
+- Write Markdown notes with a preview, checklists, tables, images, and file attachments.
+- Find notes with full-text search, tags, pin filters, and sorting.
+- Browse notes in Calendar and Agenda, reuse templates, and view writing statistics.
+- Select notes for bulk actions, or recover deleted notes from the trash.
+- Keep selected notes and their files in a PIN-protected Vault.
+- Receive text and images from other apps, or open supported text files as notes.
+- Export to text, Markdown, or PDF; print notes or share document attachments in a ZIP.
+- Choose light, dark, OLED, or system appearance, nine accent colors, Android
+  device colors, and one of five typefaces, and adjust the text size.
 
-## Android Package
+NexNote requires Android 10 (API 29) or later. Device colors require Android 12.
+Ordinary notes use Android's private app storage; Vault content has additional
+PIN-based encryption. Automatic Android backup and device transfer are disabled.
+Export anything you want to keep before uninstalling or changing devices.
+See [Vault and backup](docs/vault-and-backup.md) for details.
 
-- Release application id: `io.github.r0x4nk.nexnote`
-- Debug application id: `io.github.r0x4nk.nexnote.debug`
-- Current source version: `1.0.3` / versionCode `35`
+## Build and test
 
-The Kotlin namespace and release application id are both `io.github.r0x4nk.nexnote`, with the debug variant using `io.github.r0x4nk.nexnote.debug`.
+You need a complete JDK 21 and the Android SDK platform 36.1. Android Studio can
+install the SDK components requested by Gradle. See [JDK setup](docs/build-jdk.md)
+if Gradle uses the wrong Java installation.
 
-## Project Shape
-
-```text
-NexNote/
-|-- app/                         Android app module
-|-- gradle/libs.versions.toml     Version Catalog
-|-- fastlane/metadata/android/    Store metadata for F-Droid/IzzyOnDroid
-|-- .github/workflows/            CI and release workflows
-|-- docs/                         Project and distribution documentation
-|-- signature/                    Release signing notes
-```
-
-The app intentionally stays single-module. That matches the guide for a solo note-taking app and keeps build, review, and maintenance overhead low.
-
-## Build
-
-Prerequisites:
-
-- Android Studio or Android SDK.
-- JDK 21, matching `gradle/gradle-daemon-jvm.properties`.
-
-Useful commands:
+From the repository root:
 
 ```bash
+./gradlew assembleDebug
 ./gradlew ci
-./gradlew clean assembleDebug
-./gradlew assembleRelease
-./gradlew compileDebugAndroidTestKotlin
-./gradlew lintRelease --offline
 ```
 
 On Windows PowerShell:
 
 ```powershell
+.\gradlew.bat assembleDebug
 .\gradlew.bat ci
-.\gradlew.bat clean assembleDebug
-.\gradlew.bat assembleRelease
-.\gradlew.bat compileDebugAndroidTestKotlin
-.\gradlew.bat lintRelease --offline
 ```
 
-The `ci` task is the canonical validation gate. It runs all configured local
-unit tests, compiles instrumentation tests, runs debug and release lint, and
-assembles both APK variants.
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+The `ci` task runs local tests, compiles Android tests, checks lint, and builds
+debug and release APKs. To run the Android tests, use a disposable emulator
+and follow [Running tests](docs/testing.md).
 
-The Android-test command compiles instrumentation tests; running them requires a
-connected device or AVD. Dependency lock state and strict checksum verification
-are committed in `app/gradle.lockfile`, `settings-gradle.lockfile`, and
-`gradle/verification-metadata.xml`. Distribution license material is generated
-into each APK under `assets/legal/` from `LICENSE` and
-`THIRD_PARTY_NOTICES.md`.
+`assembleRelease` creates an unsigned, optimized APK. It does not use signing
+secrets or publish a release. Dependencies are locked and checked against
+`gradle/verification-metadata.xml`; an offline build needs a populated cache.
 
-## Release
+## Project layout
 
-Signed upstream releases are built from immutable tags by the tag-triggered
-GitHub Actions release workflow. Each release publishes one optimized universal
-APK containing native libraries for `armeabi-v7a`, `arm64-v8a`, `x86`, and
-`x86_64`. Releases use this semantic-tag process:
+The app uses Kotlin, Compose Material 3, Room, DataStore, Coroutines, and Flow
+in one Android module.
 
-```bash
-git tag -a v1.1.0 -m "NexNote 1.1.0"
-git push origin v1.1.0
-```
+| Path | Contents |
+| --- | --- |
+| `app/src/` | Application code, resources, and tests |
+| `app/schemas/` | Room schemas used by migration tests |
+| `gradle/libs.versions.toml` | Dependency and plugin versions |
+| `.github/workflows/` | Build and signed-release workflows |
+| `fastlane/metadata/android/` | Store descriptions, release notes, and artwork |
+| `docs/` | User and contributor guides |
+| `artwork/` | Logo sources and exports |
 
-The release workflow expects these GitHub Secrets:
+The release package is `io.github.r0x4nk.nexnote`; debug adds `.debug`.
+The source version is `1.0.4` / code `36`, released from tag `v1.0.4`.
 
-- `KEYSTORE_FILE`: base64-encoded production keystore.
-- `KEYSTORE_PASSWORD`
-- `KEY_ALIAS`
-- `KEY_PASSWORD`
+## Releases and F-Droid
 
-Keep the production signing key stable forever once the app is distributed. Never commit keystores or signing property files.
+The [release workflow](.github/workflows/release.yml) builds and signs a universal
+APK when a `v*` tag is pushed. Read [Contributing](CONTRIBUTING.md#releases) before
+creating a release tag: its version must match the build configuration.
 
-## F-Droid Status
+The F-Droid submission is tracked in
+[merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
+The submission remains under review. The local metadata targets 1.0.4;
+F-Droid publication and reproducibility require verification for that release.
+Store screenshots still need to be refreshed for the redesigned interface.
+See the [build guide](docs/fdroid-build-supply-chain.md),
+[historical submission record](docs/fdroid-readiness.md), and
+[signing certificate](signature/README.md).
 
-NexNote has been submitted to the official F-Droid repository and is currently
-awaiting maintainer review in
-[`fdroiddata` merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
-Each metadata revision is validated by the F-Droid merge-request pipeline,
-including its source build and APK checks.
+## Documentation
 
-The submission includes:
+- [Attachments, imports, and export](docs/attachments.md)
+- [Vault and backup](docs/vault-and-backup.md)
+- [Architecture](docs/architecture.md)
+- [Colors and typography](docs/color-design-system.md)
+- [Running tests](docs/testing.md)
+- [Asset sources and licenses](docs/fdroid-asset-inventory.md)
+- [Privacy](PRIVACY-POLICY.md) and [security reports](SECURITY.md)
 
-- GPL-3.0-only license;
-- localized Fastlane metadata in `fastlane/metadata/android/en-US/`;
-- the reviewed metadata snapshot in `docs/fdroid-submission-template.yml`;
-- Gradle dependency locking and strict artifact checksum verification;
-- no proprietary runtime services;
-- GitHub CI for build, tests, and lint;
-- R8-minified, resource-shrunk universal release builds;
-- a release workflow that publishes the matching upstream reference APK;
-- F-Droid reproducible-build verification pinned to the upstream signing
-  certificate.
-
-NexNote is **not yet available in the F-Droid catalog**. Publication occurs only
-after F-Droid maintainers accept and merge the submission and the package is
-included in an official repository index. See
-[`docs/fdroid-readiness.md`](docs/fdroid-readiness.md) for the complete audit,
-submission evidence, and post-acceptance checks.
-
-The GitHub release and the future F-Droid package are separate distribution
-channels, but both use the same upstream production signing identity. F-Droid
-rebuilds the app from source, verifies that the upstream signature can be
-transferred to its byte-equivalent build, and publishes the verified
-upstream-signed APK.
-
-## Privacy
-
-NexNote is offline-first. See `PRIVACY-POLICY.md` for the current privacy statement.
-
-## Contributing
-
-See `CONTRIBUTING.md`.
-
-## License
-
-NexNote is licensed under the GNU General Public License v3.0 only. See `LICENSE`.
+Contributions are welcome; see [Contributing](CONTRIBUTING.md).
+NexNote is licensed under [GPL-3.0-only](LICENSE). Third-party components and
+fonts retain the licenses listed in [Third-party notices](THIRD_PARTY_NOTICES.md).

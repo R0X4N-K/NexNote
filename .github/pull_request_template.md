@@ -1,15 +1,19 @@
-## Summary
+## What changed
 
--
+Explain the problem and how this change addresses it.
 
 ## Verification
 
-- [ ] `./gradlew testDebugUnitTest`
-- [ ] `./gradlew lintDebug`
-- [ ] `./gradlew assembleDebug`
+List the commands or manual checks you ran and their results.
 
-## F-Droid Compatibility
+- [ ] `./gradlew ci` for code or build changes.
+- [ ] Relevant device tests or UI checks, if behavior changed.
+- [ ] Documentation-only changes: checked facts, links, and `git diff --check`.
 
-- [ ] No proprietary runtime services added.
-- [ ] No secrets, signing files, APKs, AABs, or build output included.
-- [ ] Fastlane metadata or changelog updated if user-facing release behavior changed.
+Mention any checks you could not run.
+
+## Before submitting
+
+- [ ] Updated the unreleased changelog and documentation where needed.
+- [ ] Reviewed new dependencies, lockfiles, checksums, and notices, if applicable.
+- [ ] No credentials, signing keys, local settings, or build output included.

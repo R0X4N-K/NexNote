@@ -1,116 +1,86 @@
-# F-Droid build supply chain
+# Build and release maintenance
 
-This document describes the source-build configuration for NexNote 1.0.3
-(`versionCode` 35).
+This guide describes NexNote 1.0.4 (code 36), prepared for tag `v1.0.4`.
 
-## Toolchain and repositories
+## Build configuration
 
-- The wrapper requests Gradle 9.3.1 and pins the official binary distribution
-  SHA-256 `b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06`.
-- `gradle-wrapper.jar` has SHA-256
-  `b3a875ddc1f044746e1b1a55f645584505f4a10438c1afea9f15e92a7c42ec13`,
-  matching Gradle's published 9.3.1 wrapper checksum.
-- The project requires JDK 21. `gradle/gradle-daemon-jvm.properties` records only
-  that version; it contains no vendor download URL or Foojay dependency. An
-  F-Droid builder must provide JDK 21 before invoking the wrapper.
-- Plugins and dependencies resolve only from Google's Maven repository and Maven
-  Central. Gradle Plugin Portal and the Foojay resolver plugin are not used.
-- Android Gradle Plugin 9.1.1 is paired with Gradle 9.3.1. Kotlin is 2.2.10 and
-  KSP is 2.3.9, which supports AGP 9 built-in Kotlin source handling.
+| Setting | Current value |
+| --- | --- |
+| Release version / code | 1.0.4 / 36 |
+| Minimum Android version | API 29 |
+| Compile SDK | 36.1 |
+| Target SDK | 36 |
+| Build JDK | 21 |
+| Java source/target level | 11 |
+| Gradle wrapper | 9.3.1 |
+| Android Gradle Plugin | 9.1.1 |
+| Kotlin / Compose compiler plugin | 2.2.10 |
+| KSP | 2.3.9 |
+| Room schema | 10, with migrations from 5 onward |
 
-Official verification sources:
+The wrapper distribution checksum is pinned in
+`gradle/wrapper/gradle-wrapper.properties`. The checked-in wrapper JAR has SHA-256
+`b3a875ddc1f044746e1b1a55f645584505f4a10438c1afea9f15e92a7c42ec13`.
+Use [JDK setup](build-jdk.md) for local configuration.
 
-- <https://gradle.org/release-checksums/>
-- <https://developer.android.com/build/releases/agp-9-1-0-release-notes>
-- <https://github.com/google/ksp/releases>
+Plugins and dependencies resolve from Google Maven and Maven Central.
+`app/gradle.lockfile` and `settings-gradle.lockfile` fix dependency resolution;
+`gradle/verification-metadata.xml` checks artifact SHA-256 values. Source and
+Javadoc artifacts used by the IDE are covered too.
 
-## Resolution controls
+The [third-party notices](../THIRD_PARTY_NOTICES.md) list runtime, test, build,
+and font licenses. The build packages those notices and the project license
+under `assets/legal/`.
 
-`app/gradle.lockfile` and `settings-gradle.lockfile` fix dependency resolution.
-`gradle/verification-metadata.xml` enables strict SHA-256 verification of
-resolved artifacts. Its coverage includes Gradle/IDE source and Javadoc
-artifacts requested by Android Studio models, so project sync can retain strict
-verification. The version catalog was reconciled with versions already selected
-by the graph where doing so removed misleading nominal pins.
+## Updating dependencies
 
-The complete runtime license inventory is in `THIRD_PARTY_NOTICES.md`. Runtime,
-test-only, and build-only components are deliberately separated there. All
-release runtime components and native libraries are FLOSS and resolve from the
-two declared repositories.
+Keep Gradle, AGP, and the matching AAPT2 build number aligned. Review changed
+versions, lockfiles, licenses, and checksums together. Preserve the exported Room
+schemas and test migrations when changing database code or dependencies.
 
-## Verification maintenance
-
-The root `ci` task is the single validation entry point for local builds and
-GitHub Actions. It runs all configured local unit tests, compiles
-instrumentation tests, runs debug and release lint, and assembles both APK
-variants. Keeping this task in the metadata update command is important because
-build tools such as KSP can resolve additional detached configurations only
-while their tasks execute. The maintenance command forces task execution so an
-up-to-date output or build-cache entry cannot hide one of those configurations.
-The gate also resolves the Linux, macOS, and Windows AAPT2 binaries explicitly,
-so checksum metadata generated on one host remains valid on the other supported
-build hosts. The AAPT2 coordinate in the version catalog must be updated with
-AGP and must use the build number published by that AGP release.
-
-After a reviewed dependency or build-plugin change, refresh checksum metadata
-from the declared repositories and execute the complete gate:
+After changing dependencies, resolve the affected configurations while updating
+lock state and generating checksum candidates. Review both diffs, then rerun
+the checks in strict mode:
 
 ```bash
 ./gradlew --no-daemon --refresh-dependencies --rerun-tasks \
-  --write-verification-metadata sha256 ci
+  --write-locks --write-verification-metadata sha256 ci
 ./gradlew --no-daemon --refresh-dependencies --rerun-tasks ci
 ./gradlew --no-daemon --offline --no-build-cache clean ci
 ```
 
-Review every addition to `gradle/verification-metadata.xml` before committing
-it. An unexpected component or version must be investigated rather than
-trusted automatically. Strict dependency verification must not be disabled to
-make a build pass.
+Verify new checksum entries against trusted upstream artifacts before committing
+them. Recording a checksum is not itself a trust check. Do not disable verification
+to make the build pass. Offline checks need previously downloaded dependencies.
 
-## Deliberate version dispositions
+The root `ci` task resolves AAPT2 for Linux, macOS, and Windows as well as the
+normal build tasks. Run [device tests](testing.md) separately.
 
-Lint version checks are advisory, not proof that an upgrade is compatible. These
-families remain pinned pending a separately tested upgrade:
+## Release APK and signing
 
-| Family | Current disposition |
-|---|---|
-| Gradle/AGP | Gradle 9.3.1 and AGP 9.1.1 are an officially supported pair; do not move either independently. |
-| Kotlin/Compose compiler | Kotlin 2.2.10 is retained with the current Compose and KSP graph. |
-| Compose BOM | The resolved 2026.02.01 platform and its Compose 1.10.4 modules are retained as one tested set. |
-| Room | 2.7.0 supports the migration chain from schema 5 through 9. Versions 8 and 9 add a derived statistics index and active-note FTS index. Database schemas earlier than 5 are outside the supported upgrade path. |
-| Navigation, DataStore, ExifInterface | Retained to keep dependency changes scoped to the current release. |
-| AndroidX test/Espresso/JUnit | Test-only pins; upgrade separately with device-backed instrumentation. |
-| Coroutines | 1.10.1 retained with the current cancellation regression coverage. |
+`assembleRelease` produces an unsigned universal APK with R8 minification and
+resource shrinking. The workflows require four ABIs, an R8 mapping file, and an
+unsigned APK below 15 MiB. Only the release workflow checks all four ABIs; the
+normal build workflow checks the mapping and size.
 
-## Android API and native libraries
+The tag-triggered release workflow checks that the tag matches `versionName`,
+checks 16 KiB ZIP alignment, and signs with Build Tools 34.0.0 using v2 and v3
+signatures with v1 disabled. It then publishes one GitHub release APK.
+See [Contributing](../CONTRIBUTING.md#releases) for secrets and release steps.
 
-The app compiles and targets API 36. API 37 targeting and its Android 17
-behavior changes are outside the scope of version 1.0.3. `OldTargetApi`
-therefore remains visible rather than being suppressed. The deprecated
-device-credential confirmation API is retained until a modern Biometric
-migration can be validated on supported devices.
+Version codes 31-34 belonged to the older ABI-specific release. Code 35 replaced
+them with a universal APK; later releases need a larger code. Never rewrite an
+existing release tag or replace its APK with different contents.
 
-The APK's two AndroidX native libraries are supplied for four ABIs. The
-dependencies ship stripped binaries without `.debug*` sections or `.symtab`;
-`.dynsym` remains as required for dynamic linking.
+## F-Droid
 
-The release is one universal APK with `versionCode` 35 and all four packaged
-ABIs. R8 code minification and Android resource shrinking are enabled for the
-release build. Together they reduced the unsigned APK by more than 90%, so
-architecture-specific packages are no longer needed.
+The [metadata template](fdroid-submission-template.yml) targets 1.0.4. It uses
+`Binaries` to locate the signed upstream APK and `AllowedAPKSigningKeys` to pin
+the [production certificate](../signature/README.md). Update checks read
+`baseVersionCode` and `versionName` from `app/build.gradle.kts`.
 
-The previous upstream release exposed ABI-specific APKs with versionCodes 31
-through 34. VersionCode 35 preserves Android's required monotonic upgrade path
-for users who installed any of those packages.
-
-## F-Droid invocation
-
-With Android SDK platform/API 36 and JDK 21 provisioned, the build uses the
-standard Gradle release task. The unsigned APK does not depend on signing
-secrets. The top-level `Binaries` URL lets F-Droid compare it with the signed
-GitHub asset and transfer the verified signature.
-
-`UpdateCheckData` reads the numeric `baseVersionCode` and `versionName` directly
-from `app/build.gradle.kts`. The metadata template uses the intended immutable
-`v1.0.3` release ref; the live merge request should pin the exact tag commit
-after the tag and signed release are public.
+A builder needs JDK 21 and SDK platform 36.1 for the current source. The unsigned
+build does not need signing secrets. Verify the effective recipe and server
+reproducibility result for each new release; the local YAML is not the live
+F-Droid configuration. The [submission record](fdroid-readiness.md) preserves
+historical evidence for 1.0.1, not approval of subsequent changes.
