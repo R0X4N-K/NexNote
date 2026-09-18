@@ -51,7 +51,11 @@ class AgendaViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeDao = AgendaFakeNoteDao()
         val imageStorage = NoOpNoteImageStorage()
-        val repository = NoteRepositoryImpl(fakeDao, imageStorage)
+        val repository = NoteRepositoryImpl(
+            fakeDao,
+            imageStorage,
+            statisticsComputationDispatcher = testDispatcher
+        )
         viewModel = AgendaViewModel(
             observeDistinctLocalDays = ObserveDistinctLocalDaysUseCase(repository),
             observeAllNotes = ObserveAllNotesUseCase(repository),
