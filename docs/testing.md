@@ -47,6 +47,7 @@ These fixtures belong to the test APK, not the release app.
 | ZIP and media export options | `AttachmentBundleExporterTest`, `ExportMediaPolicyTest` |
 | Accessibility | `RadialMenuAccessibilityTest`, `MarkdownTaskAccessibilityTest` |
 | Colors and card metadata | `ColorContrastTest`, `NoteCardMetadataTest` |
+| Shared Markdown and legacy card previews | `ExternalShareImporterTest`, `NoteCardMarkdownRegressionTest` |
 
 For example, run the encryption unit tests with:
 

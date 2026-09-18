@@ -38,6 +38,10 @@ The shared subject supplies the title. Each deliberate share creates a new
 ordinary note. Multiple-item shares, HTML-only shares, and shared document
 streams are not supported. To attach a document, use the paperclip in its note.
 
+Shared text uses Markdown, like notes created in the editor and imported text
+files. Starting with 1.0.5, note cards also render Markdown for notes previously
+shared into 1.0.4; their stored text and modification dates are unchanged.
+
 The two paths have different limits: shared text and its subject are each
 checked against the byte limit above; the text-file character limit applies
 to opened files, not to shared text.

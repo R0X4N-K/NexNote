@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -58,12 +57,12 @@ class ExternalShareImporterTest {
 
     @Test
     fun sharedTextPreservesSubjectBodyAndIndexesTags() = runTest {
-        val text = "https://example.com/\nBody with #shared"
+        val text = "# Shared heading\n**Bold** and [Docs](https://example.com/)\n- [x] Done\n#shared"
         val result = importer().importFrom(textIntent(text).putExtra(Intent.EXTRA_SUBJECT, "Page title"))
         val note = stored(result)
         assertEquals("Page title", note.title)
         assertEquals(text, note.content)
-        assertFalse(note.isMarkdown)
+        assertTrue(note.isMarkdown)
         assertEquals(1234L, note.creationDate)
         assertEquals(listOf("shared"), TagRepositoryImpl(database, database.tagDao(), database.noteContentPatchDao()).getTagsForNote(note.id).first().map { it.name })
     }

@@ -75,7 +75,7 @@ internal class ExternalShareImporter(
             persist(Note(
                 title = title,
                 content = text,
-                isMarkdown = isImage,
+                isMarkdown = true,
                 creationDate = timestamp,
                 lastModifiedDate = timestamp
             ), imageUri)

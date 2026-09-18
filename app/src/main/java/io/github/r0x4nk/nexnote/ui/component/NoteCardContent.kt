@@ -107,13 +107,14 @@ private fun rememberNoteCardTextState(
         if (hasTitle) note.title.take(NOTE_CARD_TITLE_MAX_LENGTH) else untitledLabel
     }
     val effectiveTitleRanges = if (hasTitle) titleHighlightRanges else emptyList()
-    val titleAnnotated = remember(displayTitle, effectiveTitleRanges, markdownColors, note.isMarkdown, imagePlaceholder) {
+    // Match the Markdown-only editor, including notes imported with the legacy false flag.
+    val titleAnnotated = remember(displayTitle, effectiveTitleRanges, markdownColors, imagePlaceholder) {
         buildNoteCardDisplayText(
             sourceText = displayTitle,
             ranges = effectiveTitleRanges,
             colors = markdownColors,
             highlightColor = primaryColor,
-            renderMarkdown = note.isMarkdown,
+            renderMarkdown = true,
             imagePlaceholder = imagePlaceholder
         )
     }
@@ -128,13 +129,13 @@ private fun rememberNoteCardTextState(
             if (safeStart < safeEnd) safeStart..<safeEnd else null
         }
     }
-    val previewAnnotated = remember(previewText, clampedContentRanges, markdownColors, note.isMarkdown, imagePlaceholder) {
+    val previewAnnotated = remember(previewText, clampedContentRanges, markdownColors, imagePlaceholder) {
         buildNoteCardDisplayText(
             sourceText = previewText,
             ranges = clampedContentRanges,
             colors = markdownColors,
             highlightColor = primaryColor,
-            renderMarkdown = note.isMarkdown,
+            renderMarkdown = true,
             imagePlaceholder = imagePlaceholder
         )
     }.takeIf { previewText.isNotBlank() }
