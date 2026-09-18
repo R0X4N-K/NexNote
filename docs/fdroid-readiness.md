@@ -65,3 +65,21 @@ The metadata template retains the earlier build entries and adds 1.0.5.
 The 1.0.4 [F-Droid pipeline #2860628475](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2860628475)
 passed all nine jobs and verified reproducibility. The 1.0.5 server result must
 be recorded separately after its signed APK is published.
+
+## Published APK and upgrade verification — 2026-09-18
+
+The public [1.0.5 release](https://github.com/R0X4N-K/NexNote/releases/tag/v1.0.5)
+contains `NexNote-v1.0.5.apk` (5,995,728 bytes). The downloaded APK's SHA-256
+matches the GitHub asset digest recorded in [release signatures](../signature/README.md).
+`apksigner verify` accepts its v3 signature and unchanged production certificate.
+The package reports version 1.0.5 / code 37 and includes all four expected ABIs.
+Both [upstream CI](https://github.com/R0X4N-K/NexNote/actions/runs/35347801957)
+and the [release workflow](https://github.com/R0X4N-K/NexNote/actions/runs/35347830817)
+passed.
+
+A separate manual upgrade check used the public signed APKs on a Pixel 9 Pro XL
+Android 16 emulator. Three synthetic notes shared into 1.0.4 displayed raw
+Markdown in their cards. Installing 1.0.5 with `adb install -r`, without clearing
+app data or editing those notes, preserved all three and rendered their headings,
+bold text, links, and checklist items correctly. This also verifies the fix in
+the minified production APK, beyond the earlier debug instrumentation tests.

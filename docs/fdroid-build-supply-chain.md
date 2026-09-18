@@ -1,6 +1,6 @@
 # Build and release maintenance
 
-This guide describes NexNote 1.0.5 (code 37), prepared for tag `v1.0.5`.
+This guide describes NexNote 1.0.5 (code 37), released from tag `v1.0.5`.
 
 ## Build configuration
 
