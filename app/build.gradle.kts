@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val baseVersionCode = 36
+val baseVersionCode = 37
 
 val prepareLegalAssets by tasks.registering(Sync::class) {
     from(rootProject.file("LICENSE")) {
@@ -41,7 +41,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = baseVersionCode
-        versionName = "1.0.4"
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

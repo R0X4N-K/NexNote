@@ -1,12 +1,12 @@
 # Build and release maintenance
 
-This guide describes NexNote 1.0.4 (code 36), prepared for tag `v1.0.4`.
+This guide describes NexNote 1.0.5 (code 37), prepared for tag `v1.0.5`.
 
 ## Build configuration
 
 | Setting | Current value |
 | --- | --- |
-| Release version / code | 1.0.4 / 36 |
+| Release version / code | 1.0.5 / 37 |
 | Minimum Android version | API 29 |
 | Compile SDK | 36.1 |
 | Target SDK | 36 |
@@ -74,7 +74,7 @@ existing release tag or replace its APK with different contents.
 
 ## F-Droid
 
-The [metadata template](fdroid-submission-template.yml) targets 1.0.4. It uses
+The [metadata template](fdroid-submission-template.yml) targets 1.0.5. It uses
 `Binaries` to locate the signed upstream APK and `AllowedAPKSigningKeys` to pin
 the [production certificate](../signature/README.md). Update checks read
 `baseVersionCode` and `versionName` from `app/build.gradle.kts`.

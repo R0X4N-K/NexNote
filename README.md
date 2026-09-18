@@ -7,8 +7,8 @@
 NexNote is an Android app for keeping notes on your device. It works without an
 account, a server, or an internet connection. It has no ads or analytics.
 
-This README describes NexNote 1.0.4. See the
-[changelog](CHANGELOG.md#104---2026-09-18) for the changes in this release.
+This README describes NexNote 1.0.5. See the
+[changelog](CHANGELOG.md#105---2026-09-18) for the changes in this release.
 
 ## What you can do
 
@@ -73,7 +73,7 @@ in one Android module.
 | `artwork/` | Logo sources and exports |
 
 The release package is `io.github.r0x4nk.nexnote`; debug adds `.debug`.
-The source version is `1.0.4` / code `36`, released from tag `v1.0.4`.
+The source version is `1.0.5` / code `37`, released from tag `v1.0.5`.
 
 ## Releases and F-Droid
 
@@ -83,9 +83,10 @@ creating a release tag: its version must match the build configuration.
 
 The F-Droid submission is tracked in
 [merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
-The submission remains under review. The local metadata targets 1.0.4;
+The submission remains under review. The local metadata targets 1.0.5;
 F-Droid publication and reproducibility require verification for that release.
-Store screenshots still need to be refreshed for the redesigned interface.
+Store screenshots show the 1.0.5 interface with synthetic example notes; see the
+[asset inventory](docs/fdroid-asset-inventory.md).
 See the [build guide](docs/fdroid-build-supply-chain.md),
 [historical submission record](docs/fdroid-readiness.md), and
 [signing certificate](signature/README.md).

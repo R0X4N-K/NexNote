@@ -35,12 +35,17 @@ physical-dimension profiles are retained.
 
 ## Screenshots
 
-The Fastlane screenshots predate the 1.0.4 restyling. They show the
-release interface with only the
-built-in Checklist template and the synthetic title “Weekly checklist”. They
-contain no personal or third-party content. Both files are 1392×3120 RGBA sRGB
-PNGs and are distributed with NexNote under `GPL-3.0-only`. Replace them with
-screenshots of the release being prepared before publishing new store metadata.
+The Fastlane screenshots were refreshed on 18 September 2026 from the 1.0.5
+(code 37) source, using the debug build on a Pixel 9 Pro XL Android 16 emulator.
+They show the English interface with the default light theme and Violet accent:
+
+- `1.png`: the Notes list with five original synthetic notes and rendered
+  Markdown headings, emphasis, list items, and a completed checklist item.
+- `2.png`: the rendered preview of the synthetic "Weekly checklist" note.
+
+Both are direct, unretouched 1344×2992 PNG captures. Android demo mode fixes the
+status bar at 09:41 and hides notifications. No personal or third-party content
+is included. The screenshots are distributed with NexNote under `GPL-3.0-only`.
 
 ## Distributed assets
 
@@ -53,8 +58,8 @@ screenshots of the release being prepared before publishing new store metadata.
 | `app/src/main/res/drawable/ic_launcher_monochrome.xml` | `EDE7653804F3B0801DB99581F34DF570635AC445682544D0D09E9A351B00CD71` | Single-color derivation of the original silhouette; GPL-3.0-only |
 | both `app/src/main/res/mipmap-anydpi/ic_launcher*.xml` | `ADA31DA9E23F4520F3753E71CA23799A107431473DAA3774B6CECAC26847260C` | Adaptive-icon references to the three layers above |
 | `fastlane/metadata/android/en-US/images/icon.png` | `F49A3A87252F825CBEB4CA165903B6C349E4A2674EC11A53FAB9174015841E36` | Production rendering of the same identity; GPL-3.0-only |
-| `fastlane/metadata/android/en-US/images/phoneScreenshots/1.png` | `55A9433943FF4EA7075F6D51D171F1C1D20AB24067287140AD1D04685719DA7D` | Project screenshot with synthetic content; GPL-3.0-only |
-| `fastlane/metadata/android/en-US/images/phoneScreenshots/2.png` | `23C27498F193A1EAA9C842CA12B708200585872F055AA606586823D99BE421D7` | Project screenshot without user content; GPL-3.0-only |
+| `fastlane/metadata/android/en-US/images/phoneScreenshots/1.png` | `5ECBC9C09139D9D75C7D31BDBEBA3DEDF14373FA3EFC57E68178E9015E7D3B04` | Project screenshot with synthetic content; GPL-3.0-only |
+| `fastlane/metadata/android/en-US/images/phoneScreenshots/2.png` | `0DAB199C09AB0B9CB54DA2CD4C47E108E9E268A2D849DEEB3C2C7119C2D257A9` | Project screenshot with synthetic checklist; GPL-3.0-only |
 
 Source vectors, production exports, and the visual validation sheet are retained
 under `artwork/`; `artwork/README.md` describes their relationships.

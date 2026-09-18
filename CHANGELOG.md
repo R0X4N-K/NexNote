@@ -6,6 +6,17 @@ The format follows Keep a Changelog, and this project uses semantic versioning.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-09-18
+
+### Fixed
+
+- Render Markdown consistently in note cards, including text shared into 1.0.4.
+- Save newly shared text as Markdown, matching the editor and text-file imports.
+
+### Changed
+
+- Refresh store screenshots with the current interface and synthetic example notes.
+
 ## [1.0.4] - 2026-09-18
 
 ### Added

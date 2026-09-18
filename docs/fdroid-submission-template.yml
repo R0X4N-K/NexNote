@@ -28,10 +28,17 @@ Builds:
     gradle:
       - yes
 
+  - versionName: 1.0.5
+    versionCode: 37
+    commit: v1.0.5
+    subdir: app
+    gradle:
+      - yes
+
 AllowedAPKSigningKeys: 74c22d14ebe94c04469a6eb546ea93496ec9eb723d71755b7a035118a64878a4
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[\d.]+$
 UpdateCheckData: app/build.gradle.kts|baseVersionCode\s*=\s*(\d+)|.|versionName\s*=\s*"([^"]+)"
-CurrentVersion: 1.0.4
-CurrentVersionCode: 36
+CurrentVersion: 1.0.5
+CurrentVersionCode: 37

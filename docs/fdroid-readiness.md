@@ -50,3 +50,18 @@ retaining the 1.0.3 build entry and the production signing certificate.
 The earlier results above remain historical evidence only. Verification of
 1.0.4 on F-Droid and replacement of the pre-restyling store screenshots
 remain separate release checks.
+
+## Markdown preview fix and screenshot refresh — 2026-09-18
+
+Version 1.0.5 (code 37, tag v1.0.5) corrects Markdown card previews for shared
+text, including existing notes imported by 1.0.4. The source-side `ci` checks
+pass all 947 JVM tests. Eleven focused Android tests passed on an Android 16
+emulator, covering shared-text persistence, legacy card previews, and cold/warm
+share intents. These are focused device results, not a full device-suite run.
+
+The two Fastlane screenshots now show the 1.0.5 interface and synthetic notes;
+see the [asset inventory](fdroid-asset-inventory.md) for capture details and hashes.
+The metadata template retains the earlier build entries and adds 1.0.5.
+The 1.0.4 [F-Droid pipeline #2860628475](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2860628475)
+passed all nine jobs and verified reproducibility. The 1.0.5 server result must
+be recorded separately after its signed APK is published.

@@ -1,0 +1,2 @@
+- Markdown previews now work for notes shared from other apps, including existing notes.
+- Newly shared text uses the same Markdown format as the editor.
