@@ -83,8 +83,10 @@ creating a release tag: its version must match the build configuration.
 
 The F-Droid submission is tracked in
 [merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620).
-The submission remains under review. The local metadata targets 1.0.5;
-F-Droid publication and reproducibility require verification for that release.
+The submission remains under review. The metadata targets 1.0.5;
+[F-Droid's build job](https://gitlab.com/R0X4N-K/fdroiddata/-/jobs/16595014854)
+verified its reproducibility against the upstream-signed APK. Publication awaits
+the F-Droid maintainers' review and merge.
 Store screenshots show the 1.0.5 interface with synthetic example notes; see the
 [asset inventory](docs/fdroid-asset-inventory.md).
 See the [build guide](docs/fdroid-build-supply-chain.md),

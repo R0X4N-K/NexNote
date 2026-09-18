@@ -83,3 +83,19 @@ Markdown in their cards. Installing 1.0.5 with `adb install -r`, without clearin
 app data or editing those notes, preserved all three and rendered their headings,
 bold text, links, and checklist items correctly. This also verifies the fix in
 the minified production APK, beyond the earlier debug instrumentation tests.
+
+A new note shared into the signed 1.0.5 APK also rendered its Markdown heading,
+bold text, and checked list item correctly.
+
+## F-Droid reproducibility verification — 2026-09-18
+
+The existing [merge request !46620](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/46620)
+now includes [commit 667a7970](https://gitlab.com/R0X4N-K/fdroiddata/-/commit/667a7970297783cc815522cf7e8ae81c8dbac38f),
+adding 1.0.5 / code 37 / tag v1.0.5 without changing the pinned signing key.
+The local submission template matches that metadata apart from its introductory
+comment. The [build job](https://gitlab.com/R0X4N-K/fdroiddata/-/jobs/16595014854)
+successfully compared the rebuilt code-37 APK with the supplied reference binary
+and accepted the production signer. It also reverified the historical builds 35
+and 36. [Pipeline #2862358067](https://gitlab.com/R0X4N-K/fdroiddata/-/pipelines/2862358067)
+passed all nine jobs, including `fdroid build`, `check apk`, `checkupdates`, and
+`fdroid rewritemeta`. F-Droid publication remains pending maintainer review and merge.
